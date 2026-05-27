@@ -1,41 +1,72 @@
-.collections-view {
-  padding: 24px;
-  max-width: 900px;
-}
-
-.collections-empty {
+.collections-home {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--color-text-secondary);
+  padding: 48px;
 }
 
-.collections-empty h2 {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 8px;
+.home-hero {
+  text-align: center;
+  max-width: 420px;
+}
+
+.home-icon {
+  margin-bottom: 20px;
+}
+
+.home-hero h2 {
+  font-size: 22px;
+  font-weight: 700;
   color: var(--color-text);
+  margin-bottom: 8px;
 }
 
-.collections-empty p {
+.home-hero p {
   font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
 }
 
-.collections-loading,
+.collections-view {
+  padding: 12px 0;
+  max-width: 900px;
+}
+
+.collections-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 24px;
+}
+
+.collections-skeleton {
+  height: 14px;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .collections-error {
   padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: #e03131;
+}
+
+.collections-empty-list {
+  padding: 48px 24px;
   text-align: center;
   font-size: 14px;
   color: var(--color-text-muted);
 }
 
-.collections-error {
-  color: #e03131;
-}
-
-.document-list {
+.document-tree {
   padding: 0;
 }
 
@@ -43,29 +74,40 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 14px;
+  padding: 7px 24px;
+  text-decoration: none;
   color: var(--color-text);
-  text-align: left;
+  font-size: 14px;
   transition: background 0.1s;
+  border-radius: 0;
 }
 
 .document-tree-item:hover {
   background: var(--color-bg-secondary);
 }
 
-.document-tree-emoji {
+.document-tree-icon {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.document-tree-emoji {
   font-size: 16px;
+  line-height: 1;
+}
+
+.document-tree-doc-icon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
 }
 
 .document-tree-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.4;
 }

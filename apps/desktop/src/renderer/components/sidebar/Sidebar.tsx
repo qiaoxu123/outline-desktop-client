@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { useUIStore, useProfileStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import type { OutlineCollection } from "@outline/shared-types";
@@ -10,10 +11,12 @@ interface CollectionListResponse {
 
 export default function Sidebar(): React.ReactElement {
   const api = useElectronAPI();
+  const navigate = useNavigate();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const selectedCollectionId = useUIStore((s) => s.selectedCollectionId);
   const selectCollection = useUIStore((s) => s.selectCollection);
   const profiles = useProfileStore((s) => s.profiles);
+  const activeProfile = profiles.find((p) => p.id === activeProfileId);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["profile", activeProfileId, "collections"],
@@ -22,49 +25,73 @@ export default function Sidebar(): React.ReactElement {
     enabled: !!activeProfileId,
   });
 
-  if (!activeProfileId) {
-    return (
-      <div className="sidebar-empty">
-        <p>No workspace selected</p>
-        <a href="#/settings" className="sidebar-link">
-          Add a workspace in Settings
-        </a>
-      </div>
-    );
-  }
-
   const collections = data?.data ?? [];
 
   return (
     <div className="sidebar">
-      <div className="sidebar-section">
-        <div className="sidebar-section-header">
-          <span>Collections</span>
-        </div>
-        {isLoading && <div className="sidebar-loading">Loading…</div>}
-        {error && (
-          <div className="sidebar-error">Failed to load collections</div>
-        )}
-        <ul className="sidebar-tree">
-          {collections.map((col) => (
-            <li
-              key={col.id}
-              className={`sidebar-tree-item ${selectedCollectionId === col.id ? "active" : ""}`}
-              onClick={() => selectCollection(col.id)}
-            >
-              <span
-                className="sidebar-collection-color"
-                style={{ backgroundColor: col.color || "#4c6ef5" }}
-              />
-              <span className="sidebar-collection-name">{col.name}</span>
-            </li>
-          ))}
-        </ul>
+      <div className="sidebar-header">
+        <a
+          href="#/"
+          className={`sidebar-home-link ${!selectedCollectionId ? "active" : ""}`}
+          onClick={() => selectCollection(null)}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+            <path d="M9 1L2 5v8l7 4 7-4V5L9 1z" />
+          </svg>
+          <span>Home</span>
+        </a>
       </div>
+
+      <div className="sidebar-body">
+        {isLoading && (
+          <div className="sidebar-loading">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="sidebar-skeleton"
+                style={{ width: `${60 + Math.random() * 30}%` }}
+              />
+            ))}
+          </div>
+        )}
+        {error && (
+          <div className="sidebar-error">
+            <p>Failed to load collections</p>
+          </div>
+        )}
+        {!isLoading && !error && (
+          <div className="sidebar-collections">
+            {collections.map((col) => (
+              <a
+                key={col.id}
+                href={`#/collection/${col.id}`}
+                className={`sidebar-collection-item ${selectedCollectionId === col.id ? "active" : ""}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  selectCollection(col.id);
+                  navigate(`/collection/${col.id}`);
+                }}
+              >
+                <span
+                  className="sidebar-collection-dot"
+                  style={{ backgroundColor: col.color || "#4c6ef5" }}
+                />
+                <span className="sidebar-collection-name">{col.name}</span>
+                {col.documentCount !== undefined && col.documentCount > 0 && (
+                  <span className="sidebar-collection-count">
+                    {col.documentCount}
+                  </span>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="sidebar-footer">
-        <div className="sidebar-footer-info">
-          {profiles.find((p) => p.id === activeProfileId)?.name}
-        </div>
+        <span className="sidebar-footer-name">
+          {activeProfile?.name || "Outline"}
+        </span>
       </div>
     </div>
   );

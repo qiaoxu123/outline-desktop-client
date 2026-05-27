@@ -1,13 +1,8 @@
 import { useUIStore } from "../../state/uiStore";
-import { useProfileStore } from "../../state/uiStore";
 import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
-  const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const profiles = useProfileStore((s) => s.profiles);
-  const activeProfile = profiles.find((p) => p.id === activeProfileId);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
 
   return (
     <header className="titlebar" style={{ paddingLeft: "80px" }}>
@@ -21,23 +16,7 @@ export default function TitleBar(): React.ReactElement {
             <path d="M2 3h12v1.5H2V3zm0 4h12v1.5H2V7zm0 4h8v1.5H2V11z" />
           </svg>
         </button>
-        <span className="titlebar-app-name">Outline Desktop</span>
-      </div>
-      <div className="titlebar-center">
-        <select
-          className="titlebar-profile-select"
-          value={activeProfileId ?? ""}
-          onChange={(e) => setActiveProfileId(e.target.value || null)}
-        >
-          <option value="" disabled>
-            Select workspace…
-          </option>
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <span className="titlebar-app-name">Outline</span>
       </div>
       <div className="titlebar-right">
         <a href="#/search" className="titlebar-button" title="Search">
