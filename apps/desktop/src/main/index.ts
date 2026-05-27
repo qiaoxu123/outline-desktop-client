@@ -5,7 +5,6 @@ import { registerProfileHandlers } from "./ipc/handlers/profiles";
 import { registerCollectionHandlers } from "./ipc/handlers/collections";
 import { registerDocumentHandlers } from "./ipc/handlers/documents";
 import { registerAuthHandlers } from "./ipc/handlers/auth";
-import { ensureDefaultProfile } from "./services/outlineApi/preconfigure";
 
 // Set proxy for main process Node.js fetch calls
 process.env.https_proxy = "http://127.0.0.1:7897";
@@ -65,7 +64,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  ensureDefaultProfile();
   registerAllIpcHandlers();
   createMainWindow();
 
