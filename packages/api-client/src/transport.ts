@@ -1,4 +1,5 @@
 import https from "node:https";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { OutlineApiError, AuthError, NetworkError } from "./errors";
 
 export interface TransportConfig {
@@ -7,36 +8,23 @@ export interface TransportConfig {
   timeoutMs?: number;
 }
 
-function createHttpsAgent(): https.Agent {
+function createAgent(): https.Agent | HttpsProxyAgent<string> {
+  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || "";
+
+  if (proxyUrl) {
+    return new HttpsProxyAgent(proxyUrl, {
+      rejectUnauthorized: false,
+    });
+  }
+
   return new https.Agent({ rejectUnauthorized: false });
 }
 
-const sharedAgent = createHttpsAgent();
+let _agent: https.Agent | HttpsProxyAgent<string> | null = null;
 
-async function createFetchDispatcher(): Promise<unknown | undefined> {
-  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || "";
-  if (!proxyUrl) return undefined;
-
-  try {
-    // Use undici ProxyAgent for proxy support
-    const { ProxyAgent } = await import("undici");
-    return new ProxyAgent({
-      uri: proxyUrl,
-      proxyTls: { rejectUnauthorized: false },
-      requestTls: { rejectUnauthorized: false },
-    });
-  } catch {
-    return undefined;
-  }
-}
-
-let dispatcherPromise: Promise<unknown | undefined> | null = null;
-
-function getDispatcher(): Promise<unknown | undefined> {
-  if (!dispatcherPromise) {
-    dispatcherPromise = createFetchDispatcher();
-  }
-  return dispatcherPromise;
+function getAgent(): https.Agent | HttpsProxyAgent<string> {
+  if (!_agent) _agent = createAgent();
+  return _agent;
 }
 
 export async function apiRequest<T = unknown>(
@@ -55,7 +43,7 @@ export async function apiRequest<T = unknown>(
     : controller.signal;
 
   try {
-    const fetchOptions: Record<string, unknown> = {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -64,14 +52,9 @@ export async function apiRequest<T = unknown>(
       },
       body: JSON.stringify(params),
       signal: linkedSignal,
-    };
-
-    const dispatcher = await getDispatcher();
-    if (dispatcher) {
-      fetchOptions.dispatcher = dispatcher;
-    }
-
-    const response = await fetch(url, fetchOptions);
+      // @ts-expect-error - dispatcher is Node.js fetch's undici option
+      dispatcher: getAgent(),
+    });
 
     clearTimeout(timeoutId);
 

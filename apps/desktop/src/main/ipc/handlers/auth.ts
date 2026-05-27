@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from "electron";
+import { ipcMain, BrowserWindow, session } from "electron";
 
 const OUTLINE_URL = "https://notes.jlu-mcns.site";
 
@@ -6,167 +6,124 @@ function ok<T>(data: T) {
   return { ok: true as const, data };
 }
 
-function fail(code: string, message: string, retryable = false) {
-  return { ok: false as const, error: { code, message, retryable } };
+function fail(code: string, message: string) {
+  return { ok: false as const, error: { code, message } };
 }
 
 export function registerAuthHandlers(): void {
   ipcMain.handle("auth:loginWithBrowser", async () => {
-    let authWindow: BrowserWindow | null = null;
+    const ses = session.defaultSession;
+
+    // Configure proxy on the default session
+    await ses.setProxy({ proxyRules: "http://127.0.0.1:7897" });
+
+    // Allow all certs
+    ses.setCertificateVerifyProc((_request, cb) => cb(0));
+
+    let authWindow: BrowserWindow | null = new BrowserWindow({
+      width: 900,
+      height: 700,
+      title: "Outline — Sign In",
+      webPreferences: {
+        session: ses,
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+      },
+    });
 
     return new Promise((resolve) => {
-      authWindow = new BrowserWindow({
-        width: 900,
-        height: 700,
-        title: "Outline Login",
-        webPreferences: {
-          // Use default session to inherit proxy settings from commandLine
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-        },
-      });
+      if (!authWindow) {
+        resolve(fail("ERROR", "Failed to create window"));
+        return;
+      }
 
-      const cleanup = () => {
-        if (authWindow && !authWindow.isDestroyed()) {
-          authWindow.close();
-        }
-        authWindow = null;
-      };
+      const w = authWindow;
 
       const timeout = setTimeout(() => {
-        cleanup();
-        resolve(fail("TIMEOUT", "Login timed out. Please try again.", true));
-      }, 300_000); // 5 minutes
+        if (!w.isDestroyed()) w.close();
+        resolve(fail("TIMEOUT", "Login timed out (5 minutes)"));
+      }, 300_000);
 
-      // Handle page load failures
-      authWindow.webContents.on(
-        "did-fail-load",
-        (_event, errorCode, errorDescription, validatedURL) => {
-          console.error("auth window load error:", errorCode, errorDescription, validatedURL);
-          // Only fail if it's the initial load, not OIDC redirects
-          if (validatedURL === OUTLINE_URL || validatedURL.startsWith(OUTLINE_URL)) {
-            // ERR_CERT_AUTHORITY_INVALID, ERR_PROXY_CONNECTION_FAILED, etc.
-            if (errorCode < 0) {
-              clearTimeout(timeout);
-              cleanup();
-              resolve(
-                fail(
-                  "LOAD_ERROR",
-                  `Failed to load login page: ${errorDescription}. Error code: ${errorCode}`,
-                  true,
-                ),
-              );
-            }
-          }
-        },
-      );
-
-      // Monitor navigation to detect successful login
-      authWindow.webContents.on("did-navigate", async (_event, url: string) => {
-        // After successful login, the user will be redirected to the Outline workspace
-        // URL will be like https://notes.jlu-mcns.site/home or /doc/...
-        if (
-          url.startsWith(OUTLINE_URL) &&
-          !url.includes("/auth/") &&
-          !url.includes("/login")
-        ) {
-          try {
-            const cookies = await authWindow!.webContents.session.cookies.get({
-              url: OUTLINE_URL,
-            });
-
-            // Try to find the access token cookie
-            const accessToken = cookies.find(
-              (c) =>
-                c.name === "accessToken" ||
-                c.name === "idToken" ||
-                c.name === "session",
-            );
-
-            if (accessToken) {
-              clearTimeout(timeout);
-              cleanup();
-              resolve(
-                ok({
-                  token: accessToken.value,
-                  cookieName: accessToken.name,
-                }),
-              );
-              return;
-            }
-
-            // Try localStorage
-            let localStorageToken: string | null = null;
-            if (authWindow && !authWindow.isDestroyed()) {
-              try {
-                localStorageToken = await authWindow.webContents.executeJavaScript(
-                  `
-                  (function() {
-                    try {
-                      var keys = Object.keys(localStorage);
-                      for (var i = 0; i < keys.length; i++) {
-                        var k = keys[i];
-                        if (k.indexOf('token') !== -1 || k.indexOf('session') !== -1 || k.indexOf('auth') !== -1) {
-                          return localStorage.getItem(k);
-                        }
-                      }
-                    } catch(e) {}
-                    return null;
-                  })()
-                `,
-                );
-              } catch {
-                // executeJavaScript may fail if page unloaded
-              }
-            }
-
-            clearTimeout(timeout);
-            cleanup();
-
-            if (localStorageToken) {
-              resolve(ok({ token: localStorageToken, cookieName: "localStorage" }));
-            } else {
-              // Fall back to using all cookies as a token string
-              const cookieStr = cookies
-                .map((c) => `${c.name}=${c.value}`)
-                .join("; ");
-              if (cookieStr) {
-                resolve(ok({ token: cookieStr, cookieName: "cookies" }));
-              } else {
-                resolve(
-                  fail(
-                    "NO_TOKEN",
-                    "Login succeeded but no auth token found. Please navigate to a document page in the browser before closing it.",
-                  ),
-                );
-              }
-            }
-          } catch (err) {
-            clearTimeout(timeout);
-            cleanup();
-            resolve(
-              fail("ERROR", `Login error: ${err instanceof Error ? err.message : "Unknown"}`),
-            );
-          }
+      w.webContents.on("did-fail-load", (_e, code, desc, url) => {
+        console.error("[auth] load fail:", code, desc, url);
+        if (url === OUTLINE_URL || url === OUTLINE_URL + "/") {
+          clearTimeout(timeout);
+          if (!w.isDestroyed()) w.close();
+          resolve(fail("LOAD_ERROR", `Page load failed: ${desc} (${code})`));
         }
       });
 
-      authWindow.on("closed", () => {
-        clearTimeout(timeout);
-        authWindow = null;
-        // If the promise hasn't resolved yet, it means the user closed without logging in
-        resolve(fail("CANCELLED", "Login was cancelled"));
+      w.webContents.on("did-finish-load", () => {
+        console.log("[auth] page loaded:", w.webContents.getURL());
       });
 
-      // Load Outline login page
-      authWindow.loadURL(OUTLINE_URL).catch((err) => {
-        clearTimeout(timeout);
-        cleanup();
-        resolve(
-          fail("LOAD_ERROR", `Failed to load: ${err.message}`, true),
-        );
+      w.webContents.on("did-navigate", async (_e, url: string) => {
+        // After login, the OIDC flow brings the user back to Outline workspace
+        if (!url.startsWith(OUTLINE_URL)) return;
+        // Still on auth page
+        if (url.includes("/auth/")) return;
+
+        // User is back on Outline workspace → login complete
+        try {
+          const cookies = await ses.cookies.get({ url: OUTLINE_URL });
+
+          const token = cookies.find(
+            (c) => c.name === "accessToken" || c.name === "idToken",
+          );
+
+          if (token) {
+            clearTimeout(timeout);
+            if (!w.isDestroyed()) w.close();
+            resolve(ok({ token: token.value, cookieName: token.name }));
+            return;
+          }
+
+          // Try localStorage
+          let localToken: string | null = null;
+          if (!w.isDestroyed()) {
+            try {
+              localToken = await w.webContents.executeJavaScript(`
+                (function(){
+                  try{
+                    var k=Object.keys(localStorage);
+                    for(var i=0;i<k.length;i++){
+                      if(k[i].indexOf('token')!==-1) return localStorage.getItem(k[i]);
+                    }
+                  }catch(e){}
+                  return null;
+                })()
+              `);
+            } catch {}
+          }
+
+          clearTimeout(timeout);
+          if (!w.isDestroyed()) w.close();
+
+          if (localToken) {
+            resolve(ok({ token: localToken, cookieName: "localStorage" }));
+          } else {
+            const str = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+            if (str) {
+              resolve(ok({ token: str, cookieName: "cookies" }));
+            } else {
+              resolve(fail("NO_TOKEN", "No auth token found. Please try again."));
+            }
+          }
+        } catch (err) {
+          clearTimeout(timeout);
+          if (!w.isDestroyed()) w.close();
+          resolve(fail("ERROR", err instanceof Error ? err.message : "Failed"));
+        }
       });
+
+      w.on("closed", () => {
+        clearTimeout(timeout);
+        authWindow = null;
+        resolve(fail("CANCELLED", "Login window was closed"));
+      });
+
+      w.loadURL(OUTLINE_URL);
     });
   });
 }

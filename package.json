@@ -16,6 +16,7 @@
     "packages/ui"
   ],
   "dependencies": {
-    "electron": "^42.0.0"
+    "electron": "^42.0.0",
+    "https-proxy-agent": "^9.0.0"
   }
 }
