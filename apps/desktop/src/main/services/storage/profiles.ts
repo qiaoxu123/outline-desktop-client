@@ -38,3 +38,24 @@ export function findProfile(id: string): StoredProfile | undefined {
   const profiles = readProfiles();
   return profiles.find((p) => p.id === id);
 }
+
+/** Network config for API calls from the main process */
+export interface NetworkConfig {
+  caCertPath: string;
+  proxyUrl: string;
+}
+
+const DEFAULT_NETWORK: NetworkConfig = {
+  caCertPath: "", // Will be set at runtime
+  proxyUrl: "",
+};
+
+let networkConfig: NetworkConfig = DEFAULT_NETWORK;
+
+export function getNetworkConfig(): NetworkConfig {
+  return networkConfig;
+}
+
+export function setNetworkConfig(config: Partial<NetworkConfig>): void {
+  networkConfig = { ...networkConfig, ...config };
+}

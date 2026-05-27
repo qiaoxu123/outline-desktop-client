@@ -15,6 +15,9 @@ export interface ElectronAPI {
   documents: {
     info: (profileId: string, documentId: string) => Promise<unknown>;
   };
+  auth: {
+    loginWithBrowser: () => Promise<unknown>;
+  };
 }
 
 const api: ElectronAPI = {
@@ -35,6 +38,9 @@ const api: ElectronAPI = {
   documents: {
     info: (profileId, documentId) =>
       ipcRenderer.invoke("documents:info", { profileId, documentId }),
+  },
+  auth: {
+    loginWithBrowser: () => ipcRenderer.invoke("auth:loginWithBrowser"),
   },
 };
 

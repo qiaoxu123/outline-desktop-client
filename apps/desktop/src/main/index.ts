@@ -4,11 +4,18 @@ import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { registerProfileHandlers } from "./ipc/handlers/profiles";
 import { registerCollectionHandlers } from "./ipc/handlers/collections";
 import { registerDocumentHandlers } from "./ipc/handlers/documents";
+import { registerAuthHandlers } from "./ipc/handlers/auth";
+
+// Set proxy for main process Node.js fetch calls
+process.env.https_proxy = process.env.https_proxy || "http://127.0.0.1:7897";
+process.env.http_proxy = process.env.http_proxy || "http://127.0.0.1:7897";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 function registerAllIpcHandlers(): void {
   registerProfileHandlers();
   registerCollectionHandlers();
   registerDocumentHandlers();
+  registerAuthHandlers();
 }
 
 function createMainWindow(): BrowserWindow {
@@ -45,6 +52,10 @@ function createMainWindow(): BrowserWindow {
 
   return mainWindow;
 }
+
+// Use system proxy for all network requests (main process + renderer)
+app.commandLine.appendSwitch("proxy-server", "127.0.0.1:7897");
+app.commandLine.appendSwitch("ignore-certificate-errors");
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId("com.outline.desktop");

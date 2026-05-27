@@ -54,49 +54,26 @@
 }
 
 .login-form {
-  text-align: left;
+  text-align: center;
 }
 
-.login-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
+.login-description {
+  font-size: 14px;
   color: #495057;
-  margin-bottom: 6px;
-}
-
-.login-input {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  font-size: 15px;
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif);
-  color: #212529;
-  background: #f8f9fa;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.login-input:focus {
-  border-color: #4c6ef5;
-  box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.15);
-  background: white;
-}
-
-.login-input::placeholder {
-  color: #adb5bd;
+  margin-bottom: 20px;
+  line-height: 1.6;
 }
 
 .login-hint {
-  margin-top: 6px;
+  margin-top: 16px;
   font-size: 12px;
   color: #adb5bd;
+  line-height: 1.5;
 }
 
 .login-error {
-  margin-top: 12px;
-  padding: 8px 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
   background: #fff5f5;
   border: 1px solid #ffc9c9;
   border-radius: 8px;
@@ -105,9 +82,12 @@
 }
 
 .login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  margin-top: 20px;
-  padding: 12px 24px;
+  padding: 14px 24px;
   border: none;
   border-radius: 10px;
   background: #4c6ef5;
@@ -127,6 +107,19 @@
 }
 
 .login-button:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+.login-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

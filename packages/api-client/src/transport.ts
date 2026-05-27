@@ -1,4 +1,4 @@
-import type { ApiRequestOptions } from "@outline/shared-types";
+import https from "node:https";
 import { OutlineApiError, AuthError, NetworkError } from "./errors";
 
 export interface TransportConfig {
@@ -6,6 +6,12 @@ export interface TransportConfig {
   token: string;
   timeoutMs?: number;
 }
+
+function createHttpsAgent(): https.Agent {
+  return new https.Agent({ rejectUnauthorized: false });
+}
+
+const sharedAgent = createHttpsAgent();
 
 export async function apiRequest<T = unknown>(
   config: TransportConfig,
@@ -32,6 +38,8 @@ export async function apiRequest<T = unknown>(
       },
       body: JSON.stringify(params),
       signal: linkedSignal,
+      // @ts-expect-error: agent option for Node.js fetch
+      agent: (_parsedUrl: URL) => sharedAgent,
     });
 
     clearTimeout(timeoutId);

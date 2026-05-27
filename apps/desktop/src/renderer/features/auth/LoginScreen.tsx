@@ -10,32 +10,27 @@ export default function LoginScreen(): React.ReactElement {
   const api = useElectronAPI();
   const addProfile = useProfileStore((s) => s.addProfile);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
-  const [apiKey, setApiKey] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState("");
 
-  const handleConnect = async () => {
-    const trimmed = apiKey.trim();
-    if (!trimmed) {
-      setError("请输入 API Token");
-      return;
-    }
-
+  const handleBrowserLogin = async () => {
     setConnecting(true);
     setError("");
 
     try {
-      const result = (await api.profiles.testConnection({
-        serverUrl: SERVER_URL,
-        apiKey: trimmed,
-      })) as { ok: boolean; error?: { message: string } };
+      const result = (await api.auth.loginWithBrowser()) as {
+        ok: boolean;
+        data?: { token: string; cookieName: string };
+        error?: { message: string };
+      };
 
-      if (result.ok) {
+      if (result.ok && result.data?.token) {
+        // Save the profile with the captured token
         const createResult = (await api.profiles.create({
           name: SERVER_NAME,
           serverUrl: SERVER_URL,
-          apiKey: trimmed,
-        })) as { ok: boolean; data?: { id: string } };
+          apiKey: result.data.token,
+        })) as { ok: boolean; data?: { id: string }; error?: { message: string } };
 
         if (createResult.ok && createResult.data) {
           addProfile({
@@ -46,20 +41,16 @@ export default function LoginScreen(): React.ReactElement {
           });
           setActiveProfileId(createResult.data.id);
         } else {
-          setError("保存配置失败");
+          setError(createResult.error?.message || "Failed to save login");
         }
       } else {
-        setError(result.error?.message || "连接失败，请检查 API Token");
+        setError(result.error?.message || "Login failed. Please try again.");
       }
     } catch {
-      setError("网络错误，请检查连接");
+      setError("Network error. Please check your connection.");
     } finally {
       setConnecting(false);
     }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleConnect();
   };
 
   return (
@@ -97,36 +88,32 @@ export default function LoginScreen(): React.ReactElement {
         </div>
 
         <div className="login-form">
-          <label className="login-label" htmlFor="api-key">
-            API Token
-          </label>
-          <input
-            id="api-key"
-            className="login-input"
-            type="password"
-            placeholder="ol_api_..."
-            value={apiKey}
-            onChange={(e) => {
-              setApiKey(e.target.value);
-              setError("");
-            }}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            disabled={connecting}
-          />
-          <p className="login-hint">
-            在 Outline 设置 → API 中创建个人 Token
+          <p className="login-description">
+            Sign in with your web browser — just like you do on the Outline
+            website.
           </p>
 
           {error && <p className="login-error">{error}</p>}
 
           <button
             className="login-button"
-            onClick={handleConnect}
-            disabled={connecting || !apiKey.trim()}
+            onClick={handleBrowserLogin}
+            disabled={connecting}
           >
-            {connecting ? "连接中…" : "连接知识库"}
+            {connecting ? (
+              <>
+                <span className="login-spinner" />
+                Waiting for login…
+              </>
+            ) : (
+              "Sign in with Browser"
+            )}
           </button>
+
+          <p className="login-hint">
+            A browser window will open. After signing in, this window will
+            close automatically.
+          </p>
         </div>
       </div>
     </div>
