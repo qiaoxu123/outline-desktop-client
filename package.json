@@ -1,0 +1,21 @@
+{
+  "name": "outline-desktop-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop client for Outline knowledge base",
+  "scripts": {
+    "dev": "npm run dev -w apps/desktop",
+    "build": "npm run build -w apps/desktop",
+    "lint": "npm run lint -w apps/desktop",
+    "typecheck": "npm run typecheck -w apps/desktop"
+  },
+  "workspaces": [
+    "apps/desktop",
+    "packages/shared-types",
+    "packages/api-client",
+    "packages/ui"
+  ],
+  "dependencies": {
+    "electron": "^42.0.0"
+  }
+}

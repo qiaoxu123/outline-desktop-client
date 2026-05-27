@@ -1,0 +1,139 @@
+.settings-view {
+  padding: 24px 32px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.settings-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.settings-section {
+  margin-bottom: 32px;
+}
+
+.settings-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.settings-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.profiles-list {
+  margin-bottom: 16px;
+}
+
+.profiles-empty {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  padding: 12px 0;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.profile-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-card-info strong {
+  font-size: 14px;
+}
+
+.profile-card-url {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.profile-card-remove {
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: #e03131;
+  cursor: pointer;
+}
+
+.profile-card-remove:hover {
+  background: #fff0f0;
+}
+
+.add-profile-form {
+  padding: 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+
+.add-profile-form h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.form-field {
+  margin-bottom: 12px;
+}
+
+.form-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+}
+
+.form-field input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+}
+
+.form-field input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.12);
+}
+
+.form-error {
+  font-size: 13px;
+  color: #e03131;
+  margin-bottom: 8px;
+}
+
+.form-submit {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.form-submit:hover {
+  background: var(--color-primary-hover);
+}

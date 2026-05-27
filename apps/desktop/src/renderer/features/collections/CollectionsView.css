@@ -1,0 +1,71 @@
+.collections-view {
+  padding: 24px;
+  max-width: 900px;
+}
+
+.collections-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-secondary);
+}
+
+.collections-empty h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--color-text);
+}
+
+.collections-empty p {
+  font-size: 14px;
+}
+
+.collections-loading,
+.collections-error {
+  padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.collections-error {
+  color: #e03131;
+}
+
+.document-list {
+  padding: 0;
+}
+
+.document-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text);
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.document-tree-item:hover {
+  background: var(--color-bg-secondary);
+}
+
+.document-tree-emoji {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.document-tree-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
