@@ -13,6 +13,32 @@ function createHttpsAgent(): https.Agent {
 
 const sharedAgent = createHttpsAgent();
 
+async function createFetchDispatcher(): Promise<unknown | undefined> {
+  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || "";
+  if (!proxyUrl) return undefined;
+
+  try {
+    // Use undici ProxyAgent for proxy support
+    const { ProxyAgent } = await import("undici");
+    return new ProxyAgent({
+      uri: proxyUrl,
+      proxyTls: { rejectUnauthorized: false },
+      requestTls: { rejectUnauthorized: false },
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+let dispatcherPromise: Promise<unknown | undefined> | null = null;
+
+function getDispatcher(): Promise<unknown | undefined> {
+  if (!dispatcherPromise) {
+    dispatcherPromise = createFetchDispatcher();
+  }
+  return dispatcherPromise;
+}
+
 export async function apiRequest<T = unknown>(
   config: TransportConfig,
   method: string,
@@ -29,7 +55,7 @@ export async function apiRequest<T = unknown>(
     : controller.signal;
 
   try {
-    const response = await fetch(url, {
+    const fetchOptions: Record<string, unknown> = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -38,9 +64,14 @@ export async function apiRequest<T = unknown>(
       },
       body: JSON.stringify(params),
       signal: linkedSignal,
-      // @ts-expect-error: agent option for Node.js fetch
-      agent: (_parsedUrl: URL) => sharedAgent,
-    });
+    };
+
+    const dispatcher = await getDispatcher();
+    if (dispatcher) {
+      fetchOptions.dispatcher = dispatcher;
+    }
+
+    const response = await fetch(url, fetchOptions);
 
     clearTimeout(timeoutId);
 
