@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, net, shell } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
+import { setFetchImplementation } from "@outline/api-client";
 import { registerProfileHandlers } from "./ipc/handlers/profiles";
 import { registerCollectionHandlers } from "./ipc/handlers/collections";
 import { registerDocumentHandlers } from "./ipc/handlers/documents";
@@ -69,6 +70,15 @@ function createMainWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId("com.outline.desktop");
+
+  // Route ALL Outline API calls through Chromium's network stack (net.fetch)
+  // instead of Node's undici fetch. On some machines undici fails with
+  // "fetch failed" (TLS chain / DNS / IPv6 differences) while Chromium —
+  // which demonstrably loads the login window — connects fine.
+  setFetchImplementation(
+    ((input: RequestInfo | URL, init?: RequestInit) =>
+      net.fetch(input as string, init)) as typeof fetch,
+  );
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);

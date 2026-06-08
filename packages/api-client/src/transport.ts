@@ -7,6 +7,21 @@ export interface TransportConfig {
   timeoutMs?: number;
 }
 
+type FetchFn = typeof globalThis.fetch;
+
+/**
+ * Injectable fetch implementation. In the Electron main process Node's
+ * undici fetch can fail ("fetch failed") where Chromium's network stack
+ * succeeds (different TLS/CA, DNS and proxy handling) — the app injects
+ * Electron's `net.fetch` here so ALL API calls share the Chromium stack
+ * that demonstrably reaches the server (it loads the login window).
+ */
+let _fetchFn: FetchFn | null = null;
+
+export function setFetchImplementation(fn: FetchFn): void {
+  _fetchFn = fn;
+}
+
 /**
  * undici `fetch` only accepts an undici `Dispatcher` (e.g. `ProxyAgent`) for
  * `dispatcher` — a Node `http(s).Agent`/`https-proxy-agent` has no `.dispatch()`
@@ -57,8 +72,10 @@ export async function apiRequest<T = unknown>(
     : controller.signal;
 
   try {
-    const dispatcher = getDispatcher();
-    const response = await fetch(url, {
+    const f = _fetchFn ?? fetch;
+    // The undici `dispatcher` (proxy) option only applies to Node's fetch.
+    const dispatcher = _fetchFn ? undefined : getDispatcher();
+    const response = await f(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,4 +1,8 @@
-export { apiRequest, type TransportConfig } from "./transport";
+export {
+  apiRequest,
+  setFetchImplementation,
+  type TransportConfig,
+} from "./transport";
 export {
   listCollections,
   getCollection,

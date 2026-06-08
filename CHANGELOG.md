@@ -1,3 +1,11 @@
+## [0.1.4] - 2026-06-08
+
+### Fixes
+- **"fetch failed" / "Client network socket disconnected before secure TLS connection was established".** Node's (undici/OpenSSL) TLS handshake to the server is cut mid-handshake on the user's network, while Chromium (BoringSSL) connects fine — consistent with TLS-fingerprint-based filtering by a middlebox/CDN. Fix: stop using Node fetch entirely in the main process.
+  - `@outline/api-client` gains `setFetchImplementation()`; the main process injects Electron's `net.fetch`, so ALL API calls (collections, documents, verify, testConnection) ride Chromium's network stack.
+  - The email auth handlers now use `session.fetch` with `credentials: "include"` — same session as the login window. The Chromium cookie jar handles Set-Cookie across redirects, so the `accessToken` is read from the jar after the callback (no manual Set-Cookie parsing), and CSRF uses the jar cookie + header echo. Failure notices are read from the final redirected URL.
+  - `setCertificateVerifyProc` is applied to the default session for all auth flows (was only set inside browser login).
+
 ## [0.1.3] - 2026-06-08
 
 ### Fixes (verified against outline/outline server source)

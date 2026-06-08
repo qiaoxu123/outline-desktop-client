@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, session } from "electron";
+import { ipcMain, BrowserWindow, session, type Session } from "electron";
 import { z } from "zod";
 
 const OUTLINE_URL = "https://notes.jlu-mcns.site";
@@ -15,14 +15,6 @@ function fail(code: string, message: string) {
   return { ok: false as const, error: { code, message } };
 }
 
-function getSetCookies(response: Response): string[] {
-  return (
-    (
-      response.headers as unknown as { getSetCookie?: () => string[] }
-    ).getSetCookie?.() ?? []
-  );
-}
-
 /**
  * Outline's email login (verified against outline/outline source):
  *
@@ -31,28 +23,26 @@ function getSetCookies(response: Response): string[] {
  *      header). With preferOTP the server emails a 6-digit code; otherwise a
  *      magic link.
  *   2. GET /auth/email.callback — MUST include follow=true (links omit it to
- *      defeat mail-client prefetching; without it the server returns a
- *      client-side redirect page and never signs in). Accepts either
- *      token=… (link) or code=…&email=…. On success it sets the `accessToken`
- *      session cookie (a JWT the API accepts as a Bearer token).
+ *      defeat mail-client prefetching). Accepts token=… (link) or
+ *      code=…&email=…. On success it sets the `accessToken` session cookie
+ *      (a JWT the API accepts as a Bearer token).
+ *
+ * All requests use `session.fetch` — Chromium's network stack with the
+ * session cookie jar — the exact same path as the login BrowserWindow.
+ * Node's undici fetch fails on some machines ("fetch failed") where
+ * Chromium connects fine, and the jar handles Set-Cookie across redirects.
  */
 
-/** GET the site root to obtain a fresh CSRF cookie. */
-async function fetchCsrfToken(): Promise<string | null> {
-  try {
-    const response = await fetch(`${OUTLINE_URL}/`, {
-      method: "GET",
-      redirect: "manual",
-      headers: { Accept: "text/html" },
-    });
-    for (const cookie of getSetCookies(response)) {
-      const match = /^csrfToken=([^;]+)/.exec(cookie);
-      if (match && match[1]) return match[1]; // keep raw value for echo-back
-    }
-  } catch {
-    /* older servers don't issue CSRF cookies — proceed without */
-  }
-  return null;
+function authSession(): Session {
+  const ses = session.defaultSession;
+  // Accept the server cert (chain root may be absent from the bundled CA store)
+  ses.setCertificateVerifyProc((_request, cb) => cb(0));
+  return ses;
+}
+
+async function getCookieValue(ses: Session, name: string): Promise<string | null> {
+  const cookies = await ses.cookies.get({ url: OUTLINE_URL, name });
+  return cookies[0]?.value ?? null;
 }
 
 /** Extract the sign-in token from a pasted magic link (or accept a raw token). */
@@ -84,79 +74,6 @@ const NOTICE_MESSAGES: Record<string, string> = {
   "suspended": "该账号已被停用，请联系管理员。",
 };
 
-type ExchangeParams = { token: string } | { code: string; email: string };
-
-/**
- * Perform the email.callback exchange, following same-origin redirects
- * manually so we can read the `accessToken` Set-Cookie on the 302.
- */
-async function exchangeEmailSession(
-  params: ExchangeParams,
-): Promise<{ token: string } | { errorCode: string; message: string }> {
-  const qs = new URLSearchParams(
-    "token" in params
-      ? { token: params.token, follow: "true" }
-      : { code: params.code, email: params.email, follow: "true" },
-  );
-  let url = `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`;
-  const cookieJar: string[] = [];
-
-  for (let hop = 0; hop < 5; hop++) {
-    const response = await fetch(url, {
-      method: "GET",
-      redirect: "manual",
-      headers: {
-        Accept: "text/html,application/json",
-        ...(cookieJar.length ? { Cookie: cookieJar.join("; ") } : {}),
-      },
-    });
-
-    for (const cookie of getSetCookies(response)) {
-      const pair = cookie.split(";")[0];
-      cookieJar.push(pair);
-      const match = /^accessToken=(.+)$/.exec(pair);
-      if (match && match[1]) {
-        return { token: decodeURIComponent(match[1]) };
-      }
-    }
-
-    const location = response.headers.get("location");
-    if (!location) {
-      // Terminal response without a session cookie
-      if (response.status >= 400) {
-        const body = (await response.json().catch(() => ({}))) as {
-          message?: string;
-          error?: string;
-        };
-        return {
-          errorCode: "CALLBACK_FAILED",
-          message: body.message ?? body.error ?? `服务器返回 ${response.status}`,
-        };
-      }
-      break;
-    }
-
-    const next = new URL(location, url);
-    const notice = next.searchParams.get("notice");
-    if (notice) {
-      const description = next.searchParams.get("description");
-      return {
-        errorCode: "NOTICE",
-        message:
-          NOTICE_MESSAGES[notice] ??
-          `登录失败（${notice}${description ? `: ${description}` : ""}）`,
-      };
-    }
-    if (!next.toString().startsWith(OUTLINE_URL)) break; // don't follow off-site
-    url = next.toString();
-  }
-
-  return {
-    errorCode: "NO_TOKEN",
-    message: "未能从服务器获取会话。验证码/链接可能已失效，请重新发送登录邮件。",
-  };
-}
-
 const EmailSchema = z.object({ email: z.string().email() });
 const CompleteSchema = z.object({
   input: z.string().min(1),
@@ -172,16 +89,25 @@ export function registerAuthHandlers(): void {
       return fail("VALIDATION", "请输入有效的邮箱地址");
     }
 
-    try {
-      // /auth routes verify a CSRF double-submit: cookie + x-csrf-token header
-      const csrf = await fetchCsrfToken();
+    const ses = authSession();
 
-      const response = await fetch(`${OUTLINE_URL}/auth/email`, {
+    try {
+      // GET the site root so the server issues a csrfToken cookie into the jar
+      await ses.fetch(`${OUTLINE_URL}/`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "text/html" },
+      });
+      const csrf = await getCookieValue(ses, CSRF_COOKIE);
+
+      // POST with the cookie jar (sends csrfToken) + header echo (double-submit)
+      const response = await ses.fetch(`${OUTLINE_URL}/auth/email`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          ...(csrf ? { Cookie: `${CSRF_COOKIE}=${csrf}`, [CSRF_HEADER]: csrf } : {}),
+          ...(csrf ? { [CSRF_HEADER]: csrf } : {}),
         },
         body: JSON.stringify({ email: parsed.data.email, preferOTP: true }),
       });
@@ -227,31 +153,84 @@ export function registerAuthHandlers(): void {
     }
 
     const input = parsed.data.input.trim();
-    let params: ExchangeParams | null = null;
+    let qs: URLSearchParams | null = null;
 
     if (/^\d{6}$/.test(input)) {
       if (!parsed.data.email) {
         return fail("VALIDATION", "缺少邮箱地址，请返回上一步重新发送");
       }
-      params = { code: input, email: parsed.data.email };
+      qs = new URLSearchParams({
+        code: input,
+        email: parsed.data.email,
+        follow: "true",
+      });
     } else {
       const token = extractEmailToken(input);
-      if (token) params = { token };
+      if (token) qs = new URLSearchParams({ token, follow: "true" });
     }
 
-    if (!params) {
+    if (!qs) {
       return fail(
         "INVALID_INPUT",
         "无法识别输入。请输入邮件中的 6 位验证码，或完整粘贴登录链接。",
       );
     }
 
+    const ses = authSession();
+
     try {
-      const result = await exchangeEmailSession(params);
-      if ("token" in result) {
-        return ok({ token: result.token, cookieName: "accessToken" });
+      // Drop any stale session cookie so the jar reflects only this attempt
+      await ses.cookies.remove(OUTLINE_URL, "accessToken").catch(() => {});
+
+      // GET with redirect-follow: Chromium processes Set-Cookie on every hop,
+      // so on success the jar ends up holding the accessToken session cookie.
+      const response = await ses.fetch(
+        `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`,
+        {
+          credentials: "include",
+          redirect: "follow",
+          cache: "no-store",
+          headers: { Accept: "text/html,application/json" },
+        },
+      );
+
+      const token = await getCookieValue(ses, "accessToken");
+      if (token) {
+        return ok({ token, cookieName: "accessToken" });
       }
-      return fail(result.errorCode, result.message);
+
+      // No session: the server redirected to /?notice=… — read it off the
+      // final URL after redirects
+      try {
+        const finalUrl = new URL(response.url);
+        const notice = finalUrl.searchParams.get("notice");
+        if (notice) {
+          const description = finalUrl.searchParams.get("description");
+          return fail(
+            "NOTICE",
+            NOTICE_MESSAGES[notice] ??
+              `登录失败（${notice}${description ? `: ${description}` : ""}）`,
+          );
+        }
+      } catch {
+        /* fall through to generic error */
+      }
+
+      if (response.status >= 400) {
+        const body = (await response.json().catch(() => ({}))) as {
+          message?: string;
+          error?: string;
+        };
+        return fail(
+          "CALLBACK_FAILED",
+          body.message ?? body.error ?? `服务器返回 ${response.status}`,
+        );
+      }
+
+      return fail(
+        "NO_TOKEN",
+        "未能从服务器获取会话。验证码/链接可能已失效，请重新发送登录邮件。",
+      );
     } catch (err) {
       console.error("[auth] email.callback error:", err);
       return fail(
@@ -263,14 +242,9 @@ export function registerAuthHandlers(): void {
 
   // Fallback: interactive sign-in inside a BrowserWindow. Succeeds only when
   // a real `accessToken` session cookie appears — merely loading the login
-  // page must NOT count as success (the old implementation resolved on the
-  // first navigation and saved junk cookies as the token).
+  // page must NOT count as success.
   ipcMain.handle("auth:loginWithBrowser", async () => {
-    const ses = session.defaultSession;
-
-    // Server is reachable directly — connect without a proxy, but accept its
-    // cert (chain root may be absent from Chromium's bundled CA store).
-    ses.setCertificateVerifyProc((_request, cb) => cb(0));
+    const ses = authSession();
 
     let authWindow: BrowserWindow | null = new BrowserWindow({
       width: 900,
@@ -314,10 +288,9 @@ export function registerAuthHandlers(): void {
       const checkSession = async () => {
         if (settled) return;
         try {
-          const cookies = await ses.cookies.get({ url: OUTLINE_URL });
-          const token = cookies.find((c) => c.name === "accessToken");
-          if (token && token.value) {
-            finish(ok({ token: token.value, cookieName: "accessToken" }));
+          const token = await getCookieValue(ses, "accessToken");
+          if (token) {
+            finish(ok({ token, cookieName: "accessToken" }));
           }
         } catch {
           /* keep waiting */
