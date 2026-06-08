@@ -4,6 +4,10 @@
   "private": true,
   "description": "Outline Desktop - cross-platform client (macOS / Windows / Linux)",
   "author": "xu <george.x.qiao@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qiaoxu123/outline-desktop-client.git"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
