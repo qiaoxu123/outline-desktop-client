@@ -201,6 +201,27 @@
   margin: 1px 0 3px;
 }
 
+/* Nested document levels: indent + a vertical guide line per level so the
+   hierarchy reads clearly (Outline / wolai style). */
+.sb-children {
+  margin-left: 15px;
+  padding-left: 4px;
+  border-left: 1px solid var(--color-border);
+}
+
+.sb-node > .sb-item {
+  padding-left: 4px;
+}
+
+/* leaf documents (no children) get a small dot in place of the chevron */
+.sb-doc-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  opacity: 0.45;
+}
+
 .sb-note {
   padding: 3px 0 5px 30px;
   font-size: 12px;

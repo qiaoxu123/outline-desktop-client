@@ -1,3 +1,8 @@
+## [1.4.1] - 2026-06-08
+
+### Fixes
+- **Sidebar hierarchy now reads clearly.** Nested documents used a flat 14px-per-level padding with no visual guide, so deep trees looked nearly flush and the parent/child relationship was hard to see. Switched to nested containers with a per-level indent **and a vertical guide line** (Outline / wolai style); leaf documents show a small dot instead of a chevron. Applies to collection trees and starred-document subtrees.
+
 ## [1.4.0] - 2026-06-08
 
 ### Features

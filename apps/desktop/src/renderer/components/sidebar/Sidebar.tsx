@@ -73,12 +73,10 @@ function Chevron({ open }: { open: boolean }): React.ReactElement {
 
 function DocNode({
   doc,
-  depth,
   expanded,
   toggle,
 }: {
   doc: OutlineCollectionDocument;
-  depth: number;
   expanded: Set<string>;
   toggle: (id: string) => void;
 }): React.ReactElement {
@@ -89,10 +87,9 @@ function DocNode({
   const isOpen = expanded.has(doc.id);
 
   return (
-    <div>
+    <div className="sb-node">
       <div
         className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
-        style={{ paddingLeft: `${22 + depth * 14}px` }}
       >
         <button
           className={`sb-chevron ${hasChildren ? "" : "hidden"}`}
@@ -102,10 +99,7 @@ function DocNode({
           {hasChildren ? (
             <Chevron open={isOpen} />
           ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity="0.7">
-              <path d="M6 4a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8.83a2 2 0 00-.59-1.42l-2.82-2.82A2 2 0 0015.17 4H6zm0 2h9v3a1 1 0 001 1h3v8H6V6z" opacity="0" />
-              <path d="M7 3a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8.41a2 2 0 00-.59-1.41l-3.41-3.41A2 2 0 0013.59 3H7zm0 2h6v3a1 1 0 001 1h3v10H7V5z" />
-            </svg>
+            <span className="sb-doc-dot" />
           )}
         </button>
         <a
@@ -123,12 +117,11 @@ function DocNode({
         </a>
       </div>
       {hasChildren && isOpen && (
-        <div>
+        <div className="sb-children">
           {doc.children.map((child) => (
             <DocNode
               key={child.id}
               doc={child}
-              depth={depth + 1}
               expanded={expanded}
               toggle={toggle}
             />
@@ -175,9 +168,9 @@ function CollectionTree({
   if (documents.length === 0) return <div className="sb-note">（空）</div>;
 
   return (
-    <div className="sb-tree">
+    <div className="sb-tree sb-children">
       {documents.map((doc) => (
-        <DocNode key={doc.id} doc={doc} depth={0} expanded={expanded} toggle={toggle} />
+        <DocNode key={doc.id} doc={doc} expanded={expanded} toggle={toggle} />
       ))}
     </div>
   );
@@ -193,10 +186,8 @@ interface ChildDoc {
 
 function ChildDocs({
   parentDocumentId,
-  depth,
 }: {
   parentDocumentId: string;
-  depth: number;
 }): React.ReactElement {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
@@ -218,31 +209,24 @@ function ChildDocs({
   if (children.length === 0) return <div className="sb-note">（无子文档）</div>;
 
   return (
-    <div className="sb-tree">
+    <div className="sb-children">
       {children.map((child) => (
-        <ChildNode key={child.id} doc={child} depth={depth} />
+        <ChildNode key={child.id} doc={child} />
       ))}
     </div>
   );
 }
 
-function ChildNode({
-  doc,
-  depth,
-}: {
-  doc: ChildDoc;
-  depth: number;
-}): React.ReactElement {
+function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
   const navigate = useNavigate();
   const selectDocument = useUIStore((s) => s.selectDocument);
   const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
   const [open, setOpen] = useState(false);
 
   return (
-    <div>
+    <div className="sb-node">
       <div
         className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
       >
         <button className="sb-chevron" onClick={() => setOpen(!open)}>
           <Chevron open={open} />
@@ -261,7 +245,7 @@ function ChildNode({
           <span className="sb-title">{doc.title || "Untitled"}</span>
         </a>
       </div>
-      {open && <ChildDocs parentDocumentId={doc.id} depth={depth + 1} />}
+      {open && <ChildDocs parentDocumentId={doc.id} />}
     </div>
   );
 }
@@ -281,10 +265,9 @@ function StarNode({
   const [open, setOpen] = useState(false);
 
   return (
-    <div>
+    <div className="sb-node">
       <div
         className={`sb-item ${selectedDocumentId === documentId ? "active" : ""}`}
-        style={{ paddingLeft: "4px" }}
       >
         <button
           className="sb-chevron"
@@ -313,7 +296,7 @@ function StarNode({
           <span className="sb-title">{title}</span>
         </a>
       </div>
-      {open && <ChildDocs parentDocumentId={documentId} depth={1} />}
+      {open && <ChildDocs parentDocumentId={documentId} />}
     </div>
   );
 }
