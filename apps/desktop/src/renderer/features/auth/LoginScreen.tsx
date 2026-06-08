@@ -128,6 +128,7 @@ export default function LoginScreen({
 
   return (
     <div className="login-screen">
+      <div className="login-dragbar" />
       <div className="login-card">
         <div className="login-logo">
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none">

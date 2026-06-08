@@ -1,3 +1,14 @@
+## [0.2.0] - 2026-06-08
+
+### Features
+- **Expandable sidebar tree.** Collections expand in place (chevron) to a lazily-loaded, recursive document tree with per-node expand/collapse, emoji, and active highlight — mirroring the web sidebar.
+- **Document editing.** Edit button opens a split markdown editor (textarea + live preview) with title editing; saves via `documents.update` and invalidates queries so the sidebar/title refresh.
+- **Search wired up.** SearchView now calls `documents.search`; handles both the modern `{ranking, context, document}` result shape and older flat shapes; click-through to documents.
+- **Account settings.** Settings shows the signed-in user (avatar/name/email/role via `auth.info`) and team name, plus server info and logout. UI translated to Chinese.
+
+### Fixes
+- **Window drag.** The titlebar's full-width left container was `no-drag`, making the bar undraggable — only buttons opt out now. The login screen (no titlebar) gets a top drag strip.
+
 ## [0.1.4] - 2026-06-08
 
 ### Fixes

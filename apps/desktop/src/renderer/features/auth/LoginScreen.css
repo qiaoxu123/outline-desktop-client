@@ -6,6 +6,16 @@
   background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f0 100%);
 }
 
+/* The login screen has no titlebar — give the window a drag strip on top. */
+.login-dragbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  -webkit-app-region: drag;
+}
+
 .login-card {
   width: 420px;
   padding: 40px;

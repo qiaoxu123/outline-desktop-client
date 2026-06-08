@@ -110,6 +110,31 @@ export function registerProfileHandlers(): void {
     }
   });
 
+  // Current user + team info (auth.info) for the settings screen
+  ipcMain.handle("profiles:userInfo", async (_event, id: unknown) => {
+    if (typeof id !== "string") {
+      return fail("VALIDATION", "id must be a string");
+    }
+
+    const profile = readProfiles().find((p) => p.id === id);
+    if (!profile) return fail("NOT_FOUND", "Profile not found");
+
+    try {
+      const result = await apiRequest(
+        { baseUrl: profile.serverUrl, token: profile.apiKey },
+        "auth.info",
+        {},
+      );
+      return ok(result);
+    } catch (err) {
+      return fail(
+        "API_ERROR",
+        err instanceof Error ? err.message : "Failed to load user info",
+        true,
+      );
+    }
+  });
+
   // Verify a stored profile's token is still accepted by the server.
   // valid:false + reason:"auth" → token expired/revoked (caller should drop it)
   // valid:false + reason:"network" → server unreachable (keep the profile)

@@ -7,6 +7,7 @@ export interface ElectronAPI {
     update: (payload: unknown) => Promise<unknown>;
     delete: (id: string) => Promise<unknown>;
     verify: (id: string) => Promise<unknown>;
+    userInfo: (id: string) => Promise<unknown>;
     testConnection: (payload: unknown) => Promise<unknown>;
   };
   collections: {
@@ -15,6 +16,14 @@ export interface ElectronAPI {
   };
   documents: {
     info: (profileId: string, documentId: string) => Promise<unknown>;
+    update: (
+      profileId: string,
+      params: { id: string; title?: string; text?: string },
+    ) => Promise<unknown>;
+    search: (
+      profileId: string,
+      params: { query: string; collectionId?: string },
+    ) => Promise<unknown>;
   };
   auth: {
     loginWithBrowser: () => Promise<unknown>;
@@ -31,6 +40,7 @@ const api: ElectronAPI = {
     update: (payload) => ipcRenderer.invoke("profiles:update", payload),
     delete: (id) => ipcRenderer.invoke("profiles:delete", id),
     verify: (id) => ipcRenderer.invoke("profiles:verify", id),
+    userInfo: (id) => ipcRenderer.invoke("profiles:userInfo", id),
     testConnection: (payload) =>
       ipcRenderer.invoke("profiles:testConnection", payload),
   },
@@ -43,6 +53,10 @@ const api: ElectronAPI = {
   documents: {
     info: (profileId, documentId) =>
       ipcRenderer.invoke("documents:info", { profileId, documentId }),
+    update: (profileId, params) =>
+      ipcRenderer.invoke("documents:update", { profileId, ...params }),
+    search: (profileId, params) =>
+      ipcRenderer.invoke("documents:search", { profileId, ...params }),
   },
   auth: {
     loginWithBrowser: () => ipcRenderer.invoke("auth:loginWithBrowser"),

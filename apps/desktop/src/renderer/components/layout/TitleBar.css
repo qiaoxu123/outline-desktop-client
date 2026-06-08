@@ -10,17 +10,22 @@
   user-select: none;
 }
 
+/* Containers stay draggable — only the interactive controls opt out,
+   otherwise the full-width left container makes the whole bar undraggable. */
 .titlebar-left,
 .titlebar-right {
   display: flex;
   align-items: center;
   gap: 2px;
-  -webkit-app-region: no-drag;
 }
 
 .titlebar-left {
   flex: 1;
   gap: 8px;
+}
+
+.titlebar-button {
+  -webkit-app-region: no-drag;
 }
 
 .titlebar-app-name {
