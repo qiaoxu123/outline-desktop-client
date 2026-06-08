@@ -1,0 +1,91 @@
+/* The editor inherits .document-body typography; these are editor-specific. */
+
+.doc-editor .ProseMirror {
+  outline: none;
+  min-height: 50vh;
+  caret-color: var(--color-text);
+}
+
+.doc-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-placeholder);
+  pointer-events: none;
+  height: 0;
+}
+
+.doc-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+
+.doc-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  gap: 8px;
+}
+
+.doc-editor .ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.doc-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: var(--color-primary);
+}
+
+.doc-editor .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.doc-editor .ProseMirror th,
+.doc-editor .ProseMirror td {
+  border: 1px solid var(--color-border);
+  padding: 8px 14px;
+  text-align: left;
+}
+
+.doc-editor .ProseMirror th {
+  background: var(--color-bg-secondary);
+  font-weight: 600;
+}
+
+.doc-editor .ProseMirror pre {
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-code-border);
+  color: var(--color-text);
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.doc-editor .ProseMirror code {
+  background: var(--color-code-bg);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.doc-editor .ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+
+.doc-editor .ProseMirror blockquote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 14px;
+  color: var(--color-text-secondary);
+  margin: 0.8em 0;
+}
+
+.doc-editor .ProseMirror img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.doc-editor .ProseMirror a {
+  color: var(--color-primary);
+}

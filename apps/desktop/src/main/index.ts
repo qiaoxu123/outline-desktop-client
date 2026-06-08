@@ -6,6 +6,7 @@ import { registerProfileHandlers } from "./ipc/handlers/profiles";
 import { registerCollectionHandlers } from "./ipc/handlers/collections";
 import { registerDocumentHandlers } from "./ipc/handlers/documents";
 import { registerAuthHandlers } from "./ipc/handlers/auth";
+import { registerApiHandlers } from "./ipc/handlers/api";
 
 // The Outline server (notes.jlu-mcns.site) is a domestic host reachable
 // directly — it must NOT be routed through a general-purpose proxy. We only
@@ -25,6 +26,7 @@ function registerAllIpcHandlers(): void {
   registerCollectionHandlers();
   registerDocumentHandlers();
   registerAuthHandlers();
+  registerApiHandlers();
 }
 
 function createMainWindow(): BrowserWindow {

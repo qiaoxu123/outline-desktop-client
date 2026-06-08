@@ -3,6 +3,8 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import AppShell from "./components/layout/AppShell";
 import CollectionsView from "./features/collections/CollectionsView";
 import DocumentView from "./features/documents/DocumentView";
+import HomeView from "./features/home/HomeView";
+import SharesView from "./features/shares/SharesView";
 import SearchView from "./features/search/SearchView";
 import SettingsView from "./features/profiles/SettingsView";
 import LoginScreen from "./features/auth/LoginScreen";
@@ -158,9 +160,10 @@ export default function App(): React.ReactElement {
         <AppInit>
           <Routes>
             <Route element={<AppShell />}>
-              <Route path="/" element={<CollectionsView />} />
+              <Route path="/" element={<HomeView />} />
               <Route path="/collection/:collectionId" element={<CollectionsView />} />
               <Route path="/document/:documentId" element={<DocumentView />} />
+              <Route path="/shares" element={<SharesView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/settings" element={<SettingsView />} />
             </Route>

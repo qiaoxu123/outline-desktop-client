@@ -30,6 +30,12 @@ export interface ElectronAPI {
     requestEmailLogin: (email: string) => Promise<unknown>;
     completeEmailLogin: (input: string, email?: string) => Promise<unknown>;
   };
+  /** Whitelisted pass-through to the Outline API (see main api.ts). */
+  call: (
+    profileId: string,
+    method: string,
+    params?: Record<string, unknown>,
+  ) => Promise<unknown>;
   platform: string;
 }
 
@@ -65,6 +71,8 @@ const api: ElectronAPI = {
     completeEmailLogin: (input, email) =>
       ipcRenderer.invoke("auth:completeEmailLogin", { input, email }),
   },
+  call: (profileId, method, params) =>
+    ipcRenderer.invoke("api:call", { profileId, method, params }),
   platform: process.platform,
 };
 

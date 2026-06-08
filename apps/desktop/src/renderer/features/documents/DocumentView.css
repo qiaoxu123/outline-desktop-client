@@ -5,15 +5,6 @@
   min-height: 100%;
 }
 
-/* Wide layout while editing (split editor + preview) */
-.document-view:has(.document-editor) {
-  max-width: none;
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
 .document-header-row {
   display: flex;
   align-items: flex-start;
@@ -21,129 +12,95 @@
   gap: 16px;
 }
 
-.document-edit-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-top: 6px;
-  transition: background 0.1s, color 0.1s;
-}
-
-.document-edit-button:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
-}
-
-.document-editor {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  gap: 12px;
-}
-
-.document-editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.document-editor-title {
-  flex: 1;
-  padding: 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--color-text);
-  background: var(--color-bg);
-  outline: none;
-}
-
-.document-editor-title:focus {
-  border-color: var(--color-primary);
-}
-
-.document-editor-actions {
+.document-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
-.document-editor-error {
+.document-save-error {
   font-size: 12px;
-  color: #e03131;
-  max-width: 240px;
+  color: var(--color-danger);
+  max-width: 220px;
 }
 
-.document-editor-cancel,
-.document-editor-save {
-  padding: 9px 18px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
+.document-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.document-icon-button:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.document-button {
+  padding: 7px 16px;
   border: 1px solid var(--color-border);
+  border-radius: 7px;
   background: var(--color-bg);
   color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
 }
 
-.document-editor-save {
+.document-button:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.document-button.primary {
   border: none;
   background: var(--color-primary);
   color: white;
+  font-weight: 600;
 }
 
-.document-editor-cancel:disabled,
-.document-editor-save:disabled {
+.document-button.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  color: white;
+}
+
+.document-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.document-editor-split {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  gap: 16px;
-}
-
-.document-editor-textarea {
+/* in-place title editing — looks like the title, not a form field */
+.document-title-input {
   flex: 1;
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--color-text);
-  background: var(--color-bg);
-  resize: none;
+  border: none;
   outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+  color: var(--color-text);
+  padding: 0;
 }
 
-.document-editor-textarea:focus {
-  border-color: var(--color-primary);
+.document-title-input::placeholder {
+  color: var(--color-placeholder);
 }
 
-.document-editor-preview {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 16px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-secondary);
-  font-size: 15px;
-  line-height: 1.7;
+.document-meta-hint {
+  color: var(--color-placeholder);
 }
 
 .document-empty {

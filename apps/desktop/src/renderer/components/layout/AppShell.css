@@ -1,19 +1,37 @@
+/* Palette mirrors outline/outline shared/styles/theme.ts (buildLightTheme) */
 :root {
-  --color-bg: #ffffff;
-  --color-bg-secondary: #fafbfc;
-  --color-bg-tertiary: #f4f6f8;
-  --color-border: #e9ebed;
-  --color-text: #111418;
-  --color-text-secondary: #5e6e82;
-  --color-text-muted: #9da9bb;
-  --color-primary: #4c6ef5;
-  --color-primary-hover: #4263eb;
-  --color-accent: #12b886;
+  /* base colors */
+  --color-bg: #ffffff;                      /* background */
+  --color-bg-secondary: #edf2f7;            /* warmGrey / backgroundSecondary */
+  --color-bg-tertiary: #d7e0ea;             /* backgroundTertiary */
+  --color-border: #dae1e9;                  /* slateLight / divider */
+  --color-text: #111319;                    /* almostBlack */
+  --color-text-secondary: #394351;          /* slateDark */
+  --color-text-muted: #66778f;              /* slate */
+  --color-placeholder: #a2b2c3;
+  --color-primary: #0366d6;                 /* accent */
+  --color-primary-hover: #0258ba;
+  --color-accent: #0366d6;
+  --color-danger: #ed2651;
+  --color-warning: #f08a24;
+  --color-success: #3ad984;
+  --color-star: #edba07;                    /* yellow */
+
+  /* sidebar (Outline web) */
+  --sidebar-bg: #edf2f7;                    /* warmGrey */
+  --sidebar-text: rgb(78, 92, 110);
+  --sidebar-hover: hsl(212 31% 90% / 1);
+  --sidebar-active: hsl(212 31% 85% / 1);
+
+  --color-code-bg: #f4f7fa;                 /* smoke */
+  --color-code-border: #e8ebed;             /* smokeDark */
+
   --sidebar-width: 260px;
   --titlebar-height: 48px;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, Inter, "Segoe UI", Roboto,
+    Oxygen, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
+    monospace;
 }
 
 * {
@@ -29,6 +47,26 @@ body {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Outline-style slim scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+  background-clip: content-box;
+  border: 2px solid transparent;
 }
 
 .app-shell {
@@ -48,9 +86,10 @@ body {
 .app-sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  border-right: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  overflow-y: auto;
+  background: var(--sidebar-bg);
+  overflow: hidden; /* the collections section scrolls; account card stays pinned */
+  display: flex;
+  flex-direction: column;
 }
 
 .app-content {

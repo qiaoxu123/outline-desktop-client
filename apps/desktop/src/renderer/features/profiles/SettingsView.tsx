@@ -1,29 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
 import { useProfileStore, useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
-import { unwrapIpc } from "../../lib/ipc";
+import {
+  useUserInfo,
+  absoluteUrl,
+  roleLabel,
+  canUserEdit,
+} from "../../hooks/useOutline";
 import "./SettingsView.css";
 
 const SERVER_URL = "https://notes.jlu-mcns.site";
-
-interface AuthInfoResponse {
-  data: {
-    user?: {
-      id: string;
-      name: string;
-      email?: string;
-      avatarUrl?: string | null;
-      role?: string;
-      createdAt?: string;
-      lastActiveAt?: string;
-    };
-    team?: {
-      id: string;
-      name: string;
-      avatarUrl?: string | null;
-    };
-  };
-}
 
 export default function SettingsView(): React.ReactElement {
   const api = useElectronAPI();
@@ -32,16 +17,8 @@ export default function SettingsView(): React.ReactElement {
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["profile", activeProfileId, "userInfo"],
-    queryFn: () =>
-      unwrapIpc<AuthInfoResponse>(api.profiles.userInfo(activeProfileId!)),
-    enabled: !!activeProfileId,
-  });
-
-  const user = data?.data?.user;
-  const team = data?.data?.team;
+  const { user, team, isLoading, error } = useUserInfo();
+  const avatar = absoluteUrl(user?.avatarUrl);
 
   const handleLogout = async () => {
     if (activeProfileId) {
@@ -62,17 +39,13 @@ export default function SettingsView(): React.ReactElement {
         {isLoading && <p className="settings-description">加载用户信息…</p>}
         {!!error && (
           <p className="settings-description settings-error-text">
-            无法加载用户信息
+            无法加载用户信息（{error instanceof Error ? error.message : "未知错误"}）
           </p>
         )}
         {user && (
           <div className="settings-user-card">
-            {user.avatarUrl ? (
-              <img
-                className="settings-avatar"
-                src={user.avatarUrl}
-                alt={user.name}
-              />
+            {avatar ? (
+              <img className="settings-avatar" src={avatar} alt={user.name} />
             ) : (
               <div className="settings-avatar settings-avatar-fallback">
                 {(user.name || "?").slice(0, 1).toUpperCase()}
@@ -83,9 +56,12 @@ export default function SettingsView(): React.ReactElement {
               {user.email && (
                 <div className="settings-user-email">{user.email}</div>
               )}
-              {user.role && (
-                <span className="settings-user-role">{user.role}</span>
-              )}
+              <div className="settings-user-badges">
+                <span className="settings-user-role">{roleLabel(user)}</span>
+                {!canUserEdit(user) && (
+                  <span className="settings-user-role muted">无编辑权限</span>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -122,7 +98,7 @@ export default function SettingsView(): React.ReactElement {
       <section className="settings-section">
         <h3>关于</h3>
         <p className="settings-description">
-          Outline Desktop v0.1 — macOS / Windows / Linux
+          Outline Desktop v0.2 — macOS / Windows / Linux
         </p>
       </section>
     </div>

@@ -130,3 +130,14 @@
 .settings-error-text {
   color: #e03131;
 }
+
+.settings-user-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.settings-user-role.muted {
+  color: #66778f;
+  background: #edf2f7;
+}

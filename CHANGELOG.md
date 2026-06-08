@@ -1,3 +1,19 @@
+## [0.3.0] - 2026-06-08
+
+### Features (web-parity pass)
+- **Outline-native theme.** Global palette now mirrors outline/outline `shared/styles/theme.ts` light theme exactly (accent #0366d6, warmGrey sidebar #EDF2F7, almostBlack text #111319, hsl-based sidebar hover/active states, slim scrollbars, Inter font stack).
+- **Sidebar rebuilt like the web app.** Team header, primary nav (搜索/主页/共享链接/设置), 星标 section (stars.list), collections section with the expandable tree, and a pinned account card at the bottom (avatar/name/email → settings).
+- **In-place rich editing.** Split-pane markdown editor replaced by TipTap (ProseMirror — the same engine Outline uses) with two-way markdown conversion: click 编辑 and type directly in the document; title edits inline; ⌘/Ctrl+S saves, Esc cancels. Tables, task lists, images, links supported.
+- **Stars.** Star/unstar button on documents (stars.create/delete); starred docs listed in the sidebar.
+- **Shares view.** 共享链接 page lists public shares (shares.list) with copy-link.
+- **Home view.** 最近查看 (documents.viewed) + 最近更新 (documents.list) with a greeting, like web Home.
+- **Permissions.** Role from auth.info gates editing (viewer/guest hide the edit button); role badge shown in settings.
+- **Avatar fix.** Server-relative avatar URLs are made absolute; avatar shown in sidebar account card and settings.
+- **Generic API channel.** Whitelisted `api:call` IPC (stars/shares/documents.viewed/etc.) so new endpoints don't need bespoke handlers; API key still never leaves the main process.
+
+### Notes
+- TipTap markdown round-trip covers standard GFM; exotic Outline-specific embeds degrade to plain markdown on save.
+
 ## [0.2.0] - 2026-06-08
 
 ### Features
