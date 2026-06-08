@@ -139,8 +139,20 @@ body {
   max-width: none;
 }
 
-/* the document content column is capped separately — release it too, else
-   only the table-of-contents shifts while the text stays narrow */
+/* the document uses a 3-column grid (gutter | article | rail). In full
+   width, collapse the left gutter so the article fills the space; the rail
+   stays pinned at the right. */
+.app-content.full-width .document-layout {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .app-content.full-width .document-layout .document-article {
+  grid-column: 1;
   max-width: none;
+}
+
+.app-content.full-width .document-layout > .document-toc,
+.app-content.full-width .document-layout > .history-panel,
+.app-content.full-width .document-layout > .comments-panel {
+  grid-column: 2;
 }

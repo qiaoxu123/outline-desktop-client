@@ -1,21 +1,32 @@
 .document-view {
   padding: 32px 40px;
-  max-width: 1060px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   min-height: 100%;
 }
 
+/* 3-column grid: flexible gutter | centered article | right rail pinned to
+   the edge (TOC / history / comments). Keeps the article centered while the
+   side panel sits flush against the right side. */
 .document-layout {
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 760px) 1fr;
+  column-gap: 24px;
+  align-items: start;
 }
 
 .document-layout .document-article {
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
-  max-width: 780px;
-  margin: 0 auto;
+  max-width: 760px;
+  margin: 0;
+}
+
+.document-layout > .document-toc,
+.document-layout > .history-panel,
+.document-layout > .comments-panel {
+  grid-column: 3;
+  justify-self: end;
 }
 
 /* table of contents */
@@ -23,10 +34,9 @@
   position: sticky;
   top: 16px;
   width: 200px;
-  flex-shrink: 0;
   max-height: calc(100vh - var(--titlebar-height) - 64px);
   overflow-y: auto;
-  padding-left: 4px;
+  padding-left: 12px;
   border-left: 1px solid var(--color-border);
 }
 
@@ -618,4 +628,9 @@
 
 .comments-input:focus {
   border-color: var(--color-primary);
+}
+
+.document-edit-note {
+  color: var(--color-placeholder);
+  font-size: 12px;
 }

@@ -1,3 +1,10 @@
+## [1.2.0] - 2026-06-08
+
+### Changes
+- **Documents now open in the rendered read view, with an 编辑 button.** The live markdown editor mangled complex LaTeX (markdown treated `_{…}` as emphasis, ate backslashes), so display formulas like equation blocks showed raw and uncentered. Viewing now always uses the proven read pipeline (markdown-it + KaTeX): all math renders, block math is centered, tables are compact. Editing is one click away (TipTap), Esc/取消 leaves it, ⌘/Ctrl+S saves. This also avoids the round-trip corruption risk of editing math-heavy docs.
+- **KaTeX lenient mode.** `strict:false` + `throwOnError:false` in both pipelines — silences the "Unicode text character used in math mode" warning (CJK punctuation in formulas) and never blanks a doc on a bad formula.
+- **Right rail flush to the edge.** Document view switched to a 3-column grid (gutter · centered article · right rail); the table of contents / history / comments panel now sits against the right edge instead of floating mid-page.
+
 ## [1.1.1] - 2026-06-08
 
 ### Fixes

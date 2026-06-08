@@ -32,11 +32,14 @@ const md = new MarkdownIt({
 });
 
 md.use(taskLists, { enabled: true, label: true, labelAfter: true });
-// LaTeX math: $inline$ and $$block$$ rendered with KaTeX (matches Outline web)
-type MdPlugin = (md: MarkdownIt, ...args: unknown[]) => void;
+// LaTeX math: $inline$ and $$block$$ rendered with KaTeX (matches Outline web).
+// strict:false silences the CJK-punctuation-in-math warning; throwOnError
+// keeps a bad formula from blanking the whole document.
+type MdPlugin = (md: MarkdownIt, opts?: unknown) => void;
 md.use(
   (katexPlugin as unknown as { default?: MdPlugin }).default ??
     (katexPlugin as unknown as MdPlugin),
+  { throwOnError: false, strict: false },
 );
 
 const defaultRender =

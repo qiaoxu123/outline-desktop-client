@@ -89,7 +89,9 @@ export function useMarkdownEditor(
         // otherwise display formulas render as raw text in the editor.
         Mathematics.configure({
           regex: /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g,
-          katexOptions: { throwOnError: false },
+          // strict:false silences "Unicode text character used in math mode"
+          // for CJK punctuation that sometimes slips into formulas.
+          katexOptions: { throwOnError: false, strict: false },
         }),
         Markdown.configure({
           html: false,

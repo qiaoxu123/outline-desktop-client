@@ -384,36 +384,28 @@ function CommentsPanel({
   );
 }
 
-/* ---------- editable document (remounted per document via key) ---------- */
+/* ---------- editor pane (mounted only while editing) ---------- */
 
-function EditableDocument({
+function DocEditorPane({
   doc,
-  onRestored,
+  onDone,
 }: {
   doc: OutlineDocument;
-  onRestored: () => void;
+  onDone: () => void;
 }): React.ReactElement {
   const api = useElectronAPI();
   const queryClient = useQueryClient();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const showToc = useUIStore((s) => s.showToc);
-  const { starFor } = useStars();
-  const { toggle: toggleStar, isPending: starPending } = useToggleStar();
 
   const [title, setTitle] = useState(doc.title);
   const [dirty, setDirty] = useState(false);
-  const [liveMarkdown, setLiveMarkdown] = useState(doc.text);
-  const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
   const [saveError, setSaveError] = useState("");
 
   const editor = useMarkdownEditor(doc.text, true);
 
   useEffect(() => {
     if (!editor) return;
-    const handler = () => {
-      setDirty(true);
-      setLiveMarkdown(getMarkdown(editor));
-    };
+    const handler = () => setDirty(true);
     editor.on("update", handler);
     return () => {
       editor.off("update", handler);
@@ -430,32 +422,29 @@ function EditableDocument({
         }),
       ),
     onSuccess: () => {
-      setDirty(false);
-      setSaveError("");
       void queryClient.invalidateQueries({
         queryKey: ["profile", activeProfileId],
       });
+      onDone();
     },
     onError: (err) => {
       setSaveError(err instanceof Error ? err.message : "保存失败，请重试");
     },
   });
 
-  // Ctrl/Cmd+S
+  // Ctrl/Cmd+S to save, Esc to leave the editor
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        if (!saveMutation.isPending && title.trim() && dirty) {
-          saveMutation.mutate();
-        }
+        if (!saveMutation.isPending && title.trim()) saveMutation.mutate();
+      } else if (e.key === "Escape") {
+        onDone();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [title, dirty, saveMutation]);
-
-  const star = starFor(doc.id);
+  }, [title, saveMutation, onDone]);
 
   return (
     <div className="document-layout">
@@ -470,11 +459,79 @@ function EditableDocument({
                 setDirty(true);
               }}
               placeholder="标题"
+              autoFocus
             />
             <div className="document-actions">
               {saveError && (
                 <span className="document-save-error">{saveError}</span>
               )}
+              <button
+                className="document-button subtle"
+                onClick={onDone}
+                disabled={saveMutation.isPending}
+              >
+                取消
+              </button>
+              <button
+                className="document-button primary"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || !title.trim()}
+              >
+                {saveMutation.isPending ? "保存中…" : "保存"}
+              </button>
+            </div>
+          </div>
+          <div className="document-meta">
+            <span className="document-meta-hint">
+              ⌘/Ctrl+S 保存 · Esc 退出编辑
+            </span>
+            {dirty && <span className="document-dirty">未保存</span>}
+            <span className="document-edit-note">
+              提示：复杂公式建议保持源码不动，保存后在阅读视图查看渲染效果
+            </span>
+          </div>
+        </header>
+
+        <div className="document-body">
+          <MarkdownEditorContent editor={editor} />
+        </div>
+      </article>
+    </div>
+  );
+}
+
+/* ---------- document with read view + edit toggle (editors) ---------- */
+
+function EditableDocument({
+  doc,
+  onRestored,
+}: {
+  doc: OutlineDocument;
+  onRestored: () => void;
+}): React.ReactElement {
+  const showToc = useUIStore((s) => s.showToc);
+  const { starFor } = useStars();
+  const { toggle: toggleStar, isPending: starPending } = useToggleStar();
+  const [editing, setEditing] = useState(false);
+  const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
+  const star = starFor(doc.id);
+
+  // While editing, the TipTap editor takes over; viewing always uses the
+  // proven read pipeline (KaTeX math, centered display, compact tables).
+  if (editing) {
+    return <DocEditorPane doc={doc} onDone={() => setEditing(false)} />;
+  }
+
+  return (
+    <div className="document-layout">
+      <article className="document-article">
+        <header className="document-header">
+          <div className="document-header-row">
+            <h1 className="document-title">
+              {doc.emoji && <span className="document-emoji">{doc.emoji}</span>}
+              {doc.title || "Untitled"}
+            </h1>
+            <div className="document-actions">
               <Viewers documentId={doc.id} />
               <button
                 className={`document-icon-button ${star ? "starred" : ""}`}
@@ -511,27 +568,28 @@ function EditableDocument({
               </button>
               <button
                 className="document-button primary"
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || !dirty || !title.trim()}
+                onClick={() => setEditing(true)}
               >
-                {saveMutation.isPending ? "保存中…" : dirty ? "保存" : "已保存"}
+                编辑
               </button>
             </div>
           </div>
           <div className="document-meta">
             <span>更新于 {new Date(doc.updatedAt).toLocaleDateString()}</span>
             {doc.updatedBy && <span>by {doc.updatedBy.name}</span>}
-            <span className="document-meta-hint">⌘/Ctrl+S 保存</span>
-            {dirty && <span className="document-dirty">未保存</span>}
           </div>
         </header>
 
         <div className="document-body">
-          <MarkdownEditorContent editor={editor} />
+          {doc.text.trim() ? (
+            <MarkdownRenderer content={doc.text} />
+          ) : (
+            <p className="document-blank">此文档暂无内容，点击右上角“编辑”开始撰写。</p>
+          )}
         </div>
       </article>
 
-      {showToc && panel === "none" && <Toc markdown={liveMarkdown} />}
+      {showToc && panel === "none" && <Toc markdown={doc.text} />}
       {panel === "history" && (
         <HistoryPanel
           documentId={doc.id}
