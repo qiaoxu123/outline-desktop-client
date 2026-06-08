@@ -1,3 +1,8 @@
+## [1.4.3] - 2026-06-08
+
+### Fixes
+- **Tabs flush to the sidebar.** Removed the tab bar's left padding so the first tab's left edge aligns with the sidebar's right edge (the content area's left edge).
+
 ## [1.4.2] - 2026-06-08
 
 ### Fixes

@@ -2,7 +2,9 @@
   display: flex;
   align-items: stretch;
   gap: 2px;
-  padding: 5px 8px 0 10px;
+  /* no left padding — the first tab sits flush against the sidebar's right
+     edge (i.e. the content area's left edge) */
+  padding: 5px 8px 0 0;
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   overflow-x: auto;
