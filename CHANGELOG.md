@@ -1,3 +1,9 @@
+## [1.1.1] - 2026-06-08
+
+### Fixes
+- **Block math now renders in the editor.** The Mathematics extension's default regex only matched inline `$...$`, so `$$block$$` display formulas showed as raw text in the (default) edit view. Extended the regex to match `$$…$$` too, and added an editor-load normalization that collapses multi-line `$$\n…\n$$` blocks onto a single line (skipping fenced code) so they land in one text node and render. Added styling for the rendered KaTeX / raw-source spans.
+- **Compact tables.** Tables were stretched to 100% width with tall rows. Now content-width (`width:auto; max-width:100%`), cell padding reduced to 4px 10px, and paragraph margins inside cells removed — matching the web app's density. Applied to both read and edit views.
+
 ## [1.1.0] - 2026-06-08
 
 ### Features (web-parity)

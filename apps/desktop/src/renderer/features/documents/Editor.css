@@ -139,3 +139,49 @@
   overflow-x: auto;
   overflow-y: hidden;
 }
+
+/* TipTap Mathematics: the rendered KaTeX preview span */
+.Tiptap-mathematics-render {
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.Tiptap-mathematics-render--editable:hover {
+  background: var(--color-bg-secondary);
+  border-radius: 4px;
+}
+
+/* raw source shown while the caret is inside a formula */
+.Tiptap-mathematics-editor {
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* compact tables (match Outline web) */
+.doc-editor .ProseMirror table {
+  border-collapse: collapse;
+  width: auto;
+  max-width: 100%;
+  margin: 0.8em 0;
+  font-size: 14px;
+}
+
+.doc-editor .ProseMirror th,
+.doc-editor .ProseMirror td {
+  border: 1px solid var(--color-border);
+  padding: 4px 10px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.doc-editor .ProseMirror th {
+  background: var(--color-bg-secondary);
+  font-weight: 600;
+}
+
+.doc-editor .ProseMirror td > p,
+.doc-editor .ProseMirror th > p {
+  margin: 0;
+}

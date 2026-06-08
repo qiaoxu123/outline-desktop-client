@@ -20,6 +20,45 @@ import "katex/dist/katex.min.css";
 import "./Editor.css";
 
 /**
+ * Collapse multi-line block math (`$$` on its own lines) into a single
+ * `$$ … $$` line so it lands in one text node and the Mathematics regex can
+ * match it. Fenced code blocks are skipped so we don't touch real code.
+ */
+function flattenBlockMath(markdown: string): string {
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let inFence = false;
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^(```|~~~)/.test(line.trim())) {
+      inFence = !inFence;
+      out.push(line);
+      i++;
+      continue;
+    }
+    if (!inFence && line.trim() === "$$") {
+      // gather until the closing $$
+      const body: string[] = [];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() !== "$$") {
+        body.push(lines[j].trim());
+        j++;
+      }
+      if (j < lines.length) {
+        out.push(`$$${body.join(" ").trim()}$$`);
+        i = j + 1;
+        continue;
+      }
+    }
+    out.push(line);
+    i++;
+  }
+  return out.join("\n");
+}
+
+/**
  * In-place rich text editor — TipTap (ProseMirror, the same engine Outline
  * uses) with two-way markdown conversion. The content area looks identical
  * to the read view; you simply start typing.
@@ -44,9 +83,12 @@ export function useMarkdownEditor(
         TableCell,
         TableHeader,
         Placeholder.configure({ placeholder: "开始编写…" }),
-        // Renders $inline$ / $$block$$ LaTeX with KaTeX while keeping the
-        // source text (so markdown round-trip is preserved).
+        // Renders LaTeX with KaTeX while keeping the source text (so markdown
+        // round-trip is preserved). The default regex only matches inline
+        // `$...$`; we extend it to also catch block `$$...$$` (matched first),
+        // otherwise display formulas render as raw text in the editor.
         Mathematics.configure({
+          regex: /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g,
           katexOptions: { throwOnError: false },
         }),
         Markdown.configure({
@@ -56,7 +98,7 @@ export function useMarkdownEditor(
           transformPastedText: true,
         }),
       ],
-      content: initialMarkdown,
+      content: flattenBlockMath(initialMarkdown),
     },
     [],
   );
