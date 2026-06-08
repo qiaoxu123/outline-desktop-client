@@ -97,6 +97,7 @@ export function registerAuthHandlers(): void {
         credentials: "include",
         cache: "no-store",
         headers: { Accept: "text/html" },
+        signal: AbortSignal.timeout(15_000),
       });
       const csrf = await getCookieValue(ses, CSRF_COOKIE);
 
@@ -110,7 +111,9 @@ export function registerAuthHandlers(): void {
           ...(csrf ? { [CSRF_HEADER]: csrf } : {}),
         },
         body: JSON.stringify({ email: parsed.data.email, preferOTP: true }),
+        signal: AbortSignal.timeout(15_000),
       });
+      console.log("[auth] /auth/email status:", response.status);
 
       const body = (await response.json().catch(() => ({}))) as {
         success?: boolean;
@@ -182,48 +185,66 @@ export function registerAuthHandlers(): void {
       // Drop any stale session cookie so the jar reflects only this attempt
       await ses.cookies.remove(OUTLINE_URL, "accessToken").catch(() => {});
 
-      // GET with redirect-follow: Chromium processes Set-Cookie on every hop,
-      // so on success the jar ends up holding the accessToken session cookie.
-      const response = await ses.fetch(
-        `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`,
-        {
+      // Walk redirects manually: Chromium still records Set-Cookie on every
+      // hop, but we only follow same-origin hops with a hard timeout per
+      // request. (redirect:"follow" can hang indefinitely if the server's
+      // post-login redirect target — its configured team URL — points
+      // somewhere unreachable, which shows up as an infinite spinner.)
+      let url = `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`;
+      let lastStatus = 0;
+      let lastResponse: Response | null = null;
+
+      for (let hop = 0; hop < 5; hop++) {
+        console.log(`[auth] callback hop ${hop}: GET ${url}`);
+        const response = await ses.fetch(url, {
           credentials: "include",
-          redirect: "follow",
+          redirect: "manual",
           cache: "no-store",
           headers: { Accept: "text/html,application/json" },
-        },
-      );
+          signal: AbortSignal.timeout(15_000),
+        });
+        lastStatus = response.status;
+        lastResponse = response;
+        console.log(`[auth] callback hop ${hop}: status ${response.status}`);
 
-      const token = await getCookieValue(ses, "accessToken");
-      if (token) {
-        return ok({ token, cookieName: "accessToken" });
-      }
+        // Session established? (jar is updated even on redirect responses)
+        const token = await getCookieValue(ses, "accessToken");
+        if (token) {
+          console.log("[auth] accessToken acquired");
+          return ok({ token, cookieName: "accessToken" });
+        }
 
-      // No session: the server redirected to /?notice=… — read it off the
-      // final URL after redirects
-      try {
-        const finalUrl = new URL(response.url);
-        const notice = finalUrl.searchParams.get("notice");
+        const location = response.headers.get("location");
+        if (!location) break;
+
+        const next = new URL(location, url);
+        console.log(`[auth] callback redirect -> ${next.toString()}`);
+
+        const notice = next.searchParams.get("notice");
         if (notice) {
-          const description = finalUrl.searchParams.get("description");
+          const description = next.searchParams.get("description");
           return fail(
             "NOTICE",
             NOTICE_MESSAGES[notice] ??
               `登录失败（${notice}${description ? `: ${description}` : ""}）`,
           );
         }
-      } catch {
-        /* fall through to generic error */
+
+        if (!next.toString().startsWith(OUTLINE_URL)) {
+          console.warn("[auth] off-origin redirect, not following:", next.origin);
+          break;
+        }
+        url = next.toString();
       }
 
-      if (response.status >= 400) {
-        const body = (await response.json().catch(() => ({}))) as {
+      if (lastStatus >= 400 && lastResponse) {
+        const body = (await lastResponse.json().catch(() => ({}))) as {
           message?: string;
           error?: string;
         };
         return fail(
           "CALLBACK_FAILED",
-          body.message ?? body.error ?? `服务器返回 ${response.status}`,
+          body.message ?? body.error ?? `服务器返回 ${lastStatus}`,
         );
       }
 
@@ -233,9 +254,12 @@ export function registerAuthHandlers(): void {
       );
     } catch (err) {
       console.error("[auth] email.callback error:", err);
+      const msg = err instanceof Error ? err.message : "";
       return fail(
         "NETWORK",
-        err instanceof Error ? err.message : "网络错误，请检查网络后重试",
+        msg.includes("abort") || msg.includes("timeout") || msg.includes("Timeout")
+          ? "服务器响应超时，请重试"
+          : msg || "网络错误，请检查网络后重试",
       );
     }
   });
