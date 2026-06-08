@@ -6,6 +6,7 @@ export interface ElectronAPI {
     create: (payload: unknown) => Promise<unknown>;
     update: (payload: unknown) => Promise<unknown>;
     delete: (id: string) => Promise<unknown>;
+    verify: (id: string) => Promise<unknown>;
     testConnection: (payload: unknown) => Promise<unknown>;
   };
   collections: {
@@ -29,6 +30,7 @@ const api: ElectronAPI = {
     create: (payload) => ipcRenderer.invoke("profiles:create", payload),
     update: (payload) => ipcRenderer.invoke("profiles:update", payload),
     delete: (id) => ipcRenderer.invoke("profiles:delete", id),
+    verify: (id) => ipcRenderer.invoke("profiles:verify", id),
     testConnection: (payload) =>
       ipcRenderer.invoke("profiles:testConnection", payload),
   },

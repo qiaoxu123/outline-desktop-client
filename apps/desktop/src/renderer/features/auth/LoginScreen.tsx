@@ -14,7 +14,11 @@ type IpcResult<T> = {
 
 type Step = "email" | "link";
 
-export default function LoginScreen(): React.ReactElement {
+export default function LoginScreen({
+  notice = "",
+}: {
+  notice?: string;
+}): React.ReactElement {
   const api = useElectronAPI();
   const addProfile = useProfileStore((s) => s.addProfile);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
@@ -24,7 +28,7 @@ export default function LoginScreen(): React.ReactElement {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(notice);
 
   const saveProfile = async (token: string) => {
     setStatus("正在保存登录信息…");

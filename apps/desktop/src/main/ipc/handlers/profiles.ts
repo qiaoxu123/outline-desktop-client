@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import { z } from "zod";
 import { readProfiles, writeProfiles, type StoredProfile } from "../../services/storage/profiles";
-import { apiRequest } from "@outline/api-client";
+import { apiRequest, AuthError } from "@outline/api-client";
 
 const ProfileCreateSchema = z.object({
   name: z.string().min(1),
@@ -107,6 +107,32 @@ export function registerProfileHandlers(): void {
       return ok({ deleted: true });
     } catch (err) {
       return fail("WRITE_ERROR", err instanceof Error ? err.message : "Failed to delete profile");
+    }
+  });
+
+  // Verify a stored profile's token is still accepted by the server.
+  // valid:false + reason:"auth" → token expired/revoked (caller should drop it)
+  // valid:false + reason:"network" → server unreachable (keep the profile)
+  ipcMain.handle("profiles:verify", async (_event, id: unknown) => {
+    if (typeof id !== "string") {
+      return fail("VALIDATION", "id must be a string");
+    }
+
+    const profile = readProfiles().find((p) => p.id === id);
+    if (!profile) return fail("NOT_FOUND", "Profile not found");
+
+    try {
+      await apiRequest(
+        { baseUrl: profile.serverUrl, token: profile.apiKey, timeoutMs: 8_000 },
+        "auth.info",
+        {},
+      );
+      return ok({ valid: true });
+    } catch (err) {
+      if (err instanceof AuthError) {
+        return ok({ valid: false, reason: "auth" });
+      }
+      return ok({ valid: false, reason: "network" });
     }
   });
 

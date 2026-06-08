@@ -1,17 +1,22 @@
 import { useProfileStore, useUIStore } from "../../state/uiStore";
+import { useElectronAPI } from "../../hooks/useElectronAPI";
 import "./SettingsView.css";
 
 const SERVER_URL = "https://notes.jlu-mcns.site";
 
 export default function SettingsView(): React.ReactElement {
+  const api = useElectronAPI();
   const profiles = useProfileStore((s) => s.profiles);
   const removeProfile = useProfileStore((s) => s.removeProfile);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (activeProfileId) {
+      // Delete from disk too — otherwise the profile resurrects on restart
+      // and the login screen never shows again.
+      await api.profiles.delete(activeProfileId);
       removeProfile(activeProfileId);
       setActiveProfileId(null);
     }

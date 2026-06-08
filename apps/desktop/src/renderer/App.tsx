@@ -25,19 +25,43 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
   const [loading, setLoading] = useState(true);
+  const [loginNotice, setLoginNotice] = useState("");
 
   useEffect(() => {
-    api.profiles.list().then((result) => {
-      const r = result as {
+    const init = async () => {
+      const r = (await api.profiles.list()) as {
         ok: boolean;
         data?: { id: string; name: string; serverUrl: string; createdAt: string }[];
       };
-      if (r.ok && r.data && r.data.length > 0) {
-        setProfiles(r.data);
-        setActiveProfileId(r.data[0].id);
+
+      if (!r.ok || !r.data || r.data.length === 0) {
+        setLoading(false);
+        return;
       }
+
+      // Validate the stored session before entering the app — stale or
+      // pre-seeded tokens otherwise skip the login screen forever.
+      const profile = r.data[0];
+      const v = (await api.profiles.verify(profile.id)) as {
+        ok: boolean;
+        data?: { valid: boolean; reason?: string };
+      };
+
+      if (v.ok && v.data && !v.data.valid && v.data.reason === "auth") {
+        // Token expired/revoked: drop the profile and show the login screen
+        await api.profiles.delete(profile.id);
+        setLoginNotice("登录已过期，请重新登录。");
+        setLoading(false);
+        return;
+      }
+
+      // Valid token (or server temporarily unreachable): enter the app
+      setProfiles(r.data);
+      setActiveProfileId(profile.id);
       setLoading(false);
-    });
+    };
+
+    void init();
   }, []);
 
   if (loading) {
@@ -53,7 +77,7 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
   }
 
   if (!activeProfileId) {
-    return <LoginScreen />;
+    return <LoginScreen notice={loginNotice} />;
   }
 
   return <>{children}</>;
