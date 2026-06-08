@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   useEditor,
   EditorContent,
@@ -29,12 +30,15 @@ const MarkdownHighlight = Highlight.extend({
   addStorage() {
     return {
       markdown: {
+        // Markdown only encodes "highlighted" (==), not the specific color —
+        // this matches Outline's own markdown export. The chosen color shows
+        // live in the editor; on reload via markdown it falls back to default.
         serialize: { open: "==", close: "==", expelEnclosingWhitespace: true },
         parse: {},
       },
     };
   },
-});
+}).configure({ multicolor: true });
 
 /**
  * Collapse multi-line block math (`$$` on its own lines) into a single
@@ -130,6 +134,16 @@ export function getMarkdown(editor: TiptapEditor): string {
   ).markdown!.getMarkdown();
 }
 
+/* Outline's 6 highlight preset colors (shared/utils/color.ts). */
+const HIGHLIGHT_COLORS: { hex: string; name: string }[] = [
+  { hex: "#FDEA9B", name: "珊瑚黄" },
+  { hex: "#FED46A", name: "杏橙" },
+  { hex: "#FA551E", name: "落日橙" },
+  { hex: "#B4DC19", name: "青柠" },
+  { hex: "#C8AFF0", name: "泡泡紫" },
+  { hex: "#3CBEFC", name: "霓虹蓝" },
+];
+
 /* ---------- selection toolbar (bubble menu) ---------- */
 
 function ToolbarButton({
@@ -155,6 +169,61 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+function HighlightControl({
+  editor,
+}: {
+  editor: TiptapEditor;
+}): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const active = editor.isActive("highlight");
+
+  return (
+    <span className="bubble-hl-wrap">
+      <button
+        type="button"
+        className={`bubble-btn ${active ? "active" : ""}`}
+        title="高亮"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setOpen((v) => !v);
+        }}
+      >
+        <span className="bubble-hl">A</span>
+      </button>
+      {open && (
+        <span className="bubble-hl-popover">
+          {HIGHLIGHT_COLORS.map((c) => (
+            <button
+              key={c.hex}
+              type="button"
+              className="bubble-swatch"
+              title={c.name}
+              style={{ background: c.hex }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                editor.chain().focus().setHighlight({ color: c.hex }).run();
+                setOpen(false);
+              }}
+            />
+          ))}
+          <button
+            type="button"
+            className="bubble-swatch bubble-swatch-none"
+            title="取消高亮"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().unsetHighlight().run();
+              setOpen(false);
+            }}
+          >
+            ⌀
+          </button>
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -201,13 +270,7 @@ function SelectionToolbar({
       >
         <s>S</s>
       </ToolbarButton>
-      <ToolbarButton
-        title="高亮"
-        active={editor.isActive("highlight")}
-        onClick={() => editor.chain().focus().toggleHighlight().run()}
-      >
-        <span className="bubble-hl">H</span>
-      </ToolbarButton>
+      <HighlightControl editor={editor} />
       <ToolbarButton
         title="行内代码"
         active={editor.isActive("code")}

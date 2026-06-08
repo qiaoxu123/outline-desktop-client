@@ -132,11 +132,55 @@
   color: #5a4a00;
   border-radius: 3px;
   padding: 0 4px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .bubble-btn.active .bubble-hl {
   background: rgba(255, 255, 255, 0.85);
+}
+
+/* highlight color picker popover */
+.bubble-hl-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bubble-hl-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 5;
+}
+
+.bubble-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bubble-swatch:hover {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.bubble-swatch-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 
 .bubble-divider {

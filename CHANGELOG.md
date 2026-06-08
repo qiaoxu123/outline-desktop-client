@@ -1,3 +1,8 @@
+## [1.7.0] - 2026-06-08
+
+### Features
+- **Highlight color picker (6 Outline presets).** The highlight button now opens a swatch popover with Outline's exact preset palette — 珊瑚黄 #FDEA9B, 杏橙 #FED46A, 落日橙 #FA551E, 青柠 #B4DC19, 泡泡紫 #C8AFF0, 霓虹蓝 #3CBEFC — plus a remove option. (Markdown stores `==` only, so the specific color is a live-editor attribute and falls back to default on reload — this matches Outline's own markdown export.)
+
 ## [1.6.0] - 2026-06-08
 
 ### Features
