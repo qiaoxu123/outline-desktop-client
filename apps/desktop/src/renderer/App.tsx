@@ -8,7 +8,74 @@ import SettingsView from "./features/profiles/SettingsView";
 import LoginScreen from "./features/auth/LoginScreen";
 import { useUIStore, useProfileStore } from "./state/uiStore";
 import { useElectronAPI } from "./hooks/useElectronAPI";
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState, type ReactNode } from "react";
+
+/**
+ * Without a boundary, any render error unmounts the entire React tree and
+ * leaves a silent white window. Show the error instead.
+ */
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error };
+  }
+
+  componentDidCatch(error: Error): void {
+    console.error("[renderer] render crash:", error);
+  }
+
+  render(): ReactNode {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100vh",
+            gap: "12px",
+            fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+            color: "#495057",
+            background: "#f5f7fa",
+            padding: "40px",
+            textAlign: "center",
+          }}
+        >
+          <h2 style={{ color: "#e03131" }}>界面渲染出错</h2>
+          <pre
+            style={{
+              fontSize: "12px",
+              color: "#868e96",
+              whiteSpace: "pre-wrap",
+              maxWidth: "600px",
+            }}
+          >
+            {String(this.state.error)}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: "10px 24px",
+              border: "none",
+              borderRadius: "8px",
+              background: "#4c6ef5",
+              color: "white",
+              cursor: "pointer",
+            }}
+          >
+            重新加载
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,7 +138,7 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
         height: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
         color: "#6c757d", background: "#f5f7fa",
       }}>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        正在连接 JLUMCNS-MEC…
       </div>
     );
   }
@@ -85,8 +152,9 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
 
 export default function App(): React.ReactElement {
   return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <HashRouter>
         <AppInit>
           <Routes>
             <Route element={<AppShell />}>
@@ -98,7 +166,8 @@ export default function App(): React.ReactElement {
             </Route>
           </Routes>
         </AppInit>
-      </HashRouter>
-    </QueryClientProvider>
+        </HashRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

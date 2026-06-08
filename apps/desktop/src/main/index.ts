@@ -54,6 +54,24 @@ function createMainWindow(): BrowserWindow {
     mainWindow.show();
   });
 
+  // Surface renderer logs/crashes in the dev terminal — a renderer exception
+  // otherwise produces a silent white window with nothing in the terminal.
+  if (is.dev) {
+    mainWindow.webContents.on(
+      "console-message",
+      (event: unknown, ...args: unknown[]) => {
+        const e = event as { level?: number | string; message?: string };
+        const message =
+          typeof e?.message === "string" ? e.message : String(args[1] ?? "");
+        console.log("[renderer]", message);
+      },
+    );
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
+  mainWindow.webContents.on("render-process-gone", (_e, details) => {
+    console.error("[renderer] process gone:", details.reason);
+  });
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url);
     return { action: "deny" };

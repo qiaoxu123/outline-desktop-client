@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
+import { unwrapIpc } from "../../lib/ipc";
 import type { OutlineCollectionDocument } from "@outline/shared-types";
 import "./CollectionsView.css";
 
@@ -25,10 +26,9 @@ export default function CollectionsView(): React.ReactElement {
       "documents",
     ],
     queryFn: () =>
-      api.collections.documents(
-        activeProfileId!,
-        collectionId ?? "",
-      ) as Promise<CollectionDocumentsResponse>,
+      unwrapIpc<CollectionDocumentsResponse>(
+        api.collections.documents(activeProfileId!, collectionId ?? ""),
+      ),
     enabled: !!activeProfileId && !!collectionId,
   });
 

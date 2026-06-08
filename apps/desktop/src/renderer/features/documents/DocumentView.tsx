@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
+import { unwrapIpc } from "../../lib/ipc";
 import { MarkdownRenderer } from "../../lib/markdown/renderer";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
@@ -18,7 +19,9 @@ export default function DocumentView(): React.ReactElement {
   const { data, isLoading, error } = useQuery({
     queryKey: ["profile", activeProfileId, "document", documentId],
     queryFn: () =>
-      api.documents.info(activeProfileId!, documentId!) as Promise<DocumentInfoResponse>,
+      unwrapIpc<DocumentInfoResponse>(
+        api.documents.info(activeProfileId!, documentId!),
+      ),
     enabled: !!activeProfileId && !!documentId,
   });
 

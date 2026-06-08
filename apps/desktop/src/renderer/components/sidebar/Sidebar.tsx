@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useUIStore, useProfileStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
+import { unwrapIpc } from "../../lib/ipc";
 import type { OutlineCollection } from "@outline/shared-types";
 import "./Sidebar.css";
 
@@ -21,7 +22,7 @@ export default function Sidebar(): React.ReactElement {
   const { data, isLoading, error } = useQuery({
     queryKey: ["profile", activeProfileId, "collections"],
     queryFn: () =>
-      api.collections.list(activeProfileId!) as Promise<CollectionListResponse>,
+      unwrapIpc<CollectionListResponse>(api.collections.list(activeProfileId!)),
     enabled: !!activeProfileId,
   });
 
