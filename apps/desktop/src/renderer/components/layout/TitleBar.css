@@ -17,21 +17,86 @@
   display: flex;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .titlebar-left {
+  gap: 4px;
+}
+
+.titlebar-center {
   flex: 1;
-  gap: 8px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  overflow: hidden;
 }
 
 .titlebar-button {
   -webkit-app-region: no-drag;
 }
 
-.titlebar-app-name {
-  font-weight: 700;
-  font-size: 14px;
+/* wolai-style breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 13.5px;
+  -webkit-app-region: no-drag;
+}
+
+.crumb-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  padding: 3px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: inherit;
+  font-family: inherit;
+  cursor: default;
+}
+
+.crumb-link {
+  cursor: pointer;
+}
+
+.crumb-link:hover {
+  background: var(--color-bg-tertiary);
   color: var(--color-text);
+}
+
+.crumb-current {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.crumb-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumb-emoji {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.crumb-sep {
+  color: var(--color-text-muted);
+  margin: 0 2px;
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .titlebar-button {

@@ -1,3 +1,9 @@
+## [1.4.0] - 2026-06-08
+
+### Features
+- **wolai-style breadcrumb.** The title bar now shows the location path — Workspace › Collection › Document — with collection/document emoji, replacing the static "Outline" label. Each segment is clickable (workspace → home, collection → collection view). Reuses the existing query cache, so no extra requests, and updates live as the document loads.
+- **Tidier title bar.** Left holds sidebar toggle + back/forward; the breadcrumb fills the center; view/search/settings controls stay right.
+
 ## [1.3.0] - 2026-06-08
 
 ### Features

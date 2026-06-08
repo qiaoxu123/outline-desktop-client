@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
+import Breadcrumb from "./Breadcrumb";
 import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
@@ -45,7 +46,9 @@ export default function TitleBar(): React.ReactElement {
             <path d="M6 3.5L10.5 8 6 12.5l-1.06-1.06L8.38 8 4.94 4.56 6 3.5z" />
           </svg>
         </button>
-        <span className="titlebar-app-name">Outline</span>
+      </div>
+      <div className="titlebar-center">
+        <Breadcrumb />
       </div>
       <div className="titlebar-right">
         <button
