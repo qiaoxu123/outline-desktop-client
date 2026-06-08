@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
+import katexPlugin from "@vscode/markdown-it-katex";
 import hljs from "highlight.js";
+import "katex/dist/katex.min.css";
 import "./highlight-theme.css";
 
 const md = new MarkdownIt({
@@ -30,6 +32,12 @@ const md = new MarkdownIt({
 });
 
 md.use(taskLists, { enabled: true, label: true, labelAfter: true });
+// LaTeX math: $inline$ and $$block$$ rendered with KaTeX (matches Outline web)
+type MdPlugin = (md: MarkdownIt, ...args: unknown[]) => void;
+md.use(
+  (katexPlugin as unknown as { default?: MdPlugin }).default ??
+    (katexPlugin as unknown as MdPlugin),
+);
 
 const defaultRender =
   md.renderer.rules.link_open ??

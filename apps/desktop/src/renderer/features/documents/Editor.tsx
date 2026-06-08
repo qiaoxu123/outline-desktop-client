@@ -1,4 +1,9 @@
-import { useEditor, EditorContent, type Editor as TiptapEditor } from "@tiptap/react";
+import {
+  useEditor,
+  EditorContent,
+  BubbleMenu,
+  type Editor as TiptapEditor,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -9,7 +14,9 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Mathematics } from "@tiptap/extension-mathematics";
 import { Markdown } from "tiptap-markdown";
+import "katex/dist/katex.min.css";
 import "./Editor.css";
 
 /**
@@ -37,6 +44,11 @@ export function useMarkdownEditor(
         TableCell,
         TableHeader,
         Placeholder.configure({ placeholder: "开始编写…" }),
+        // Renders $inline$ / $$block$$ LaTeX with KaTeX while keeping the
+        // source text (so markdown round-trip is preserved).
+        Mathematics.configure({
+          katexOptions: { throwOnError: false },
+        }),
         Markdown.configure({
           html: false,
           linkify: true,
@@ -56,10 +68,137 @@ export function getMarkdown(editor: TiptapEditor): string {
   ).markdown!.getMarkdown();
 }
 
+/* ---------- selection toolbar (bubble menu) ---------- */
+
+function ToolbarButton({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <button
+      type="button"
+      className={`bubble-btn ${active ? "active" : ""}`}
+      title={title}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SelectionToolbar({
+  editor,
+}: {
+  editor: TiptapEditor;
+}): React.ReactElement {
+  return (
+    <BubbleMenu
+      editor={editor}
+      tippyOptions={{ duration: 100 }}
+      className="bubble-menu"
+    >
+      <ToolbarButton
+        title="加粗"
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        <strong>B</strong>
+      </ToolbarButton>
+      <ToolbarButton
+        title="斜体"
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        <em>I</em>
+      </ToolbarButton>
+      <ToolbarButton
+        title="删除线"
+        active={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      >
+        <s>S</s>
+      </ToolbarButton>
+      <ToolbarButton
+        title="行内代码"
+        active={editor.isActive("code")}
+        onClick={() => editor.chain().focus().toggleCode().run()}
+      >
+        {"</>"}
+      </ToolbarButton>
+      <span className="bubble-divider" />
+      <ToolbarButton
+        title="标题 1"
+        active={editor.isActive("heading", { level: 1 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+      >
+        H1
+      </ToolbarButton>
+      <ToolbarButton
+        title="标题 2"
+        active={editor.isActive("heading", { level: 2 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+      >
+        H2
+      </ToolbarButton>
+      <ToolbarButton
+        title="引用"
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        ❝
+      </ToolbarButton>
+      <ToolbarButton
+        title="项目符号列表"
+        active={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        •
+      </ToolbarButton>
+      <span className="bubble-divider" />
+      <ToolbarButton
+        title="链接"
+        active={editor.isActive("link")}
+        onClick={() => {
+          const prev = (editor.getAttributes("link").href as string) ?? "";
+          const url = window.prompt("链接地址", prev);
+          if (url === null) return;
+          if (url === "") {
+            editor.chain().focus().extendMarkRange("link").unsetLink().run();
+          } else {
+            editor
+              .chain()
+              .focus()
+              .extendMarkRange("link")
+              .setLink({ href: url })
+              .run();
+          }
+        }}
+      >
+        🔗
+      </ToolbarButton>
+    </BubbleMenu>
+  );
+}
+
 export function MarkdownEditorContent({
   editor,
 }: {
   editor: TiptapEditor | null;
 }): React.ReactElement {
-  return <EditorContent editor={editor} className="doc-editor" />;
+  return (
+    <>
+      {editor && <SelectionToolbar editor={editor} />}
+      <EditorContent editor={editor} className="doc-editor" />
+    </>
+  );
 }

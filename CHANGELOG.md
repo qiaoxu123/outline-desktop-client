@@ -1,3 +1,14 @@
+## [1.1.0] - 2026-06-08
+
+### Features (web-parity)
+- **LaTeX math.** `$inline$` and `$$block$$` formulas now render with KaTeX in both the read view (markdown-it-katex) and the editor (TipTap Mathematics extension, source text preserved for markdown round-trip). KaTeX fonts are bundled.
+- **Selection toolbar.** Selecting text in the editor pops a bubble toolbar — bold, italic, strikethrough, inline code, H1/H2, quote, bullet list, and link.
+- **Comments.** A comments panel (comments.list/create) on documents: read the thread and post new comments; available in both edit and read views.
+- **Viewers (presence).** Recent-viewer avatars shown top-right of a document (views.list, refreshed every 30s). Note: this is the REST "who has viewed" list, the closest approximation to web's live websocket presence.
+
+### Notes
+- True real-time presence (live cursors) requires Outline's collaboration websocket and is out of scope for this REST client; the viewer avatars cover "who's been here recently."
+
 ## [1.0.1] - 2026-06-08
 
 ### Fixes

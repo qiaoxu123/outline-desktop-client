@@ -35,6 +35,13 @@ const ALLOWED_METHODS = new Set([
   // revisions (history)
   "revisions.list",
   "revisions.info",
+  // comments
+  "comments.list",
+  "comments.create",
+  "comments.delete",
+  // views / presence
+  "views.list",
+  "views.create",
   // collections
   "collections.info",
 ]);

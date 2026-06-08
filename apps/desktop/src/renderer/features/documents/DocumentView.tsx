@@ -8,6 +8,7 @@ import {
   useStars,
   useToggleStar,
   canUserEdit,
+  absoluteUrl,
 } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
 import { MarkdownRenderer } from "../../lib/markdown/renderer";
@@ -180,6 +181,209 @@ function HistoryPanel({
   );
 }
 
+/* ---------- viewers (presence approximation) ---------- */
+
+interface Viewer {
+  id: string;
+  user: { id: string; name: string; avatarUrl?: string | null };
+  lastViewedAt?: string;
+}
+
+function Viewers({ documentId }: { documentId: string }): React.ReactElement | null {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+
+  // Refetch periodically so the avatar row reflects who's recently been here.
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "views", documentId],
+    queryFn: () =>
+      unwrapIpc<{ data: Viewer[] }>(
+        api.call(activeProfileId!, "views.list", { documentId }),
+      ),
+    enabled: !!activeProfileId,
+    refetchInterval: 30_000,
+  });
+
+  const viewers = data?.data ?? [];
+  if (viewers.length === 0) return null;
+
+  // Most recent first, cap at 5 avatars + overflow count
+  const sorted = [...viewers].sort((a, b) =>
+    (b.lastViewedAt ?? "").localeCompare(a.lastViewedAt ?? ""),
+  );
+  const shown = sorted.slice(0, 5);
+  const extra = sorted.length - shown.length;
+
+  return (
+    <div className="document-viewers" title="最近查看者">
+      {shown.map((v) => {
+        const url = absoluteUrl(v.user.avatarUrl);
+        return url ? (
+          <img
+            key={v.id}
+            className="viewer-avatar"
+            src={url}
+            alt={v.user.name}
+            title={v.user.name}
+          />
+        ) : (
+          <div
+            key={v.id}
+            className="viewer-avatar viewer-avatar-fallback"
+            title={v.user.name}
+          >
+            {(v.user.name || "?").slice(0, 1).toUpperCase()}
+          </div>
+        );
+      })}
+      {extra > 0 && <div className="viewer-avatar viewer-more">+{extra}</div>}
+    </div>
+  );
+}
+
+/* ---------- comments panel ---------- */
+
+interface Comment {
+  id: string;
+  data?: { content?: string };
+  text?: string;
+  createdAt: string;
+  createdBy?: { id: string; name: string; avatarUrl?: string | null };
+}
+
+function commentText(c: Comment): string {
+  // Outline stores rich comment data; fall back to any plain text field.
+  if (c.text) return c.text;
+  const content = c.data?.content;
+  if (typeof content === "string") return content;
+  if (content && typeof content === "object") {
+    try {
+      return extractProseText(content);
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function extractProseText(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const n = node as { text?: string; content?: unknown[] };
+  if (typeof n.text === "string") return n.text;
+  if (Array.isArray(n.content)) {
+    return n.content.map(extractProseText).join("");
+  }
+  return "";
+}
+
+function CommentsPanel({
+  documentId,
+  onClose,
+}: {
+  documentId: string;
+  onClose: () => void;
+}): React.ReactElement {
+  const api = useElectronAPI();
+  const queryClient = useQueryClient();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const [draft, setDraft] = useState("");
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["profile", activeProfileId, "comments", documentId],
+    queryFn: () =>
+      unwrapIpc<{ data: Comment[] }>(
+        api.call(activeProfileId!, "comments.list", { documentId }),
+      ),
+    enabled: !!activeProfileId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (text: string) =>
+      unwrapIpc(
+        api.call(activeProfileId!, "comments.create", {
+          documentId,
+          // Outline expects ProseMirror doc data; a single paragraph works.
+          data: {
+            type: "doc",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text }] },
+            ],
+          },
+        }),
+      ),
+    onSuccess: () => {
+      setDraft("");
+      void queryClient.invalidateQueries({
+        queryKey: ["profile", activeProfileId, "comments", documentId],
+      });
+    },
+  });
+
+  const comments = data?.data ?? [];
+
+  return (
+    <div className="comments-panel">
+      <div className="comments-header">
+        <span>评论{comments.length > 0 ? ` (${comments.length})` : ""}</span>
+        <button className="history-close" onClick={onClose} title="关闭">
+          ✕
+        </button>
+      </div>
+
+      {isLoading && <p className="history-note">加载中…</p>}
+      {!!error && <p className="history-note error">无法加载评论</p>}
+      {!isLoading && comments.length === 0 && (
+        <p className="history-note">还没有评论，来写第一条吧。</p>
+      )}
+
+      <div className="comments-list">
+        {comments.map((c) => {
+          const url = absoluteUrl(c.createdBy?.avatarUrl);
+          return (
+            <div key={c.id} className="comment-item">
+              <div className="comment-avatar">
+                {url ? (
+                  <img src={url} alt={c.createdBy?.name} />
+                ) : (
+                  <span className="comment-avatar-fallback">
+                    {(c.createdBy?.name || "?").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="comment-body">
+                <div className="comment-meta">
+                  <span className="comment-author">{c.createdBy?.name}</span>
+                  <span className="comment-time">
+                    {new Date(c.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <div className="comment-text">{commentText(c)}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="comments-composer">
+        <textarea
+          className="comments-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="写下评论…"
+          rows={3}
+        />
+        <button
+          className="document-button primary"
+          onClick={() => draft.trim() && createMutation.mutate(draft.trim())}
+          disabled={createMutation.isPending || !draft.trim()}
+        >
+          {createMutation.isPending ? "发送中…" : "发表评论"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- editable document (remounted per document via key) ---------- */
 
 function EditableDocument({
@@ -199,7 +403,7 @@ function EditableDocument({
   const [title, setTitle] = useState(doc.title);
   const [dirty, setDirty] = useState(false);
   const [liveMarkdown, setLiveMarkdown] = useState(doc.text);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
   const [saveError, setSaveError] = useState("");
 
   const editor = useMarkdownEditor(doc.text, true);
@@ -271,6 +475,7 @@ function EditableDocument({
               {saveError && (
                 <span className="document-save-error">{saveError}</span>
               )}
+              <Viewers documentId={doc.id} />
               <button
                 className={`document-icon-button ${star ? "starred" : ""}`}
                 onClick={() => toggleStar(doc.id, star)}
@@ -286,8 +491,21 @@ function EditableDocument({
                 </svg>
               </button>
               <button
-                className="document-button subtle"
-                onClick={() => setHistoryOpen(!historyOpen)}
+                className={`document-icon-button ${panel === "comments" ? "active" : ""}`}
+                onClick={() =>
+                  setPanel(panel === "comments" ? "none" : "comments")
+                }
+                title="评论"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3z" />
+                </svg>
+              </button>
+              <button
+                className={`document-button subtle ${panel === "history" ? "active" : ""}`}
+                onClick={() =>
+                  setPanel(panel === "history" ? "none" : "history")
+                }
               >
                 历史
               </button>
@@ -313,13 +531,16 @@ function EditableDocument({
         </div>
       </article>
 
-      {showToc && !historyOpen && <Toc markdown={liveMarkdown} />}
-      {historyOpen && (
+      {showToc && panel === "none" && <Toc markdown={liveMarkdown} />}
+      {panel === "history" && (
         <HistoryPanel
           documentId={doc.id}
-          onClose={() => setHistoryOpen(false)}
+          onClose={() => setPanel("none")}
           onRestored={onRestored}
         />
+      )}
+      {panel === "comments" && (
+        <CommentsPanel documentId={doc.id} onClose={() => setPanel("none")} />
       )}
     </div>
   );
@@ -332,6 +553,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
   const { starFor } = useStars();
   const { toggle: toggleStar, isPending: starPending } = useToggleStar();
   const star = starFor(doc.id);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   return (
     <div className="document-layout">
@@ -343,6 +565,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
               {doc.title || "Untitled"}
             </h1>
             <div className="document-actions">
+              <Viewers documentId={doc.id} />
               <button
                 className={`document-icon-button ${star ? "starred" : ""}`}
                 onClick={() => toggleStar(doc.id, star)}
@@ -355,6 +578,15 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
                   strokeWidth="1.4"
                 >
                   <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
+                </svg>
+              </button>
+              <button
+                className={`document-icon-button ${commentsOpen ? "active" : ""}`}
+                onClick={() => setCommentsOpen(!commentsOpen)}
+                title="评论"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3z" />
                 </svg>
               </button>
             </div>
@@ -373,7 +605,10 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
           )}
         </div>
       </article>
-      {showToc && <Toc markdown={doc.text} />}
+      {showToc && !commentsOpen && <Toc markdown={doc.text} />}
+      {commentsOpen && (
+        <CommentsPanel documentId={doc.id} onClose={() => setCommentsOpen(false)} />
+      )}
     </div>
   );
 }
