@@ -1,3 +1,16 @@
+## [0.1.3] - 2026-06-08
+
+### Fixes (verified against outline/outline server source)
+- **Email send failed: missing CSRF.** All `/auth` routes verify a CSRF double-submit (`csrfToken` cookie issued on any GET + matching `x-csrf-token` header). `auth:requestEmailLogin` now GETs the site root first to obtain the cookie and echoes it on the POST.
+- **Callback never signed in: missing `follow=true`.** The emailed link deliberately omits `follow` to defeat mail-client prefetching; without it the server returns a client-side redirect page and never creates a session. The exchange now always appends `follow=true`.
+- **Browser login false-positive.** The old handler resolved on the first navigation that wasn't under `/auth/` — i.e. the login page itself — and saved junk cookies (e.g. `csrfToken`) as the API token, producing a "logged in but broken" state. Success is now defined solely by the appearance of a real `accessToken` session cookie (checked on navigation events + 2s poll); all junk fallbacks removed. The window also stays open and visible until actual sign-in.
+
+### Features
+- **OTP login.** `POST /auth/email` now sends `preferOTP: true` — the server emails a 6-digit verification code, which is far better desktop UX than copying a link. The second step accepts either the code (exchanged via `code`+`email`) or a pasted magic link (older servers without OTP support). New notices handled: `invalid-code`, `user-suspended`.
+
+### Notes
+- Full protocol (CSRF reject → CSRF success → OTP exchange → bad code → link exchange → expired link) covered by a mock-server test mirroring the real middleware.
+
 ## [0.1.2] - 2026-06-08
 
 ### Features

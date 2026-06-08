@@ -86,6 +86,7 @@ export default function LoginScreen({
     try {
       const result = (await api.auth.completeEmailLogin(
         link.trim(),
+        email.trim(),
       )) as IpcResult<{ token: string }>;
 
       if (result.ok && result.data?.token) {
@@ -194,21 +195,22 @@ export default function LoginScreen({
         ) : (
           <form className="login-form" onSubmit={handleCompleteLogin}>
             <p className="login-description">
-              登录邮件已发送至 <strong>{email}</strong>。
+              验证邮件已发送至 <strong>{email}</strong>。
               <br />
-              请打开邮件，<strong>复制其中的登录链接</strong>
-              （右键复制链接地址，不要直接点击），粘贴到下方：
+              请输入邮件中的 <strong>6 位验证码</strong>
+              ；如果邮件里是登录链接，也可以复制链接粘贴到这里（不要点击链接）。
             </p>
 
             <input
               className="login-input"
               type="text"
-              placeholder={`${SERVER_URL}/auth/email.callback?token=…`}
+              placeholder="6 位验证码，或粘贴登录链接"
               value={link}
               onChange={(e) => setLink(e.target.value)}
               autoFocus
               disabled={busy}
               spellCheck={false}
+              autoComplete="one-time-code"
             />
 
             <button
@@ -240,8 +242,7 @@ export default function LoginScreen({
             </button>
 
             <p className="login-hint">
-              链接 10 分钟内有效，且只能使用一次。如果你已在浏览器里点开过链接，
-              请返回上一步重新发送。
+              验证码/链接 10 分钟内有效，且只能使用一次。失效请返回上一步重新发送。
             </p>
           </form>
         )}
