@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "cubox": {
+      "source": "OLCUBO/cubox-cli",
+      "sourceType": "github",
+      "skillPath": "skills/cubox/SKILL.md",
+      "computedHash": "eebb80552594efd848533a6c884f3fd14b00408d02e399ad9b48c95dcdc0e678"
+    }
+  }
+}

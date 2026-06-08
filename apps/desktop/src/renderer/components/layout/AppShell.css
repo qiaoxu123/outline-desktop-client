@@ -32,6 +32,37 @@
     Oxygen, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
     monospace;
+  color-scheme: light;
+}
+
+/* Dark palette mirrors outline/outline shared/styles/theme.ts (buildDarkTheme),
+   with the polished lighten()/darken() helpers resolved to concrete values. */
+:root[data-theme="dark"] {
+  --color-bg: #111319;                      /* almostBlack / background */
+  --color-bg-secondary: #1f232e;            /* backgroundSecondary */
+  --color-bg-tertiary: #2a2f3e;             /* backgroundTertiary */
+  --color-border: #20242c;                  /* lighten(0.1, almostBlack) divider */
+  --color-text: #e6e6e6;                    /* almostWhite */
+  --color-text-secondary: #8290a0;          /* lighten(0.1, slate) */
+  --color-text-muted: #66778f;              /* slate */
+  --color-placeholder: #596673;
+  --color-primary: #137ffb;                 /* dark link */
+  --color-primary-hover: #3b95fc;
+  --color-accent: #137ffb;
+  --color-danger: #ed2651;
+  --color-warning: #f08a24;
+  --color-success: #3ad984;
+  --color-star: #edba07;
+
+  --sidebar-bg: #08090c;                    /* veryDarkBlue */
+  --sidebar-text: #66778f;                  /* slate */
+  --sidebar-hover: #101216;                 /* lighten(0.05, veryDarkBlue) */
+  --sidebar-active: #1a1d24;                /* lighten(0.09, veryDarkBlue) */
+
+  --color-code-bg: #1d202a;
+  --color-code-border: rgba(255, 255, 255, 0.1);
+
+  color-scheme: dark;
 }
 
 * {
@@ -105,5 +136,11 @@ body {
 .app-content.full-width .search-view,
 .app-content.full-width .settings-view,
 .app-content.full-width .collections-view {
+  max-width: none;
+}
+
+/* the document content column is capped separately — release it too, else
+   only the table-of-contents shifts while the text stays narrow */
+.app-content.full-width .document-layout .document-article {
   max-width: none;
 }

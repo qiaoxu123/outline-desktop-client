@@ -10,11 +10,14 @@ export interface UIState {
   fullWidth: boolean;
   /** Show the document table of contents panel (persisted). */
   showToc: boolean;
+  /** Color theme (persisted). "system" follows OS preference. */
+  theme: "light" | "dark" | "system";
 
   setActiveProfileId: (id: string | null) => void;
   toggleSidebar: () => void;
   toggleFullWidth: () => void;
   toggleToc: () => void;
+  setTheme: (theme: "light" | "dark" | "system") => void;
   selectCollection: (id: string | null) => void;
   selectDocument: (id: string | null) => void;
   setGlobalSearchOpen: (open: boolean) => void;
@@ -28,6 +31,9 @@ export const useUIStore = create<UIState>((set) => ({
   globalSearchOpen: false,
   fullWidth: localStorage.getItem("ui.fullWidth") === "1",
   showToc: localStorage.getItem("ui.showToc") !== "0",
+  theme:
+    (localStorage.getItem("ui.theme") as "light" | "dark" | "system" | null) ??
+    "system",
 
   setActiveProfileId: (id) => set({ activeProfileId: id }),
   toggleSidebar: () =>
@@ -44,6 +50,10 @@ export const useUIStore = create<UIState>((set) => ({
       localStorage.setItem("ui.showToc", showToc ? "1" : "0");
       return { showToc };
     }),
+  setTheme: (theme) => {
+    localStorage.setItem("ui.theme", theme);
+    set({ theme });
+  },
   selectCollection: (id) => set({ selectedCollectionId: id }),
   selectDocument: (id) => set({ selectedDocumentId: id }),
   setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),

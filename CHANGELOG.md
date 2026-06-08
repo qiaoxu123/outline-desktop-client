@@ -1,3 +1,11 @@
+## [1.0.1] - 2026-06-08
+
+### Fixes
+- **Full-width toggle now widens the document text.** The content column had its own 780px cap, so toggling full width only moved the table of contents. The cap is released in full-width mode.
+
+### Features
+- **Dark mode.** Theme selector in 设置 → 外观 (浅色 / 深色 / 跟随系统, persisted). Dark palette mirrors outline/outline `shared/styles/theme.ts` `buildDarkTheme` (background #111319, sidebar #08090C, link #137FFB, etc.), applied via `:root[data-theme="dark"]`; "跟随系统" tracks the OS `prefers-color-scheme`. Settings/search surfaces refactored to theme variables so they adapt.
+
 ## [1.0.0] - 2026-06-08
 
 First tagged release. Cross-platform (macOS / Windows / Linux) Outline desktop client with interactive email (OTP) login, Outline-native theming, an Outline-style sidebar (team header, nav, starred + collections trees, account card), in-place TipTap editing with revision history and restore, stars, shares, home (recently viewed/updated), search, role-based permissions, a global full-width toggle, and a document table of contents. See 0.1.0–0.3.0 below for the full development history.

@@ -19,6 +19,14 @@ export default function SettingsView(): React.ReactElement {
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
   const { user, team, isLoading, error } = useUserInfo();
   const avatar = absoluteUrl(user?.avatarUrl);
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
+
+  const themeOptions: { value: "light" | "dark" | "system"; label: string }[] = [
+    { value: "light", label: "浅色" },
+    { value: "dark", label: "深色" },
+    { value: "system", label: "跟随系统" },
+  ];
 
   const handleLogout = async () => {
     if (activeProfileId) {
@@ -65,6 +73,21 @@ export default function SettingsView(): React.ReactElement {
             </div>
           </div>
         )}
+      </section>
+
+      <section className="settings-section">
+        <h3>外观</h3>
+        <div className="settings-theme-toggle">
+          {themeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              className={`settings-theme-option ${theme === opt.value ? "active" : ""}`}
+              onClick={() => setTheme(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="settings-section">

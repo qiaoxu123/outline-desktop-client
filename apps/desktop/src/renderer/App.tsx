@@ -152,7 +152,29 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
   return <>{children}</>;
 }
 
+/** Applies the chosen theme to <html data-theme>, following the OS in "system". */
+function useApplyTheme(): void {
+  const theme = useUIStore((s) => s.theme);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const apply = () => {
+      const dark = theme === "dark" || (theme === "system" && mq.matches);
+      root.setAttribute("data-theme", dark ? "dark" : "light");
+    };
+
+    apply();
+    if (theme === "system") {
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+  }, [theme]);
+}
+
 export default function App(): React.ReactElement {
+  useApplyTheme();
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

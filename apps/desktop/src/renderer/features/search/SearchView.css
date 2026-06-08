@@ -73,11 +73,11 @@
 .search-error {
   padding: 12px 16px;
   margin-bottom: 16px;
-  background: #fff5f5;
-  border: 1px solid #ffc9c9;
+  background: rgba(237, 38, 81, 0.08);
+  border: 1px solid rgba(237, 38, 81, 0.3);
   border-radius: 8px;
   font-size: 13px;
-  color: #e03131;
+  color: var(--color-danger);
 }
 
 .search-results-count {
