@@ -14,10 +14,27 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import Placeholder from "@tiptap/extension-placeholder";
+import Highlight from "@tiptap/extension-highlight";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import { Markdown } from "tiptap-markdown";
 import "katex/dist/katex.min.css";
 import "./Editor.css";
+
+/**
+ * Highlight serialized to `==text==` for markdown round-trip (the read view
+ * renders it via markdown-it-mark). Without this, tiptap-markdown falls back
+ * to emitting `<mark>` HTML, which our html:false renderer wouldn't show.
+ */
+const MarkdownHighlight = Highlight.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { open: "==", close: "==", expelEnclosingWhitespace: true },
+        parse: {},
+      },
+    };
+  },
+});
 
 /**
  * Collapse multi-line block math (`$$` on its own lines) into a single
@@ -83,6 +100,7 @@ export function useMarkdownEditor(
         TableCell,
         TableHeader,
         Placeholder.configure({ placeholder: "开始编写…" }),
+        MarkdownHighlight,
         // Renders LaTeX with KaTeX while keeping the source text (so markdown
         // round-trip is preserved). The default regex only matches inline
         // `$...$`; we extend it to also catch block `$$...$$` (matched first),
@@ -145,10 +163,21 @@ function SelectionToolbar({
 }: {
   editor: TiptapEditor;
 }): React.ReactElement {
+  const setLink = () => {
+    const prev = (editor.getAttributes("link").href as string) ?? "";
+    const url = window.prompt("链接地址", prev);
+    if (url === null) return;
+    if (url === "") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    } else {
+      editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    }
+  };
+
   return (
     <BubbleMenu
       editor={editor}
-      tippyOptions={{ duration: 100 }}
+      tippyOptions={{ duration: 100, maxWidth: "none" }}
       className="bubble-menu"
     >
       <ToolbarButton
@@ -173,13 +202,22 @@ function SelectionToolbar({
         <s>S</s>
       </ToolbarButton>
       <ToolbarButton
+        title="高亮"
+        active={editor.isActive("highlight")}
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+      >
+        <span className="bubble-hl">H</span>
+      </ToolbarButton>
+      <ToolbarButton
         title="行内代码"
         active={editor.isActive("code")}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         {"</>"}
       </ToolbarButton>
+
       <span className="bubble-divider" />
+
       <ToolbarButton
         title="标题 1"
         active={editor.isActive("heading", { level: 1 })}
@@ -195,12 +233,22 @@ function SelectionToolbar({
         H2
       </ToolbarButton>
       <ToolbarButton
+        title="标题 3"
+        active={editor.isActive("heading", { level: 3 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+      >
+        H3
+      </ToolbarButton>
+      <ToolbarButton
         title="引用"
         active={editor.isActive("blockquote")}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
       >
         ❝
       </ToolbarButton>
+
+      <span className="bubble-divider" />
+
       <ToolbarButton
         title="项目符号列表"
         active={editor.isActive("bulletList")}
@@ -208,27 +256,37 @@ function SelectionToolbar({
       >
         •
       </ToolbarButton>
+      <ToolbarButton
+        title="编号列表"
+        active={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        1.
+      </ToolbarButton>
+      <ToolbarButton
+        title="任务列表"
+        active={editor.isActive("taskList")}
+        onClick={() => editor.chain().focus().toggleTaskList().run()}
+      >
+        ☑
+      </ToolbarButton>
+
       <span className="bubble-divider" />
+
       <ToolbarButton
         title="链接"
         active={editor.isActive("link")}
-        onClick={() => {
-          const prev = (editor.getAttributes("link").href as string) ?? "";
-          const url = window.prompt("链接地址", prev);
-          if (url === null) return;
-          if (url === "") {
-            editor.chain().focus().extendMarkRange("link").unsetLink().run();
-          } else {
-            editor
-              .chain()
-              .focus()
-              .extendMarkRange("link")
-              .setLink({ href: url })
-              .run();
-          }
-        }}
+        onClick={setLink}
       >
         🔗
+      </ToolbarButton>
+      <ToolbarButton
+        title="清除格式"
+        onClick={() =>
+          editor.chain().focus().unsetAllMarks().clearNodes().run()
+        }
+      >
+        ⌫
       </ToolbarButton>
     </BubbleMenu>
   );

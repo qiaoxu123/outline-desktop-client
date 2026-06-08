@@ -1,3 +1,10 @@
+## [1.6.0] - 2026-06-08
+
+### Features
+- **Richer selection toolbar.** The bubble menu shown when selecting text now matches the web app much more closely: **highlight**, H3, ordered list, task list, and clear-formatting added alongside bold/italic/strike/code/H1/H2/quote/bullet-list/link.
+- **Text highlight.** New highlight button marks text; serialized to `==text==` so it survives the markdown round-trip and renders (yellow `<mark>`, dark-mode aware) in both the editor and the read view (markdown-it-mark). 
+- **Toolbar restyled** as a light card with a subtle border/shadow (was a dark bar), matching the rest of the UI; active buttons highlight in the accent color.
+
 ## [1.5.0] - 2026-06-08
 
 ### Features

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import katexPlugin from "@vscode/markdown-it-katex";
+import markPlugin from "markdown-it-mark";
 import hljs from "highlight.js";
 import "katex/dist/katex.min.css";
 import "./highlight-theme.css";
@@ -40,6 +41,11 @@ md.use(
   (katexPlugin as unknown as { default?: MdPlugin }).default ??
     (katexPlugin as unknown as MdPlugin),
   { throwOnError: false, strict: false },
+);
+// ==highlight== → <mark> (pairs with the editor's highlight button)
+md.use(
+  (markPlugin as unknown as { default?: MdPlugin }).default ??
+    (markPlugin as unknown as MdPlugin),
 );
 
 const defaultRender =

@@ -8,6 +8,12 @@ declare module "markdown-it-task-lists" {
   export default taskLists;
 }
 
+declare module "markdown-it-mark" {
+  import type { PluginSimple } from "markdown-it";
+  const mark: PluginSimple;
+  export default mark;
+}
+
 declare module "*.css" {
   const content: Record<string, string>;
   export default content;
