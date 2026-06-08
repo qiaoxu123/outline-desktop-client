@@ -1,3 +1,13 @@
+## [1.3.0] - 2026-06-08
+
+### Features
+- **Tabs.** Open multiple notes at once — each document gets a tab in a bar above the content; click to switch, ✕ or middle-click to close (auto-focuses a neighbour). Tabs track the document title/emoji as they load.
+- **Back / forward navigation.** Added ← → buttons to the (previously sparse) title bar, using the router history.
+- **Scroll-to-top button.** A floating button appears after scrolling down; click to smooth-scroll back to the top.
+
+### Fixes
+- **Edit controls stay visible.** The document header (title + 编辑/保存/星标/评论/历史) is now sticky at the top of the scroll area, so you no longer have to scroll back up to reach the action buttons mid-document.
+
 ## [1.2.0] - 2026-06-08
 
 ### Changes

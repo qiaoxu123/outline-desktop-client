@@ -59,6 +59,50 @@ export const useUIStore = create<UIState>((set) => ({
   setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
 }));
 
+/* ---------- open document tabs ---------- */
+
+export interface DocTab {
+  documentId: string;
+  title: string;
+  emoji?: string | null;
+}
+
+export interface TabsState {
+  tabs: DocTab[];
+  /** Open (or focus) a tab for a document. */
+  openTab: (tab: DocTab) => void;
+  /** Update a tab's title/emoji once the document loads. */
+  updateTab: (documentId: string, patch: Partial<DocTab>) => void;
+  /** Close a tab; returns the neighbour to navigate to (or null). */
+  closeTab: (documentId: string) => string | null;
+}
+
+export const useTabsStore = create<TabsState>((set, get) => ({
+  tabs: [],
+  openTab: (tab) =>
+    set((s) =>
+      s.tabs.some((t) => t.documentId === tab.documentId)
+        ? s
+        : { tabs: [...s.tabs, tab] },
+    ),
+  updateTab: (documentId, patch) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.documentId === documentId ? { ...t, ...patch } : t,
+      ),
+    })),
+  closeTab: (documentId) => {
+    const { tabs } = get();
+    const idx = tabs.findIndex((t) => t.documentId === documentId);
+    if (idx === -1) return null;
+    const next = tabs.filter((t) => t.documentId !== documentId);
+    set({ tabs: next });
+    if (next.length === 0) return null;
+    const neighbour = next[Math.min(idx, next.length - 1)];
+    return neighbour.documentId;
+  },
+}));
+
 export interface ProfileState {
   profiles: ProfileRecord[];
   setProfiles: (profiles: ProfileRecord[]) => void;

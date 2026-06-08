@@ -1,7 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
+  const navigate = useNavigate();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const fullWidth = useUIStore((s) => s.fullWidth);
   const toggleFullWidth = useUIStore((s) => s.toggleFullWidth);
@@ -19,10 +21,28 @@ export default function TitleBar(): React.ReactElement {
         <button
           className="titlebar-button"
           onClick={toggleSidebar}
-          title="Toggle sidebar"
+          title="切换侧边栏"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2 3h12v1.5H2V3zm0 4h12v1.5H2V7zm0 4h8v1.5H2V11z" />
+          </svg>
+        </button>
+        <button
+          className="titlebar-button"
+          onClick={() => navigate(-1)}
+          title="后退"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M10 3.5L5.5 8l4.5 4.5 1.06-1.06L7.62 8l3.44-3.44L10 3.5z" />
+          </svg>
+        </button>
+        <button
+          className="titlebar-button"
+          onClick={() => navigate(1)}
+          title="前进"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 3.5L10.5 8 6 12.5l-1.06-1.06L8.38 8 4.94 4.56 6 3.5z" />
           </svg>
         </button>
         <span className="titlebar-app-name">Outline</span>

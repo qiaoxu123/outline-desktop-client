@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { useUIStore } from "../../state/uiStore";
+import { useUIStore, useTabsStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import {
   useUserInfo,
@@ -678,6 +678,8 @@ export default function DocumentView(): React.ReactElement {
   const { documentId } = useParams<{ documentId: string }>();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { user } = useUserInfo();
+  const openTab = useTabsStore((s) => s.openTab);
+  const updateTab = useTabsStore((s) => s.updateTab);
   const [reloadKey, setReloadKey] = useState(0);
 
   const { data, isLoading, error } = useQuery({
@@ -688,6 +690,21 @@ export default function DocumentView(): React.ReactElement {
       ),
     enabled: !!activeProfileId && !!documentId,
   });
+
+  // Register/refresh a tab for this document
+  useEffect(() => {
+    if (!documentId) return;
+    openTab({ documentId, title: "加载中…" });
+  }, [documentId, openTab]);
+
+  useEffect(() => {
+    if (documentId && data?.data) {
+      updateTab(documentId, {
+        title: data.data.title || "Untitled",
+        emoji: data.data.emoji,
+      });
+    }
+  }, [documentId, data, updateTab]);
 
   if (!documentId) {
     return (

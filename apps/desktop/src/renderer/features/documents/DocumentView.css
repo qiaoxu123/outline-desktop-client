@@ -311,10 +311,16 @@
   line-height: 1.75;
 }
 
+/* Sticky header keeps the title + edit/save/star/comment controls visible
+   while scrolling a long document. */
 .document-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   margin-bottom: 32px;
-  padding-bottom: 20px;
+  padding: 16px 0 14px;
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
 }
 
 .document-title {
