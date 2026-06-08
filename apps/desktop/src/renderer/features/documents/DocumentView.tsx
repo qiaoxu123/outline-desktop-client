@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useUIStore, useTabsStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import {
@@ -384,6 +384,70 @@ function CommentsPanel({
   );
 }
 
+/* ---------- nested child documents (shown at the bottom, like web) ---------- */
+
+interface NestedDoc {
+  id: string;
+  title: string;
+  emoji?: string | null;
+  updatedAt?: string;
+}
+
+function NestedDocuments({
+  documentId,
+}: {
+  documentId: string;
+}): React.ReactElement | null {
+  const api = useElectronAPI();
+  const navigate = useNavigate();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const selectDocument = useUIStore((s) => s.selectDocument);
+
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "children", documentId],
+    queryFn: () =>
+      unwrapIpc<{ data: NestedDoc[] }>(
+        api.call(activeProfileId!, "documents.list", {
+          parentDocumentId: documentId,
+          limit: 100,
+        }),
+      ),
+    enabled: !!activeProfileId,
+  });
+
+  const children = data?.data ?? [];
+  if (children.length === 0) return null;
+
+  return (
+    <section className="nested-docs">
+      <div className="nested-docs-title">文档</div>
+      <div className="nested-docs-list">
+        {children.map((child) => (
+          <a
+            key={child.id}
+            href={`#/document/${child.id}`}
+            className="nested-doc-item"
+            onClick={(e) => {
+              e.preventDefault();
+              selectDocument(child.id);
+              navigate(`/document/${child.id}`);
+            }}
+          >
+            <span className="nested-doc-icon">
+              {child.emoji ?? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" opacity="0.6">
+                  <path d="M7 3a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8.41a2 2 0 00-.59-1.41l-3.41-3.41A2 2 0 0013.59 3H7zm0 2h6v3a1 1 0 001 1h3v10H7V5z" />
+                </svg>
+              )}
+            </span>
+            <span className="nested-doc-title">{child.title || "Untitled"}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* ---------- editor pane (mounted only while editing) ---------- */
 
 function DocEditorPane({
@@ -587,6 +651,7 @@ function EditableDocument({
             <p className="document-blank">此文档暂无内容，点击右上角“编辑”开始撰写。</p>
           )}
         </div>
+        <NestedDocuments documentId={doc.id} />
       </article>
 
       {showToc && panel === "none" && <Toc markdown={doc.text} />}
@@ -662,6 +727,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
             <p className="document-blank">此文档暂无内容</p>
           )}
         </div>
+        <NestedDocuments documentId={doc.id} />
       </article>
       {showToc && !commentsOpen && <Toc markdown={doc.text} />}
       {commentsOpen && (

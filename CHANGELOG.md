@@ -1,3 +1,8 @@
+## [1.5.0] - 2026-06-08
+
+### Features
+- **Nested child documents.** A parent document now lists its child documents in a "文档" section at the bottom (like the web app), each clickable to open. Hidden when the document has no children.
+
 ## [1.4.3] - 2026-06-08
 
 ### Fixes
