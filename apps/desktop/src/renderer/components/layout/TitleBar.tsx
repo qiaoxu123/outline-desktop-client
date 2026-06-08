@@ -3,9 +3,14 @@ import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  // Reserve space for macOS traffic lights; Windows/Linux use a native frame.
+  const isMac = window.electronAPI.platform === "darwin";
 
   return (
-    <header className="titlebar" style={{ paddingLeft: "80px" }}>
+    <header
+      className="titlebar"
+      style={isMac ? { paddingLeft: "80px" } : undefined}
+    >
       <div className="titlebar-left">
         <button
           className="titlebar-button"

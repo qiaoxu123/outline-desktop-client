@@ -6,13 +6,17 @@ import { registerCollectionHandlers } from "./ipc/handlers/collections";
 import { registerDocumentHandlers } from "./ipc/handlers/documents";
 import { registerAuthHandlers } from "./ipc/handlers/auth";
 
-// Set proxy for main process Node.js fetch calls
-process.env.https_proxy = "http://127.0.0.1:7897";
-process.env.http_proxy = "http://127.0.0.1:7897";
+// The Outline server (notes.jlu-mcns.site) is a domestic host reachable
+// directly — it must NOT be routed through a general-purpose proxy. We only
+// relax TLS verification because the server cert's chain root may be absent
+// from Node's / Chromium's bundled CA store.
+//
+// Node.js fetch (main-process API calls): relax cert verification.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-// Apply Chromium-level proxy and cert settings
-app.commandLine.appendSwitch("proxy-server", "127.0.0.1:7897");
+// Chromium (login BrowserWindow): accept the server cert. No proxy override —
+// Chromium connects directly. Set OUTLINE_PROXY to opt into a proxy for the
+// API transport if the network ever requires it.
 app.commandLine.appendSwitch("ignore-certificate-errors");
 
 function registerAllIpcHandlers(): void {
@@ -29,8 +33,14 @@ function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 16 },
+    // hiddenInset/trafficLightPosition are macOS-only; Windows/Linux keep the
+    // native frame so window controls (minimize/maximize/close) work normally.
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hiddenInset" as const,
+          trafficLightPosition: { x: 16, y: 16 },
+        }
+      : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: true,

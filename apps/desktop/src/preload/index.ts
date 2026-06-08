@@ -17,7 +17,10 @@ export interface ElectronAPI {
   };
   auth: {
     loginWithBrowser: () => Promise<unknown>;
+    requestEmailLogin: (email: string) => Promise<unknown>;
+    completeEmailLogin: (input: string) => Promise<unknown>;
   };
+  platform: string;
 }
 
 const api: ElectronAPI = {
@@ -41,7 +44,12 @@ const api: ElectronAPI = {
   },
   auth: {
     loginWithBrowser: () => ipcRenderer.invoke("auth:loginWithBrowser"),
+    requestEmailLogin: (email) =>
+      ipcRenderer.invoke("auth:requestEmailLogin", { email }),
+    completeEmailLogin: (input) =>
+      ipcRenderer.invoke("auth:completeEmailLogin", { input }),
   },
+  platform: process.platform,
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);

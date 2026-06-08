@@ -1,5 +1,4 @@
-import https from "node:https";
-import { HttpsProxyAgent } from "https-proxy-agent";
+import { ProxyAgent } from "undici";
 import { OutlineApiError, AuthError, NetworkError } from "./errors";
 
 export interface TransportConfig {
@@ -8,23 +7,38 @@ export interface TransportConfig {
   timeoutMs?: number;
 }
 
-function createAgent(): https.Agent | HttpsProxyAgent<string> {
-  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || "";
+/**
+ * undici `fetch` only accepts an undici `Dispatcher` (e.g. `ProxyAgent`) for
+ * `dispatcher` — a Node `http(s).Agent`/`https-proxy-agent` has no `.dispatch()`
+ * and throws "agent.dispatch is not a function".
+ *
+ * The Outline server is reachable directly, so the default path is no proxy.
+ * A proxy is only used when `OUTLINE_PROXY` is explicitly set — we deliberately
+ * ignore the ambient `https_proxy`/`HTTPS_PROXY`, since the server is a domestic
+ * host that should not be routed through a general-purpose (often foreign) proxy.
+ * TLS verification is relaxed (`requestTls.rejectUnauthorized: false`) because
+ * the server's cert chain root may be absent from Node's CA bundle.
+ */
+function createDispatcher(): ProxyAgent | undefined {
+  const proxyUrl = process.env.OUTLINE_PROXY || "";
 
-  if (proxyUrl) {
-    return new HttpsProxyAgent(proxyUrl, {
-      rejectUnauthorized: false,
-    });
-  }
+  if (!proxyUrl) return undefined;
 
-  return new https.Agent({ rejectUnauthorized: false });
+  return new ProxyAgent({
+    uri: proxyUrl,
+    requestTls: { rejectUnauthorized: false },
+  });
 }
 
-let _agent: https.Agent | HttpsProxyAgent<string> | null = null;
+let _dispatcher: ProxyAgent | undefined;
+let _dispatcherInit = false;
 
-function getAgent(): https.Agent | HttpsProxyAgent<string> {
-  if (!_agent) _agent = createAgent();
-  return _agent;
+function getDispatcher(): ProxyAgent | undefined {
+  if (!_dispatcherInit) {
+    _dispatcher = createDispatcher();
+    _dispatcherInit = true;
+  }
+  return _dispatcher;
 }
 
 export async function apiRequest<T = unknown>(
@@ -43,6 +57,7 @@ export async function apiRequest<T = unknown>(
     : controller.signal;
 
   try {
+    const dispatcher = getDispatcher();
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -52,8 +67,9 @@ export async function apiRequest<T = unknown>(
       },
       body: JSON.stringify(params),
       signal: linkedSignal,
-      // @ts-expect-error - dispatcher is Node.js fetch's undici option
-      dispatcher: getAgent(),
+      // `dispatcher` is a Node/undici fetch option absent from the DOM RequestInit
+      // type; spreading the object literal avoids excess-property type errors.
+      ...(dispatcher ? { dispatcher } : {}),
     });
 
     clearTimeout(timeoutId);

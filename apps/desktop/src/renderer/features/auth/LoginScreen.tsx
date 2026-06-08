@@ -6,52 +6,117 @@ import "./LoginScreen.css";
 const SERVER_NAME = "JLUMCNS-MEC";
 const SERVER_URL = "https://notes.jlu-mcns.site";
 
+type IpcResult<T> = {
+  ok: boolean;
+  data?: T;
+  error?: { message: string };
+};
+
+type Step = "email" | "link";
+
 export default function LoginScreen(): React.ReactElement {
   const api = useElectronAPI();
   const addProfile = useProfileStore((s) => s.addProfile);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
-  const [connecting, setConnecting] = useState(false);
+
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
-  const handleBrowserLogin = async () => {
-    setConnecting(true);
+  const saveProfile = async (token: string) => {
+    setStatus("正在保存登录信息…");
+    const createResult = (await api.profiles.create({
+      name: SERVER_NAME,
+      serverUrl: SERVER_URL,
+      apiKey: token,
+    })) as IpcResult<{ id: string }>;
+
+    if (createResult.ok && createResult.data) {
+      addProfile({
+        id: createResult.data.id,
+        name: SERVER_NAME,
+        serverUrl: SERVER_URL,
+        createdAt: new Date().toISOString(),
+      });
+      setActiveProfileId(createResult.data.id);
+    } else {
+      setError(createResult.error?.message || "保存登录信息失败");
+    }
+  };
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || busy) return;
+    setBusy(true);
     setError("");
-    setStatus("Opening login window...");
+    setStatus("正在发送登录邮件…");
 
     try {
-      const result = (await api.auth.loginWithBrowser()) as {
-        ok: boolean;
-        data?: { token: string; cookieName: string };
-        error?: { message: string };
-      };
+      const result = (await api.auth.requestEmailLogin(
+        email.trim(),
+      )) as IpcResult<{ sent: boolean }>;
 
-      if (result.ok && result.data?.token) {
-        setStatus("Saving profile...");
-        const createResult = (await api.profiles.create({
-          name: SERVER_NAME,
-          serverUrl: SERVER_URL,
-          apiKey: result.data.token,
-        })) as { ok: boolean; data?: { id: string }; error?: { message: string } };
-
-        if (createResult.ok && createResult.data) {
-          addProfile({
-            id: createResult.data.id,
-            name: SERVER_NAME,
-            serverUrl: SERVER_URL,
-            createdAt: new Date().toISOString(),
-          });
-          setActiveProfileId(createResult.data.id);
-        } else {
-          setError(createResult.error?.message || "Failed to save login");
-        }
+      if (result.ok) {
+        setStep("link");
       } else {
-        setError(result.error?.message || "Login failed");
+        setError(result.error?.message || "发送失败，请重试");
       }
     } catch {
-      setError("Unexpected error. Please try again.");
+      setError("发生意外错误，请重试");
     } finally {
-      setConnecting(false);
+      setBusy(false);
+      setStatus("");
+    }
+  };
+
+  const handleCompleteLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!link.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    setStatus("正在验证登录链接…");
+
+    try {
+      const result = (await api.auth.completeEmailLogin(
+        link.trim(),
+      )) as IpcResult<{ token: string }>;
+
+      if (result.ok && result.data?.token) {
+        await saveProfile(result.data.token);
+      } else {
+        setError(result.error?.message || "登录失败，请重试");
+      }
+    } catch {
+      setError("发生意外错误，请重试");
+    } finally {
+      setBusy(false);
+      setStatus("");
+    }
+  };
+
+  const handleBrowserLogin = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setStatus("已打开登录窗口，请在窗口中完成登录…");
+
+    try {
+      const result = (await api.auth.loginWithBrowser()) as IpcResult<{
+        token: string;
+      }>;
+
+      if (result.ok && result.data?.token) {
+        await saveProfile(result.data.token);
+      } else {
+        setError(result.error?.message || "登录失败");
+      }
+    } catch {
+      setError("发生意外错误，请重试");
+    } finally {
+      setBusy(false);
       setStatus("");
     }
   };
@@ -76,37 +141,106 @@ export default function LoginScreen(): React.ReactElement {
           <span>{SERVER_URL}</span>
         </div>
 
-        <div className="login-form">
-          <p className="login-description">
-            Sign in with your email, just like on the Outline website.
+        {(error || status) && (
+          <p className={error ? "login-error" : "login-status"}>
+            {error || status}
           </p>
+        )}
 
-          {(error || status) && (
-            <p className={error ? "login-error" : "login-status"}>
-              {error || status}
+        {step === "email" ? (
+          <form className="login-form" onSubmit={handleSendEmail}>
+            <p className="login-description">
+              输入你的邮箱，我们会发送一封包含登录链接的邮件。
             </p>
-          )}
 
-          <button
-            className="login-button"
-            onClick={handleBrowserLogin}
-            disabled={connecting}
-          >
-            {connecting ? (
-              <>
-                <span className="login-spinner" />
-                Waiting for sign in…
-              </>
-            ) : (
-              "Sign in with Browser"
-            )}
-          </button>
+            <input
+              className="login-input"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+              disabled={busy}
+            />
 
-          <p className="login-hint">
-            A sign-in window will open. Complete your login there and the
-            window will close automatically.
-          </p>
-        </div>
+            <button
+              className="login-button"
+              type="submit"
+              disabled={busy || !email.trim()}
+            >
+              {busy ? (
+                <>
+                  <span className="login-spinner" />
+                  发送中…
+                </>
+              ) : (
+                "发送登录邮件"
+              )}
+            </button>
+
+            <button
+              type="button"
+              className="login-button login-button-secondary"
+              onClick={handleBrowserLogin}
+              disabled={busy}
+            >
+              使用浏览器窗口登录
+            </button>
+          </form>
+        ) : (
+          <form className="login-form" onSubmit={handleCompleteLogin}>
+            <p className="login-description">
+              登录邮件已发送至 <strong>{email}</strong>。
+              <br />
+              请打开邮件，<strong>复制其中的登录链接</strong>
+              （右键复制链接地址，不要直接点击），粘贴到下方：
+            </p>
+
+            <input
+              className="login-input"
+              type="text"
+              placeholder={`${SERVER_URL}/auth/email.callback?token=…`}
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              autoFocus
+              disabled={busy}
+              spellCheck={false}
+            />
+
+            <button
+              className="login-button"
+              type="submit"
+              disabled={busy || !link.trim()}
+            >
+              {busy ? (
+                <>
+                  <span className="login-spinner" />
+                  验证中…
+                </>
+              ) : (
+                "完成登录"
+              )}
+            </button>
+
+            <button
+              type="button"
+              className="login-link-button"
+              onClick={() => {
+                setStep("email");
+                setLink("");
+                setError("");
+              }}
+              disabled={busy}
+            >
+              ← 换个邮箱 / 重新发送
+            </button>
+
+            <p className="login-hint">
+              链接 10 分钟内有效，且只能使用一次。如果你已在浏览器里点开过链接，
+              请返回上一步重新发送。
+            </p>
+          </form>
+        )}
       </div>
     </div>
   );

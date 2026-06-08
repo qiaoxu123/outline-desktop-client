@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@outline/shared-types": "*",
+    "undici": "^7.26.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

@@ -1,3 +1,32 @@
+## [0.1.2] - 2026-06-08
+
+### Features
+- **Interactive email (magic-link) login.** Outline's email login emails a one-time sign-in link; in a desktop app that link opens the *system browser*, so the session never reached the app — this is why interactive login was broken. New flow: enter your email in the app (`POST /auth/email`), then paste the emailed link back into the app; the main process performs the `GET /auth/email.callback?token=…` exchange itself (following same-origin redirects manually) and captures the `accessToken` Set-Cookie, a session JWT the Outline API accepts as a Bearer token. Handles `notice=expired-token`/`auth-error` redirects with friendly messages; accepts a full URL, a raw token, or a link embedded in copied text. The browser-window login remains as a fallback.
+- **Cross-platform packaging.** Added electron-builder targets: macOS (dmg/zip), Windows (nsis/zip), Linux (AppImage/deb). `npm run dist:mac|win|linux` from the repo root.
+
+### Fixes
+- **Windows/Linux window chrome.** `titleBarStyle: "hiddenInset"` and `trafficLightPosition` are macOS-only; they are now applied conditionally so Windows/Linux get a normal native frame with working window controls. The in-app titlebar's 80px traffic-light inset is likewise macOS-only (platform exposed via preload `electronAPI.platform`).
+- Moved root `electron` dep to devDependencies (packaging correctness).
+
+### Notes & Caveats
+- The emailed link is single-use and valid ~10 minutes; the UI warns users to copy (not click) it. If clicked in a browser first, the token is consumed and a new email must be sent.
+- Callback exchange logic is covered by a mock-server test (redirect + Set-Cookie + notice paths). Live end-to-end test requires a real mailbox — run `npm run dev` and sign in with a registered email.
+- `npm run lint` was already broken before this change (ESLint 9 flat-config file missing); typecheck passes.
+
+## [0.1.1] - 2026-06-08
+
+### Fixes
+- **Critical: API transport never reached the server.** `transport.ts` passed a Node `https-proxy-agent` instance to undici `fetch`'s `dispatcher` option. undici only accepts an undici `Dispatcher`, so every API call threw `TypeError: fetch failed (cause: agent.dispatch is not a function)` — collections, documents, and connection tests all failed silently. Replaced with undici's `ProxyAgent` (used only when a proxy is configured).
+- **Removed forced proxy routing.** The Outline server (`notes.jlu-mcns.site` → domestic IP) is directly reachable; routing it through the general-purpose proxy was unnecessary. Dropped the forced `http_proxy`/`https_proxy` env and the Chromium `--proxy-server` switch in the main process, and the per-session `setProxy` on the login window. The API transport now connects directly by default and only proxies when `OUTLINE_PROXY` is explicitly set.
+- **Login window robustness.** Capture the post-login token on both `did-navigate` (OIDC redirect) and `did-navigate-in-page` (SPA client-side redirect), guarded by a single-settle flag.
+
+### Design Rationale
+- **Direct-by-default networking**: The server cert is a valid ZeroSSL/Sectigo chain whose root is simply absent from Node's/Chromium's bundled CA store — hence TLS verification is relaxed (`NODE_TLS_REJECT_UNAUTHORIZED=0` + `ignore-certificate-errors`) rather than proxied. A domestic host should not be forced through a (often foreign) proxy; `OUTLINE_PROXY` remains as an explicit opt-in escape hatch.
+
+### Notes & Caveats
+- TLS verification is globally disabled for the app. Acceptable for this self-hosted, trusted single-tenant deployment; revisit by adding the Sectigo root to a custom CA bundle if stricter verification is later required.
+- Browser (email) login still requires the user to complete sign-in interactively in the popped window.
+
 ## [0.1.0] - 2026-05-27
 
 ### Features
