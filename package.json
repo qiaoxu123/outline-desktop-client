@@ -1,8 +1,9 @@
 {
   "name": "outline-desktop-client",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Desktop client for Outline knowledge base",
+  "author": "xu <george.x.qiao@gmail.com>",
   "scripts": {
     "dev": "npm run dev -w apps/desktop",
     "build": "npm run build -w apps/desktop",
