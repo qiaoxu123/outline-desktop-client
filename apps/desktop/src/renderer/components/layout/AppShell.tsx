@@ -6,6 +6,7 @@ import "./AppShell.css";
 
 export default function AppShell(): React.ReactElement {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const fullWidth = useUIStore((s) => s.fullWidth);
 
   return (
     <div className="app-shell">
@@ -16,7 +17,7 @@ export default function AppShell(): React.ReactElement {
             <Sidebar />
           </aside>
         )}
-        <main className="app-content">
+        <main className={`app-content ${fullWidth ? "full-width" : ""}`}>
           <Outlet />
         </main>
       </div>

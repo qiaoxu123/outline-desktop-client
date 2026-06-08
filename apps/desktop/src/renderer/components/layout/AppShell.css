@@ -97,3 +97,13 @@ body {
   overflow-y: auto;
   background: var(--color-bg);
 }
+
+/* One-click full width: widen every view at once */
+.app-content.full-width .document-view,
+.app-content.full-width .home-view,
+.app-content.full-width .shares-view,
+.app-content.full-width .search-view,
+.app-content.full-width .settings-view,
+.app-content.full-width .collections-view {
+  max-width: none;
+}

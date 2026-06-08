@@ -21,6 +21,8 @@ export function useMarkdownEditor(
   initialMarkdown: string,
   editable: boolean,
 ): TiptapEditor | null {
+  // Created once per component mount (callers remount via key per document) —
+  // recreating on every content/prop change would reset the cursor mid-typing.
   return useEditor(
     {
       editable,
@@ -44,7 +46,7 @@ export function useMarkdownEditor(
       ],
       content: initialMarkdown,
     },
-    [initialMarkdown, editable],
+    [],
   );
 }
 

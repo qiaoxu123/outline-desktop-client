@@ -3,6 +3,10 @@ import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const fullWidth = useUIStore((s) => s.fullWidth);
+  const toggleFullWidth = useUIStore((s) => s.toggleFullWidth);
+  const showToc = useUIStore((s) => s.showToc);
+  const toggleToc = useUIStore((s) => s.toggleToc);
   // Reserve space for macOS traffic lights; Windows/Linux use a native frame.
   const isMac = window.electronAPI.platform === "darwin";
 
@@ -24,6 +28,24 @@ export default function TitleBar(): React.ReactElement {
         <span className="titlebar-app-name">Outline</span>
       </div>
       <div className="titlebar-right">
+        <button
+          className={`titlebar-button ${showToc ? "active" : ""}`}
+          onClick={toggleToc}
+          title={showToc ? "隐藏目录" : "显示目录"}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M5 3h9v1.5H5V3zm0 4h9v1.5H5V7zm0 4h9v1.5H5V11zM2 3.75a.75.75 0 111.5 0 .75.75 0 01-1.5 0zm0 4a.75.75 0 111.5 0 .75.75 0 01-1.5 0zm0 4a.75.75 0 111.5 0 .75.75 0 01-1.5 0z" />
+          </svg>
+        </button>
+        <button
+          className={`titlebar-button ${fullWidth ? "active" : ""}`}
+          onClick={toggleFullWidth}
+          title={fullWidth ? "标准宽度" : "全宽显示"}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M1 8l3.5-3v2h7V5L15 8l-3.5 3V9h-7v2L1 8z" />
+          </svg>
+        </button>
         <a href="#/search" className="titlebar-button" title="Search">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.975 1.975 0 00-.017.016zm-5.242.156a5 5 0 110-10 5 5 0 010 10z" />

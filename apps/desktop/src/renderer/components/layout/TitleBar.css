@@ -53,3 +53,8 @@
   background: var(--color-bg-tertiary);
   color: var(--color-text);
 }
+
+.titlebar-button.active {
+  color: var(--color-primary);
+  background: var(--color-bg-secondary);
+}

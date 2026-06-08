@@ -23,6 +23,34 @@ interface CollectionDocumentsResponse {
   data: OutlineCollectionDocument[];
 }
 
+/**
+ * Collections can have an emoji icon, a named icon, or none. Render emoji
+ * directly; otherwise show a folder glyph tinted with the collection color
+ * (the bare color dot looked broken).
+ */
+function CollectionIcon({
+  icon,
+  color,
+}: {
+  icon: string | null;
+  color: string | null;
+}): React.ReactElement {
+  if (icon && /\p{Extended_Pictographic}/u.test(icon)) {
+    return <span className="sb-emoji">{icon}</span>;
+  }
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={color || "var(--color-primary)"}
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M3 6a2 2 0 012-2h4.172a2 2 0 011.414.586L12 6h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
+    </svg>
+  );
+}
+
 function Chevron({ open }: { open: boolean }): React.ReactElement {
   return (
     <svg
@@ -155,6 +183,141 @@ function CollectionTree({
   );
 }
 
+/* ---------- starred items (expandable to child documents) ---------- */
+
+interface ChildDoc {
+  id: string;
+  title: string;
+  emoji?: string | null;
+}
+
+function ChildDocs({
+  parentDocumentId,
+  depth,
+}: {
+  parentDocumentId: string;
+  depth: number;
+}): React.ReactElement {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["profile", activeProfileId, "children", parentDocumentId],
+    queryFn: () =>
+      unwrapIpc<{ data: ChildDoc[] }>(
+        api.call(activeProfileId!, "documents.list", {
+          parentDocumentId,
+          limit: 100,
+        }),
+      ),
+    enabled: !!activeProfileId,
+  });
+
+  if (isLoading) return <div className="sb-note">加载中…</div>;
+  const children = data?.data ?? [];
+  if (children.length === 0) return <div className="sb-note">（无子文档）</div>;
+
+  return (
+    <div className="sb-tree">
+      {children.map((child) => (
+        <ChildNode key={child.id} doc={child} depth={depth} />
+      ))}
+    </div>
+  );
+}
+
+function ChildNode({
+  doc,
+  depth,
+}: {
+  doc: ChildDoc;
+  depth: number;
+}): React.ReactElement {
+  const navigate = useNavigate();
+  const selectDocument = useUIStore((s) => s.selectDocument);
+  const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <div
+        className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
+        style={{ paddingLeft: `${8 + depth * 14}px` }}
+      >
+        <button className="sb-chevron" onClick={() => setOpen(!open)}>
+          <Chevron open={open} />
+        </button>
+        <a
+          href={`#/document/${doc.id}`}
+          className="sb-link"
+          onClick={(e) => {
+            e.preventDefault();
+            selectDocument(doc.id);
+            navigate(`/document/${doc.id}`);
+          }}
+          title={doc.title || "Untitled"}
+        >
+          {doc.emoji && <span className="sb-emoji">{doc.emoji}</span>}
+          <span className="sb-title">{doc.title || "Untitled"}</span>
+        </a>
+      </div>
+      {open && <ChildDocs parentDocumentId={doc.id} depth={depth + 1} />}
+    </div>
+  );
+}
+
+function StarNode({
+  documentId,
+  title,
+  emoji,
+}: {
+  documentId: string;
+  title: string;
+  emoji?: string | null;
+}): React.ReactElement {
+  const navigate = useNavigate();
+  const selectDocument = useUIStore((s) => s.selectDocument);
+  const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <div
+        className={`sb-item ${selectedDocumentId === documentId ? "active" : ""}`}
+        style={{ paddingLeft: "4px" }}
+      >
+        <button
+          className="sb-chevron"
+          onClick={() => setOpen(!open)}
+          title={open ? "收起" : "展开子文档"}
+        >
+          <Chevron open={open} />
+        </button>
+        <a
+          href={`#/document/${documentId}`}
+          className="sb-link"
+          onClick={(e) => {
+            e.preventDefault();
+            selectDocument(documentId);
+            navigate(`/document/${documentId}`);
+          }}
+          title={title}
+        >
+          {emoji ? (
+            <span className="sb-emoji">{emoji}</span>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="var(--color-star)" style={{ flexShrink: 0 }}>
+              <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
+            </svg>
+          )}
+          <span className="sb-title">{title}</span>
+        </a>
+      </div>
+      {open && <ChildDocs parentDocumentId={documentId} depth={1} />}
+    </div>
+  );
+}
+
 /* ---------- sidebar ---------- */
 
 export default function Sidebar(): React.ReactElement {
@@ -262,30 +425,7 @@ export default function Sidebar(): React.ReactElement {
           {starsOpen && (
             <div className="sb-tree">
               {starred.map((s) => (
-                <div
-                  key={s.starId}
-                  className={`sb-item ${selectedDocumentId === s.documentId ? "active" : ""}`}
-                  style={{ paddingLeft: "8px" }}
-                >
-                  <span className="sb-star-icon">
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="var(--color-star)">
-                      <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
-                    </svg>
-                  </span>
-                  <a
-                    href={`#/document/${s.documentId}`}
-                    className="sb-link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      selectDocument(s.documentId);
-                      navigate(`/document/${s.documentId}`);
-                    }}
-                    title={s.title}
-                  >
-                    {s.emoji && <span className="sb-emoji">{s.emoji}</span>}
-                    <span className="sb-title">{s.title}</span>
-                  </a>
-                </div>
+                <StarNode key={s.starId} documentId={s.documentId} title={s.title} emoji={s.emoji} />
               ))}
             </div>
           )}
@@ -334,10 +474,7 @@ export default function Sidebar(): React.ReactElement {
                         navigate(`/collection/${col.id}`);
                       }}
                     >
-                      <span
-                        className="sb-dot"
-                        style={{ backgroundColor: col.color || "#0366d6" }}
-                      />
+                      <CollectionIcon icon={col.icon} color={col.color} />
                       <span className="sb-title">{col.name}</span>
                     </a>
                   </div>

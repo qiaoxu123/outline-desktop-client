@@ -31,6 +31,10 @@ const ALLOWED_METHODS = new Set([
   "documents.drafts",
   "documents.create",
   "documents.delete",
+  "documents.restore",
+  // revisions (history)
+  "revisions.list",
+  "revisions.info",
   // collections
   "collections.info",
 ]);
