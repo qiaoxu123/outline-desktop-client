@@ -4,12 +4,31 @@ import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
-import type { OutlineCollection, OutlineDocument } from "@outline/shared-types";
+import type {
+  OutlineCollection,
+  OutlineCollectionDocument,
+  OutlineDocument,
+} from "@outline/shared-types";
 
 interface Crumb {
   label: string;
   emoji?: string | null;
   onClick?: () => void;
+}
+
+/** Walk a nested document tree to the target, returning the ancestor chain. */
+function findDocPath(
+  nodes: OutlineCollectionDocument[],
+  targetId: string,
+): OutlineCollectionDocument[] | null {
+  for (const n of nodes) {
+    if (n.id === targetId) return [n];
+    if (n.children && n.children.length) {
+      const sub = findDocPath(n.children, targetId);
+      if (sub) return [n, ...sub];
+    }
+  }
+  return null;
 }
 
 function CrumbIcon({ emoji }: { emoji?: string | null }): React.ReactElement | null {
@@ -54,6 +73,19 @@ export default function Breadcrumb(): React.ReactElement {
     enabled: !!activeProfileId,
   });
 
+  const collectionId = docData?.data?.collectionId ?? null;
+
+  // The collection's nested document tree gives us the doc's ancestor chain
+  // (shared cache with the sidebar — no extra request when already expanded).
+  const { data: treeData } = useQuery({
+    queryKey: ["profile", activeProfileId, "collection", collectionId, "documents"],
+    queryFn: () =>
+      unwrapIpc<{ data: OutlineCollectionDocument[] }>(
+        api.collections.documents(activeProfileId!, collectionId!),
+      ),
+    enabled: !!activeProfileId && !!collectionId,
+  });
+
   const collections = colsData?.data ?? [];
   const crumbs: Crumb[] = [
     { label: team?.name ?? "Workspace", onClick: () => navigate("/") },
@@ -71,7 +103,24 @@ export default function Breadcrumb(): React.ReactElement {
         onClick: () => navigate(`/collection/${col.id}`),
       });
     }
-    crumbs.push({ label: doc?.title || "Untitled", emoji: doc?.emoji });
+    // Full ancestor chain within the collection (parent documents), then the
+    // current document last. Falls back to just the doc title if the tree
+    // hasn't loaded yet.
+    const path = treeData?.data ? findDocPath(treeData.data, docId) : null;
+    if (path && path.length) {
+      path.forEach((node, i) => {
+        const isLast = i === path.length - 1;
+        crumbs.push({
+          label: node.title || "Untitled",
+          emoji: node.emoji,
+          onClick: isLast
+            ? undefined
+            : () => navigate(`/document/${node.id}`),
+        });
+      });
+    } else {
+      crumbs.push({ label: doc?.title || "Untitled", emoji: doc?.emoji });
+    }
   } else if (colId) {
     const col = collections.find((c) => c.id === colId);
     crumbs.push({ label: col?.name ?? "集合", emoji: col?.icon });

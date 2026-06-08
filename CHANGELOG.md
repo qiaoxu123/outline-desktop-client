@@ -1,3 +1,10 @@
+## [1.4.2] - 2026-06-08
+
+### Fixes
+- **Breadcrumb shows the full document path.** It previously jumped Collection › Document, skipping intermediate parent documents. It now walks the collection's document tree to render the complete ancestor chain (Workspace › Collection › Parent › … › Document), each ancestor clickable.
+- **Tabs align to content.** Reduced the leading gap and made the active tab overlap the bar's bottom border so it merges into the content area below (browser-tab look).
+- **Wider table of contents.** TOC panel widened 200 → 240px with slightly larger text for readability.
+
 ## [1.4.1] - 2026-06-08
 
 ### Fixes

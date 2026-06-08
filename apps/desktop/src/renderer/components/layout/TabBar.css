@@ -2,7 +2,7 @@
   display: flex;
   align-items: stretch;
   gap: 2px;
-  padding: 4px 8px 0;
+  padding: 5px 8px 0 10px;
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   overflow-x: auto;
@@ -39,6 +39,10 @@
   background: var(--color-bg);
   border-color: var(--color-border);
   color: var(--color-text);
+  /* overlap the tabbar's bottom border so the active tab merges into the
+     content area below, like a real browser tab */
+  margin-bottom: -1px;
+  padding-bottom: 7px;
 }
 
 .tab-emoji {

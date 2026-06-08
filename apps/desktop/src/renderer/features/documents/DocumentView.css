@@ -33,10 +33,10 @@
 .document-toc {
   position: sticky;
   top: 16px;
-  width: 200px;
+  width: 240px;
   max-height: calc(100vh - var(--titlebar-height) - 64px);
   overflow-y: auto;
-  padding-left: 12px;
+  padding-left: 14px;
   border-left: 1px solid var(--color-border);
 }
 
@@ -54,8 +54,9 @@
   text-align: left;
   border: none;
   background: none;
-  padding: 3px 10px;
-  font-size: 12.5px;
+  padding: 4px 10px;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--color-text-secondary);
   cursor: pointer;
   border-radius: 4px;
