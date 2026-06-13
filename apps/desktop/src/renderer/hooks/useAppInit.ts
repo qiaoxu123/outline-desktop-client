@@ -5,7 +5,6 @@ import { useElectronAPI } from "./useElectronAPI";
 export function useAppInit(): void {
   const api = useElectronAPI();
   const setProfiles = useProfileStore((s) => s.setProfiles);
-  const profiles = useProfileStore((s) => s.profiles);
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
 

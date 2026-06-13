@@ -1,3 +1,12 @@
+## [1.8.0] - 2026-06-13
+
+### Build
+- **macOS ad-hoc code signing.** `electron-builder` now ad-hoc signs the packed `.app` via an `afterPack` hook (`apps/desktop/build/after-pack.js`), with `mac.identity: null` (skip electron-builder's own signing so it doesn't overwrite the ad-hoc signature) and `mac.gatekeeperAssess: false`. Without an Apple Developer ID this removes the *"app is damaged"* error on Apple Silicon; first launch still needs right-click → Open, or `xattr -cr` (documented in README).
+- **ESLint v9 flat config.** Added `apps/desktop/eslint.config.mjs` (the repo previously had none, so `npm run lint` errored before linting); dropped the unsupported `--ext` flag from the lint script and removed pre-existing unused variables it surfaced.
+
+### Notes & Caveats
+- Building `dist:mac` behind the local proxy fails with `unable to get local issuer certificate` (proxy MITM on electron-builder's downloads). Build with `NODE_TLS_REJECT_UNAUTHORIZED=0 npx electron-builder --mac`. Not baked into the npm script to avoid weakening TLS for everyone.
+
 ## [1.7.0] - 2026-06-08
 
 ### Features

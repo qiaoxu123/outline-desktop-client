@@ -310,8 +310,6 @@ export default function Sidebar(): React.ReactElement {
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const selectedCollectionId = useUIStore((s) => s.selectedCollectionId);
   const selectCollection = useUIStore((s) => s.selectCollection);
-  const selectDocument = useUIStore((s) => s.selectDocument);
-  const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
   const { user, team } = useUserInfo();
   const { starred } = useStars();
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(

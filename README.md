@@ -2,7 +2,29 @@
 
 Cross-platform desktop client architecture for [Outline](https://github.com/outline/outline), designed for a macOS-first release and later expansion to Windows and Linux.
 
-This repository currently contains design documentation only. It does not include an initialized application, dependency installation, or generated scaffolding.
+The application is implemented (current version `1.7.0`): an Electron + React 19 desktop client with multi-profile support, a collection browser, a markdown viewer/editor, and full-text search.
+
+## Installation (macOS)
+
+The macOS builds are **ad-hoc signed**, not signed with a paid Apple Developer ID. This is enough for the app to launch on Apple Silicon (arm64) without the *"App is damaged and can't be opened"* error, but because downloaded files carry a quarantine attribute, the **first launch still shows *"cannot verify the developer"***.
+
+Two ways to open it the first time:
+
+1. **Right-click → Open** (recommended): in Finder, right-click (or Control-click) `Outline Desktop.app`, choose **Open**, then confirm **Open** in the dialog. macOS remembers this choice for subsequent launches.
+
+2. **Remove the quarantine attribute from Terminal** — useful when the right-click flow is blocked or you are scripting the install:
+
+   ```bash
+   # After dragging the app to /Applications:
+   xattr -cr "/Applications/Outline Desktop.app"
+
+   # Or remove only the quarantine flag:
+   xattr -dr com.apple.quarantine "/Applications/Outline Desktop.app"
+   ```
+
+   After this the app opens normally with a double-click.
+
+> Why ad-hoc signing: arm64 binaries must carry at least an ad-hoc code signature to execute at all. The build runs `codesign --sign -` on the packed `.app` (see `apps/desktop/build/after-pack.js`) and disables electron-builder's Gatekeeper assessment so the unsigned-by-Developer-ID build can still be packaged.
 
 ## Goals
 

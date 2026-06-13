@@ -15,7 +15,6 @@ export default function CollectionsView(): React.ReactElement {
   const navigate = useNavigate();
   const { collectionId } = useParams<{ collectionId?: string }>();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const selectCollection = useUIStore((s) => s.selectCollection);
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
