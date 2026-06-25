@@ -41,7 +41,7 @@ class ErrorBoundary extends Component<
             justifyContent: "center",
             height: "100vh",
             gap: "12px",
-            fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+            fontFamily: "var(--font-sans)",
             color: "#495057",
             background: "#f5f7fa",
             padding: "40px",
@@ -137,7 +137,7 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
     return (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+        height: "100vh", fontFamily: "var(--font-sans)",
         color: "#6c757d", background: "#f5f7fa",
       }}>
         正在连接 JLUMCNS-MEC…

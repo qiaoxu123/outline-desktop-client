@@ -1,5 +1,21 @@
 ## [1.8.0] - 2026-06-13
 
+### Features
+- **Personal notes zone (个人笔记).** A dedicated sidebar section that points at the user's *existing* personal folder on the server (e.g. `成员笔记 / 博士 / 乔旭`) rather than a new collection or local storage. New notes are created as ordinary documents nested under that folder (`documents.create` with `parentDocumentId`), so they sync normally and never clutter the collection list. The viewer/editor are the unmodified document flow — personal notes look and behave exactly like any other document. The folder pointer (docId + collectionId) is stored per-profile in `profiles.json`; on first use the app auto-detects it by matching a document titled with the user's own name inside a `成员笔记`-like collection, with a manual tree picker as fallback.
+  - New: `main/ipc/handlers/personalNotes.ts` (getRoot/setRoot/clearRoot), `renderer/hooks/usePersonalNotes.ts`, and a `PersonalNotesSection` + `PersonalRootPicker` in `Sidebar.tsx`. `StoredProfile` gained optional `personalRootDocId` / `personalRootCollectionId`.
+
+### Design Rationale
+- Considered (a) private server collections — rejected: Outline admins bypass collection membership (`server/policies/collection.ts` grants read on `user.isAdmin`), and it adds a top-level collection. (b) Local-only storage — rejected: no sync. Mapping the zone onto the member's pre-existing server folder gives clean structure *and* sync with zero backend changes.
+
+### App icon
+- **Official Outline icon.** Bundled `apps/desktop/build/icon.icns` (+ `icon.png` for win/linux) generated from Outline's official `icon-512.png`; wired via `mac.icon` / `win.icon` / `linux.icon`. Replaces the default Electron icon.
+
+### UI / Polish
+- **Responsive document layout.** The fixed 3-column grid (gutter · 760px article · right rail) now degrades gracefully: ≤1100px drops the left gutter so the article keeps its width; ≤860px collapses to a single column, hiding the TOC and flowing the history/comments panels below the article instead of squeezing them into a side rail. View paddings use `clamp()` so they shrink on narrow windows.
+- **Typography tokens.** Added a font-size scale (`--text-xs`…`--text-2xl`) and line-height scale (`--leading-*`) in `AppShell.css`; refactored body/document/heading/code sizes onto them (values unchanged, single source of truth).
+- **Native-feeling fonts.** `--font-sans` now leads with `system-ui` / `-apple-system` (SF Pro on macOS) and drops the unbundled `Inter`; added `font-synthesis: none` and `text-rendering: optimizeLegibility` for long-form text; added a `--font-serif` token for future use. Removed the duplicated hardcoded font stacks in `App.tsx` (now `var(--font-sans)`).
+- **Theme-consistent code blocks.** Read-view fenced code blocks moved off a hardcoded hex onto `--color-codeblock-bg`/`--color-codeblock-text` tokens (still dark to match the highlight.js theme), which also fixes a latent dark-text-on-dark-background contrast bug for unhighlighted code in light mode.
+
 ### Build
 - **macOS ad-hoc code signing.** `electron-builder` now ad-hoc signs the packed `.app` via an `afterPack` hook (`apps/desktop/build/after-pack.js`), with `mac.identity: null` (skip electron-builder's own signing so it doesn't overwrite the ad-hoc signature) and `mac.gatekeeperAssess: false`. Without an Apple Developer ID this removes the *"app is damaged"* error on Apple Silicon; first launch still needs right-click → Open, or `xattr -cr` (documented in README).
 - **ESLint v9 flat config.** Added `apps/desktop/eslint.config.mjs` (the repo previously had none, so `npm run lint` errored before linting); dropped the unsupported `--ext` flag from the lint script and removed pre-existing unused variables it surfaced.

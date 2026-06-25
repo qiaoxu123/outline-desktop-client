@@ -1,5 +1,5 @@
 .search-view {
-  padding: 24px 32px;
+  padding: clamp(16px, 3vw, 32px);
   max-width: 680px;
   margin: 0 auto;
 }

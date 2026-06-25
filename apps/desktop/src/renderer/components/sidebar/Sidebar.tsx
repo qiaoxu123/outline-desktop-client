@@ -8,6 +8,13 @@ import {
   useStars,
   absoluteUrl,
 } from "../../hooks/useOutline";
+import {
+  usePersonalRoot,
+  useSetPersonalRoot,
+  useAutoDetectRoot,
+  useCreatePersonalNote,
+  type PersonalRoot,
+} from "../../hooks/usePersonalNotes";
 import { unwrapIpc } from "../../lib/ipc";
 import type {
   OutlineCollection,
@@ -301,6 +308,229 @@ function StarNode({
   );
 }
 
+/* ---------- personal notes: a clean shortcut into the user's own folder ---------- */
+
+/**
+ * Modal that lets the user point "个人笔记" at any existing document on the
+ * server (used when auto-detection can't find their folder). Browsing the
+ * collection trees and clicking a node designates it as the personal root.
+ */
+function PersonalRootPicker({
+  onPick,
+  onClose,
+}: {
+  onPick: (root: PersonalRoot) => void;
+  onClose: () => void;
+}): React.ReactElement {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const [openCol, setOpenCol] = useState<string | null>(null);
+
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "collections"],
+    queryFn: () =>
+      unwrapIpc<CollectionListResponse>(api.collections.list(activeProfileId!)),
+    enabled: !!activeProfileId,
+  });
+  const collections = data?.data ?? [];
+
+  return (
+    <div className="sb-modal-backdrop" onClick={onClose}>
+      <div className="sb-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="sb-modal-header">
+          <span>选择个人笔记目录</span>
+          <button className="history-close" onClick={onClose} title="关闭">
+            ✕
+          </button>
+        </div>
+        <p className="sb-modal-hint">
+          点击你的个人目录（例如 成员笔记 / 博士 / 乔旭）。之后新建的笔记都会同步到这里。
+        </p>
+        <div className="sb-modal-body">
+          {collections.map((col) => (
+            <div key={col.id}>
+              <button
+                className="sb-modal-col"
+                onClick={() => setOpenCol(openCol === col.id ? null : col.id)}
+              >
+                <Chevron open={openCol === col.id} />
+                <CollectionIcon icon={col.icon} color={col.color} />
+                <span className="sb-title">{col.name}</span>
+              </button>
+              {openCol === col.id && (
+                <PickerTree
+                  collectionId={col.id}
+                  onPick={(docId) => onPick({ docId, collectionId: col.id })}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PickerTree({
+  collectionId,
+  onPick,
+  depth = 0,
+}: {
+  collectionId: string;
+  onPick: (docId: string) => void;
+  depth?: number;
+}): React.ReactElement {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["profile", activeProfileId, "collection", collectionId, "documents"],
+    queryFn: () =>
+      unwrapIpc<CollectionDocumentsResponse>(
+        api.collections.documents(activeProfileId!, collectionId),
+      ),
+    enabled: !!activeProfileId,
+  });
+
+  if (isLoading) return <div className="sb-note">加载中…</div>;
+  const docs = data?.data ?? [];
+
+  const renderNodes = (
+    nodes: OutlineCollectionDocument[],
+    level: number,
+  ): React.ReactElement[] =>
+    nodes.flatMap((doc) => [
+      <button
+        key={doc.id}
+        className="sb-modal-doc"
+        style={{ paddingLeft: `${12 + level * 16}px` }}
+        onClick={() => onPick(doc.id)}
+        title="设为个人笔记目录"
+      >
+        {doc.emoji ? (
+          <span className="sb-emoji">{doc.emoji}</span>
+        ) : (
+          <span className="sb-doc-dot" />
+        )}
+        <span className="sb-title">{doc.title || "Untitled"}</span>
+      </button>,
+      ...(doc.children?.length ? renderNodes(doc.children, level + 1) : []),
+    ]);
+
+  if (docs.length === 0) return <div className="sb-note">（空）</div>;
+  return <div className="sb-children">{renderNodes(docs, depth)}</div>;
+}
+
+function PersonalNotesSection(): React.ReactElement {
+  const navigate = useNavigate();
+  const { root, isLoading } = usePersonalRoot();
+  const { setRoot } = useSetPersonalRoot();
+  const autoDetect = useAutoDetectRoot();
+  const { create, isPending: creating } = useCreatePersonalNote();
+  const [open, setOpen] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const handleSetup = async (): Promise<void> => {
+    setDetecting(true);
+    setNotice("");
+    try {
+      const hit = await autoDetect();
+      if (hit) {
+        await setRoot(hit);
+      } else {
+        setNotice("未自动找到，请手动选择");
+        setPickerOpen(true);
+      }
+    } catch {
+      setPickerOpen(true);
+    } finally {
+      setDetecting(false);
+    }
+  };
+
+  const handleCreate = async (): Promise<void> => {
+    if (!root) return;
+    const id = await create(root);
+    navigate(`/document/${id}`);
+  };
+
+  return (
+    <div className="sb-section">
+      <div className="sb-section-header static">
+        <span>个人笔记</span>
+        {root && (
+          <button
+            className="sb-add-btn"
+            onClick={handleCreate}
+            disabled={creating}
+            title="新建笔记"
+          >
+            {creating ? "…" : "+"}
+          </button>
+        )}
+      </div>
+
+      {!root && (
+        <div className="sb-personal-setup">
+          <p className="sb-note">把这里指向你在服务器上的个人目录。</p>
+          <button
+            className="sb-personal-btn"
+            onClick={handleSetup}
+            disabled={detecting || isLoading}
+          >
+            {detecting ? "定位中…" : "自动定位我的目录"}
+          </button>
+          <button
+            className="sb-personal-btn subtle"
+            onClick={() => setPickerOpen(true)}
+          >
+            手动选择…
+          </button>
+          {notice && <p className="sb-note error">{notice}</p>}
+        </div>
+      )}
+
+      {root && (
+        <div>
+          <div className="sb-item">
+            <button className="sb-chevron" onClick={() => setOpen(!open)}>
+              <Chevron open={open} />
+            </button>
+            <a
+              href={`#/document/${root.docId}`}
+              className="sb-link"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(`/document/${root.docId}`);
+              }}
+              title="打开个人笔记目录"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-star)" style={{ flexShrink: 0 }}>
+                <path d="M3 6a2 2 0 012-2h4.172a2 2 0 011.414.586L12 6h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
+              </svg>
+              <span className="sb-title">我的笔记</span>
+            </a>
+          </div>
+          {open && <ChildDocs parentDocumentId={root.docId} />}
+        </div>
+      )}
+
+      {pickerOpen && (
+        <PersonalRootPicker
+          onPick={async (r) => {
+            await setRoot(r);
+            setPickerOpen(false);
+            setNotice("");
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ---------- sidebar ---------- */
 
 export default function Sidebar(): React.ReactElement {
@@ -412,6 +642,8 @@ export default function Sidebar(): React.ReactElement {
           )}
         </div>
       )}
+
+      <PersonalNotesSection />
 
       <div className="sb-section sb-section-grow">
         <div className="sb-section-header static">

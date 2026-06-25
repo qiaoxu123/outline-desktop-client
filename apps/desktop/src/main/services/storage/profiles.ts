@@ -8,6 +8,14 @@ export interface StoredProfile {
   serverUrl: string;
   apiKey: string;
   createdAt: string;
+  /**
+   * The user's personal-notes folder on the server, used by the sidebar
+   * "个人笔记" zone. It points at an existing document subtree (e.g.
+   * 成员笔记 / 博士 / 乔旭) so notes created there sync normally and don't
+   * add a new top-level collection. Unset until detected or chosen once.
+   */
+  personalRootDocId?: string;
+  personalRootCollectionId?: string;
 }
 
 function profilesPath(): string {

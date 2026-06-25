@@ -1,5 +1,5 @@
 .document-view {
-  padding: 32px 40px;
+  padding: clamp(16px, 4vw, 40px);
   max-width: none;
   margin: 0;
   min-height: 100%;
@@ -10,7 +10,7 @@
    side panel sits flush against the right side. */
 .document-layout {
   display: grid;
-  grid-template-columns: 1fr minmax(0, 760px) 1fr;
+  grid-template-columns: 1fr minmax(0, 920px) 1fr;
   column-gap: 24px;
   align-items: start;
 }
@@ -18,7 +18,7 @@
 .document-layout .document-article {
   grid-column: 2;
   min-width: 0;
-  max-width: 760px;
+  max-width: 920px;
   margin: 0;
 }
 
@@ -350,15 +350,16 @@
 
 /* Markdown body styling to match Outline web */
 .document-body {
-  font-size: 16px;
+  font-size: var(--text-md);
   color: var(--color-text);
+  text-rendering: optimizeLegibility;
 }
 
 .document-body h1 {
   font-size: 1.75em;
   margin: 1.2em 0 0.5em;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: var(--leading-tight);
 }
 
 .document-body h2 {
@@ -419,11 +420,12 @@
 .document-body pre {
   margin: 0.8em 0;
   padding: 16px 20px;
-  background: #1a1b2e;
+  background: var(--color-codeblock-bg);
+  color: var(--color-codeblock-text);
   border-radius: 8px;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -694,4 +696,40 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- responsive: keep the 3-column layout from overflowing ---------- */
+
+/* Medium windows: drop the flexible left gutter so the article keeps its width
+   and the right rail (TOC / history / comments) stays beside it. */
+@media (max-width: 1400px) {
+  .document-layout {
+    grid-template-columns: 0 minmax(0, 920px) auto;
+    column-gap: 16px;
+  }
+}
+
+/* Narrow windows: single column. The TOC is supplementary, so hide it; the
+   history and comments panels flow below the article at full width instead of
+   being squeezed into a side rail. */
+@media (max-width: 860px) {
+  .document-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .document-layout .document-article {
+    grid-column: 1;
+    max-width: 100%;
+  }
+  .document-layout > .document-toc {
+    display: none;
+  }
+  .document-layout > .history-panel,
+  .document-layout > .comments-panel {
+    grid-column: 1;
+    justify-self: stretch;
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-top: 16px;
+  }
 }

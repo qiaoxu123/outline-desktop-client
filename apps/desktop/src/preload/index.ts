@@ -36,6 +36,15 @@ export interface ElectronAPI {
     method: string,
     params?: Record<string, unknown>,
   ) => Promise<unknown>;
+  /** Pointer to the user's personal-notes folder on the server. */
+  personalNotes: {
+    getRoot: (profileId: string) => Promise<unknown>;
+    setRoot: (
+      profileId: string,
+      root: { docId: string; collectionId: string },
+    ) => Promise<unknown>;
+    clearRoot: (profileId: string) => Promise<unknown>;
+  };
   platform: string;
 }
 
@@ -73,6 +82,14 @@ const api: ElectronAPI = {
   },
   call: (profileId, method, params) =>
     ipcRenderer.invoke("api:call", { profileId, method, params }),
+  personalNotes: {
+    getRoot: (profileId) =>
+      ipcRenderer.invoke("personalNotes:getRoot", profileId),
+    setRoot: (profileId, root) =>
+      ipcRenderer.invoke("personalNotes:setRoot", { profileId, ...root }),
+    clearRoot: (profileId) =>
+      ipcRenderer.invoke("personalNotes:clearRoot", { profileId }),
+  },
   platform: process.platform,
 };
 

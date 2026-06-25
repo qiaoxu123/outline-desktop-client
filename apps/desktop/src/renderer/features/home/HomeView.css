@@ -1,5 +1,5 @@
 .home-view {
-  padding: 40px 48px;
+  padding: clamp(20px, 4vw, 48px);
   max-width: 720px;
   margin: 0 auto;
 }

@@ -67,7 +67,8 @@
     "appId": "com.outline.desktop",
     "productName": "Outline Desktop",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "files": [
       "out/**"
@@ -79,6 +80,7 @@
         "zip"
       ],
       "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
       "identity": null,
       "gatekeeperAssess": false
     },
@@ -86,7 +88,8 @@
       "target": [
         "nsis",
         "zip"
-      ]
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -98,6 +101,7 @@
         "deb"
       ],
       "category": "Office",
+      "icon": "build/icon.png",
       "maintainer": "george.x.qiao@gmail.com"
     }
   }

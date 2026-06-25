@@ -23,15 +23,41 @@
   --sidebar-hover: hsl(212 31% 90% / 1);
   --sidebar-active: hsl(212 31% 85% / 1);
 
-  --color-code-bg: #f4f7fa;                 /* smoke */
+  --color-code-bg: #f4f7fa;                 /* smoke (inline code) */
   --color-code-border: #e8ebed;             /* smokeDark */
+
+  /* Fenced code blocks pair with the dark highlight.js theme
+     (lib/markdown/highlight-theme.css), so they stay dark in both themes;
+     tokenised here so editor and read view share one source. */
+  --color-codeblock-bg: #1a1b2e;
+  --color-codeblock-text: #e6e6e6;
 
   --sidebar-width: 260px;
   --titlebar-height: 48px;
-  --font-sans: -apple-system, BlinkMacSystemFont, Inter, "Segoe UI", Roboto,
-    Oxygen, sans-serif;
+
+  /* Font stacks. system-ui / -apple-system resolve to SF Pro on macOS for a
+     native feel; Inter is intentionally omitted (not bundled). */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Oxygen, sans-serif;
+  --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
     monospace;
+
+  /* Type scale (values mirror the previous hardcoded sizes). */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+
+  /* Line-height scale. */
+  --leading-tight: 1.3;
+  --leading-snug: 1.4;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
   color-scheme: light;
 }
 
@@ -61,6 +87,8 @@
 
   --color-code-bg: #1d202a;
   --color-code-border: rgba(255, 255, 255, 0.1);
+  --color-codeblock-bg: #161821;
+  --color-codeblock-text: #e6e6e6;
 
   color-scheme: dark;
 }
@@ -73,11 +101,12 @@
 
 body {
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
 }
 
 /* Outline-style slim scrollbars */
