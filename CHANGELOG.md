@@ -10,6 +10,9 @@
 - **Also shipped (previously implemented, uncommitted):** always-on editing (open == editable with 1200ms-debounced autosave, save-state pill, ⌘S flush — replaces the separate 编辑 button), adjustable reading-column width (设置 → 最窄…最宽, 5 levels, `--reading-col`), one-click light/dark toggle in the titlebar, and the icon-only quick-nav row (搜索/主页/设置) in the sidebar.
 
 ### Fixes
+- **Document images now display.** Attachments are stored as relative `/api/attachments.redirect` paths behind authentication, so `<img>` tags loaded nothing. Two-part fix: the main process injects the matching profile's `Authorization: Bearer` header for renderer requests to known servers (`webRequest.onBeforeSendHeaders`), and both render pipelines absolutize the src for display only — node attrs / markdown source keep the relative path (verified: 4/4 images load on a real doc).
+- **Tab context menu + pinned tabs.** Right-click a tab: 固定/取消固定、关闭、关闭其他、关闭全部. Pinned tabs sort first, lose their close button, survive bulk-close, and tabs now persist to localStorage (`ui.tabs`) so they restore after restart.
+- **Document actions moved to the top-right.** Save-state / viewers / star / 评论 / 历史 now live at the right end of the breadcrumb bar (portaled via `#doc-actions-slot`); the 直接编辑自动保存 hint line under the title is gone — the title row is clean.
 - **Selection toolbar restyled with SVG icons.** Emoji glyphs (🔗💬⌫❝•☑) replaced with Material-grid SVG icons (quote/lists/link/comment/clear-format) matching Outline web's iconography; larger 32px buttons, softer shadow, blue active pill.
 - **Drag-resizable sidebar.** New right-edge drag handle (200–420px, persisted to `ui.sidebarWidth`).
 - **Code block font size.** 13px hardcoded → `0.9em` of body (≈14.4px), matching web proportions in both editor and read view.

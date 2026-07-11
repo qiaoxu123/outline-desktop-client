@@ -4,6 +4,7 @@ import taskLists from "markdown-it-task-lists";
 import katexPlugin from "@vscode/markdown-it-katex";
 import markPlugin from "markdown-it-mark";
 import hljs from "highlight.js";
+import { absoluteAttachmentUrl } from "../server";
 import "katex/dist/katex.min.css";
 import "./highlight-theme.css";
 
@@ -52,6 +53,19 @@ md.use(
 // reading column (same .tableWrapper the editor emits).
 md.renderer.rules.table_open = () => '<div class="tableWrapper"><table>';
 md.renderer.rules.table_close = () => "</table></div>";
+
+// Attachment images are stored as relative /api/… paths — absolutize for
+// display (display only; the markdown source keeps the relative path).
+const defaultImageRender =
+  md.renderer.rules.image ??
+  ((tokens, idx, options, _env, self) =>
+    self.renderToken(tokens, idx, options));
+md.renderer.rules.image = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const src = token?.attrGet("src");
+  if (src) token.attrSet("src", absoluteAttachmentUrl(src));
+  return defaultImageRender(tokens, idx, options, env, self);
+};
 
 const defaultRender =
   md.renderer.rules.link_open ??

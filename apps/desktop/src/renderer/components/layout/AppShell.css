@@ -197,6 +197,14 @@ body.sidebar-resizing {
   overflow: hidden;
 }
 
+/* right-aligned slot the document views portal their actions into */
+.breadcrumb-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .app-content {
   flex: 1;
   overflow-y: auto;

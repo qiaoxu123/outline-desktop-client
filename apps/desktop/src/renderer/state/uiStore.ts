@@ -76,6 +76,8 @@ export interface DocTab {
   documentId: string;
   title: string;
   emoji?: string | null;
+  /** Pinned tabs sort first, survive 关闭其他/全部关闭, and persist. */
+  pinned?: boolean;
 }
 
 export interface TabsState {
@@ -86,20 +88,46 @@ export interface TabsState {
   updateTab: (documentId: string, patch: Partial<DocTab>) => void;
   /** Close a tab; returns the neighbour to navigate to (or null). */
   closeTab: (documentId: string) => string | null;
+  togglePin: (documentId: string) => void;
+  /** Close every unpinned tab except the given one. */
+  closeOthers: (documentId: string) => void;
+  /** Close every unpinned tab. */
+  closeAll: () => void;
+}
+
+/** Pinned tabs first, both groups keeping their relative order. */
+function sortTabs(tabs: DocTab[]): DocTab[] {
+  return [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)];
+}
+
+function loadTabs(): DocTab[] {
+  try {
+    const raw = localStorage.getItem("ui.tabs");
+    return raw ? sortTabs(JSON.parse(raw) as DocTab[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistTabs(tabs: DocTab[]): DocTab[] {
+  localStorage.setItem("ui.tabs", JSON.stringify(tabs));
+  return tabs;
 }
 
 export const useTabsStore = create<TabsState>((set, get) => ({
-  tabs: [],
+  tabs: loadTabs(),
   openTab: (tab) =>
     set((s) =>
       s.tabs.some((t) => t.documentId === tab.documentId)
         ? s
-        : { tabs: [...s.tabs, tab] },
+        : { tabs: persistTabs([...s.tabs, tab]) },
     ),
   updateTab: (documentId, patch) =>
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.documentId === documentId ? { ...t, ...patch } : t,
+      tabs: persistTabs(
+        s.tabs.map((t) =>
+          t.documentId === documentId ? { ...t, ...patch } : t,
+        ),
       ),
     })),
   closeTab: (documentId) => {
@@ -107,11 +135,29 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const idx = tabs.findIndex((t) => t.documentId === documentId);
     if (idx === -1) return null;
     const next = tabs.filter((t) => t.documentId !== documentId);
-    set({ tabs: next });
+    set({ tabs: persistTabs(next) });
     if (next.length === 0) return null;
     const neighbour = next[Math.min(idx, next.length - 1)];
     return neighbour.documentId;
   },
+  togglePin: (documentId) =>
+    set((s) => ({
+      tabs: persistTabs(
+        sortTabs(
+          s.tabs.map((t) =>
+            t.documentId === documentId ? { ...t, pinned: !t.pinned } : t,
+          ),
+        ),
+      ),
+    })),
+  closeOthers: (documentId) =>
+    set((s) => ({
+      tabs: persistTabs(
+        s.tabs.filter((t) => t.pinned || t.documentId === documentId),
+      ),
+    })),
+  closeAll: () =>
+    set((s) => ({ tabs: persistTabs(s.tabs.filter((t) => t.pinned)) })),
 }));
 
 export interface ProfileState {

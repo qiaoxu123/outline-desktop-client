@@ -1,7 +1,8 @@
-import { app, BrowserWindow, net, shell } from "electron";
+import { app, BrowserWindow, net, session, shell } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { setFetchImplementation } from "@outline/api-client";
+import { readProfiles } from "./services/storage/profiles";
 import { registerProfileHandlers } from "./ipc/handlers/profiles";
 import { registerCollectionHandlers } from "./ipc/handlers/collections";
 import { registerDocumentHandlers } from "./ipc/handlers/documents";
@@ -104,6 +105,25 @@ app.whenReady().then(() => {
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
+  });
+
+  // Document images are served by the Outline server behind authentication
+  // (`/api/attachments.redirect`), but <img> tags can't send an Authorization
+  // header — inject the matching profile's Bearer token for renderer requests
+  // to any known server. Profiles are re-read per request (cheap local JSON)
+  // so newly added profiles work without a restart.
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    try {
+      const profile = readProfiles().find((p) =>
+        details.url.startsWith(p.serverUrl),
+      );
+      if (profile?.apiKey && !details.requestHeaders["Authorization"]) {
+        details.requestHeaders["Authorization"] = `Bearer ${profile.apiKey}`;
+      }
+    } catch {
+      // never block the request over a profile read failure
+    }
+    callback({ requestHeaders: details.requestHeaders });
   });
 
   registerAllIpcHandlers();

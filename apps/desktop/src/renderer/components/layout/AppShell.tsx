@@ -77,6 +77,9 @@ export default function AppShell(): React.ReactElement {
         <div className="app-main">
           <div className="breadcrumb-bar">
             <Breadcrumb />
+            {/* document views portal their action buttons (save state /
+                viewers / star / comments / history) into this slot */}
+            <div className="breadcrumb-actions" id="doc-actions-slot" />
           </div>
           <main
             ref={contentRef}

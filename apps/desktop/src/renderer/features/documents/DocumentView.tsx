@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUIStore, useTabsStore } from "../../state/uiStore";
@@ -672,6 +673,18 @@ function NestedDocuments({
   );
 }
 
+/** Document actions live in the breadcrumb bar's right corner (top-right of
+ * the content area) — portaled so each view keeps its own state/handlers. */
+function TopRightActions({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement | null {
+  const slot = document.getElementById("doc-actions-slot");
+  if (!slot) return null;
+  return createPortal(children, slot);
+}
+
 function CommentIcon(): React.ReactElement {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
@@ -831,6 +844,50 @@ function EditableDocument({
 
   return (
     <div className="document-layout">
+      <TopRightActions>
+        <div className="document-actions">
+          {saveLabel && (
+            <span
+              className={`document-save-state ${saveState === "error" ? "error" : ""}`}
+            >
+              {saveLabel}
+            </span>
+          )}
+          <Viewers documentId={doc.id} />
+          <button
+            className={`document-icon-button ${star ? "starred" : ""}`}
+            onClick={() => toggleStar(doc.id, star)}
+            disabled={starPending}
+            title={star ? "取消星标" : "加星标"}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16"
+              fill={star ? "var(--color-star)" : "none"}
+              stroke={star ? "var(--color-star)" : "currentColor"}
+              strokeWidth="1.4"
+            >
+              <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
+            </svg>
+          </button>
+          <button
+            className={`document-button subtle ${panel === "comments" ? "active" : ""}`}
+            onClick={() =>
+              setPanel(panel === "comments" ? "none" : "comments")
+            }
+            title="评论"
+          >
+            <CommentIcon />
+            <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
+          </button>
+          <button
+            className={`document-button subtle ${panel === "history" ? "active" : ""}`}
+            onClick={() =>
+              setPanel(panel === "history" ? "none" : "history")
+            }
+          >
+            历史
+          </button>
+        </div>
+      </TopRightActions>
       <article className="document-article">
         <header className="document-header">
           <div className="document-header-row">
@@ -844,51 +901,6 @@ function EditableDocument({
               }}
               placeholder="无标题"
             />
-            <div className="document-actions">
-              {saveLabel && (
-                <span
-                  className={`document-save-state ${saveState === "error" ? "error" : ""}`}
-                >
-                  {saveLabel}
-                </span>
-              )}
-              <Viewers documentId={doc.id} />
-              <button
-                className={`document-icon-button ${star ? "starred" : ""}`}
-                onClick={() => toggleStar(doc.id, star)}
-                disabled={starPending}
-                title={star ? "取消星标" : "加星标"}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16"
-                  fill={star ? "var(--color-star)" : "none"}
-                  stroke={star ? "var(--color-star)" : "currentColor"}
-                  strokeWidth="1.4"
-                >
-                  <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
-                </svg>
-              </button>
-              <button
-                className={`document-button subtle ${panel === "comments" ? "active" : ""}`}
-                onClick={() =>
-                  setPanel(panel === "comments" ? "none" : "comments")
-                }
-                title="评论"
-              >
-                <CommentIcon />
-                <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
-              </button>
-              <button
-                className={`document-button subtle ${panel === "history" ? "active" : ""}`}
-                onClick={() =>
-                  setPanel(panel === "history" ? "none" : "history")
-                }
-              >
-                历史
-              </button>
-            </div>
-          </div>
-          <div className="document-meta">
-            <span className="document-meta-hint">直接编辑，自动保存 · ⌘/Ctrl+S 立即保存</span>
           </div>
         </header>
 
@@ -934,6 +946,33 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
 
   return (
     <div className="document-layout">
+      <TopRightActions>
+        <div className="document-actions">
+          <Viewers documentId={doc.id} />
+          <button
+            className={`document-icon-button ${star ? "starred" : ""}`}
+            onClick={() => toggleStar(doc.id, star)}
+            disabled={starPending}
+            title={star ? "取消星标" : "加星标"}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16"
+              fill={star ? "var(--color-star)" : "none"}
+              stroke={star ? "var(--color-star)" : "currentColor"}
+              strokeWidth="1.4"
+            >
+              <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
+            </svg>
+          </button>
+          <button
+            className={`document-button subtle ${commentsOpen ? "active" : ""}`}
+            onClick={() => setCommentsOpen(!commentsOpen)}
+            title="评论"
+          >
+            <CommentIcon />
+            <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
+          </button>
+        </div>
+      </TopRightActions>
       <article className="document-article">
         <header className="document-header">
           <div className="document-header-row">
@@ -941,31 +980,6 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
               {doc.emoji && <span className="document-emoji">{doc.emoji}</span>}
               {doc.title || "Untitled"}
             </h1>
-            <div className="document-actions">
-              <Viewers documentId={doc.id} />
-              <button
-                className={`document-icon-button ${star ? "starred" : ""}`}
-                onClick={() => toggleStar(doc.id, star)}
-                disabled={starPending}
-                title={star ? "取消星标" : "加星标"}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16"
-                  fill={star ? "var(--color-star)" : "none"}
-                  stroke={star ? "var(--color-star)" : "currentColor"}
-                  strokeWidth="1.4"
-                >
-                  <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
-                </svg>
-              </button>
-              <button
-                className={`document-button subtle ${commentsOpen ? "active" : ""}`}
-                onClick={() => setCommentsOpen(!commentsOpen)}
-                title="评论"
-              >
-                <CommentIcon />
-                <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
-              </button>
-            </div>
           </div>
           <div className="document-meta">
             <span>更新于 {new Date(doc.updatedAt).toLocaleDateString()}</span>
