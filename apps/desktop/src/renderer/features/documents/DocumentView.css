@@ -446,7 +446,8 @@
   border-radius: 8px;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  /* 0.9em of the 16px body ≈ 14.4px — 13px read a full size too small */
+  font-size: 0.9em;
   line-height: 1.6;
 }
 

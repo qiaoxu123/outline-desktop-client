@@ -145,12 +145,36 @@ body {
 }
 
 .app-sidebar {
+  /* width set inline (drag-resizable, persisted); this is the fallback */
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
   background: var(--sidebar-bg);
-  overflow: hidden; /* the collections section scrolls; account card stays pinned */
+  overflow: hidden; /* the middle section scrolls; account card stays pinned */
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* drag handle on the sidebar's right edge */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 30;
+}
+
+.sidebar-resizer:hover,
+body.sidebar-resizing .sidebar-resizer {
+  background: var(--color-primary);
+  opacity: 0.35;
+}
+
+body.sidebar-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .app-main {

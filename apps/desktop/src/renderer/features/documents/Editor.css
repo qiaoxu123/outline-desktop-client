@@ -40,7 +40,9 @@
   border-radius: 8px;
   padding: 14px 18px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  /* match the read view: 0.9em of body, not a hardcoded small size */
+  font-size: 0.9em;
+  line-height: 1.6;
 }
 
 .doc-editor .ProseMirror code {
@@ -72,16 +74,18 @@
   color: var(--color-primary);
 }
 
-/* selection bubble toolbar — light card like the web app */
+/* selection bubble toolbar — clean icon card like the web app */
 .bubble-menu {
   display: flex;
   align-items: center;
-  gap: 1px;
-  padding: 4px;
+  gap: 2px;
+  padding: 5px 6px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  border-radius: 12px;
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.13),
+    0 2px 6px rgba(0, 0, 0, 0.08);
   white-space: nowrap;
 }
 
@@ -89,15 +93,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 30px;
+  min-width: 32px;
+  height: 32px;
   padding: 0 7px;
   border: none;
   background: transparent;
   color: var(--color-text);
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 8px;
+  transition: background 0.08s, color 0.08s;
+}
+
+.bubble-btn svg {
+  display: block;
+  opacity: 0.85;
 }
 
 .bubble-btn:hover {
@@ -107,6 +118,10 @@
 .bubble-btn.active {
   background: var(--color-primary);
   color: white;
+}
+
+.bubble-btn.active svg {
+  opacity: 1;
 }
 
 .bubble-hl {
@@ -167,9 +182,10 @@
 
 .bubble-divider {
   width: 1px;
-  height: 18px;
-  margin: 0 4px;
+  height: 20px;
+  margin: 0 5px;
   background: var(--color-border);
+  flex-shrink: 0;
 }
 
 /* highlighted text (==mark==) in both read view and editor */

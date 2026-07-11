@@ -10,6 +10,9 @@
 - **Also shipped (previously implemented, uncommitted):** always-on editing (open == editable with 1200ms-debounced autosave, save-state pill, ⌘S flush — replaces the separate 编辑 button), adjustable reading-column width (设置 → 最窄…最宽, 5 levels, `--reading-col`), one-click light/dark toggle in the titlebar, and the icon-only quick-nav row (搜索/主页/设置) in the sidebar.
 
 ### Fixes
+- **Selection toolbar restyled with SVG icons.** Emoji glyphs (🔗💬⌫❝•☑) replaced with Material-grid SVG icons (quote/lists/link/comment/clear-format) matching Outline web's iconography; larger 32px buttons, softer shadow, blue active pill.
+- **Drag-resizable sidebar.** New right-edge drag handle (200–420px, persisted to `ui.sidebarWidth`).
+- **Code block font size.** 13px hardcoded → `0.9em` of body (≈14.4px), matching web proportions in both editor and read view.
 - **Whole-sidebar scrolling.** The mouse wheel previously only worked over the collections section (`.sb-section-grow` owned the overflow). Everything between the pinned team header/quick-nav and the pinned account footer now lives in one `.sb-scroll` container — 星标/个人笔记/集合 scroll together.
 - **Table sizing.** Removed the conflicting duplicate `table { width: 100% }` block in `Editor.css` (the compact `width: auto` block now solely applies), and wide tables scroll horizontally inside a `.tableWrapper` div emitted by both pipelines (a `Table.extend` renderHTML in the editor; `table_open/close` renderer overrides in the markdown-it read path).
 - Settings 关于 now shows the real app version from `package.json` (was hardcoded "v0.2").

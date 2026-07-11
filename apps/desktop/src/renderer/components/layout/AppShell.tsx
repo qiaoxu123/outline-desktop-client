@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../sidebar/Sidebar";
 import TitleBar from "./TitleBar";
@@ -6,12 +6,48 @@ import Breadcrumb from "./Breadcrumb";
 import { useUIStore } from "../../state/uiStore";
 import "./AppShell.css";
 
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 420;
+
+function loadSidebarWidth(): number {
+  const v = Number(localStorage.getItem("ui.sidebarWidth"));
+  return v >= SIDEBAR_MIN && v <= SIDEBAR_MAX ? v : 260;
+}
+
 export default function AppShell(): React.ReactElement {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const fullWidth = useUIStore((s) => s.fullWidth);
   const contentWidth = useUIStore((s) => s.contentWidth);
   const contentRef = useRef<HTMLElement>(null);
   const [showTop, setShowTop] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+
+  // Drag the sidebar's right edge to resize (persisted).
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = loadSidebarWidth();
+    document.body.classList.add("sidebar-resizing");
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.min(
+        SIDEBAR_MAX,
+        Math.max(SIDEBAR_MIN, startWidth + ev.clientX - startX),
+      );
+      setSidebarWidth(w);
+    };
+    const onUp = (ev: MouseEvent) => {
+      const w = Math.min(
+        SIDEBAR_MAX,
+        Math.max(SIDEBAR_MIN, startWidth + ev.clientX - startX),
+      );
+      localStorage.setItem("ui.sidebarWidth", String(w));
+      document.body.classList.remove("sidebar-resizing");
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -26,8 +62,16 @@ export default function AppShell(): React.ReactElement {
       <TitleBar />
       <div className="app-body">
         {!sidebarCollapsed && (
-          <aside className="app-sidebar">
+          <aside
+            className="app-sidebar"
+            style={{ width: sidebarWidth, minWidth: sidebarWidth }}
+          >
             <Sidebar />
+            <div
+              className="sidebar-resizer"
+              onMouseDown={startResize}
+              title="拖拽调整侧边栏宽度"
+            />
           </aside>
         )}
         <div className="app-main">
