@@ -7,7 +7,6 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import Image from "@tiptap/extension-image";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Table from "@tiptap/extension-table";
@@ -19,7 +18,7 @@ import Highlight from "@tiptap/extension-highlight";
 import { Markdown } from "tiptap-markdown";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
-import { absoluteAttachmentUrl } from "../../lib/server";
+import { AttachmentImage } from "./extensions/image";
 import "katex/dist/katex.min.css";
 import "./Editor.css";
 
@@ -47,18 +46,6 @@ const MarkdownHighlight = Highlight.extend({
  * tables then overflow the reading column. Wrapping in a scroll container
  * (like Outline web's .tableWrapper) only changes the DOM, not the markdown.
  */
-/**
- * Attachment images live in markdown as relative `/api/…` paths; absolutize
- * only the rendered DOM — node attrs keep the relative path so the markdown
- * round-trip is unchanged (auth header comes from the main process).
- */
-const AttachmentImage = Image.extend({
-  renderHTML({ HTMLAttributes }) {
-    const src = (HTMLAttributes.src as string) ?? "";
-    return ["img", { ...HTMLAttributes, src: absoluteAttachmentUrl(src) }];
-  },
-});
-
 const ScrollableTable = Table.extend({
   renderHTML({ HTMLAttributes }) {
     return [

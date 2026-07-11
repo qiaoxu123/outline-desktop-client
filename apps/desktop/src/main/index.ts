@@ -1,4 +1,4 @@
-import { app, BrowserWindow, net, session, shell } from "electron";
+import { app, BrowserWindow, ipcMain, net, session, shell } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { setFetchImplementation } from "@outline/api-client";
@@ -30,6 +30,19 @@ function registerAllIpcHandlers(): void {
   registerAuthHandlers();
   registerApiHandlers();
   registerPersonalNotesHandlers();
+
+  // Attachment download: Chromium's downloader gets the Authorization header
+  // from the webRequest hook above, so a plain downloadURL just works and
+  // shows the native save dialog.
+  ipcMain.handle("attachments:download", (event, { url }: { url: string }) => {
+    if (typeof url !== "string" || !/^https?:\/\//.test(url)) {
+      return { ok: false, error: "invalid url" };
+    }
+    const isKnownServer = readProfiles().some((p) => url.startsWith(p.serverUrl));
+    if (!isKnownServer) return { ok: false, error: "unknown server" };
+    event.sender.downloadURL(url);
+    return { ok: true };
+  });
 }
 
 function createMainWindow(): BrowserWindow {

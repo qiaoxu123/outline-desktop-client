@@ -5,6 +5,7 @@ import katexPlugin from "@vscode/markdown-it-katex";
 import markPlugin from "markdown-it-mark";
 import hljs from "highlight.js";
 import { absoluteAttachmentUrl } from "../server";
+import { parseImageTitle } from "./imageTitle";
 import "katex/dist/katex.min.css";
 import "./highlight-theme.css";
 
@@ -54,16 +55,25 @@ md.use(
 md.renderer.rules.table_open = () => '<div class="tableWrapper"><table>';
 md.renderer.rules.table_close = () => "</table></div>";
 
-// Attachment images are stored as relative /api/… paths — absolutize for
-// display (display only; the markdown source keeps the relative path).
+// Attachment images: absolutize the relative /api/… src for display, and
+// decode Outline web's title conventions ("layoutClass =WxH") into width +
+// layout class so resized/aligned images render like web.
 const defaultImageRender =
   md.renderer.rules.image ??
   ((tokens, idx, options, _env, self) =>
     self.renderToken(tokens, idx, options));
 md.renderer.rules.image = (tokens, idx, options, env, self) => {
   const token = tokens[idx];
-  const src = token?.attrGet("src");
-  if (src) token.attrSet("src", absoluteAttachmentUrl(src));
+  if (token) {
+    const src = token.attrGet("src");
+    if (src) token.attrSet("src", absoluteAttachmentUrl(src));
+    const parsed = parseImageTitle(token.attrGet("title"));
+    if (parsed.width) token.attrSet("width", String(parsed.width));
+    if (parsed.layoutClass)
+      token.attrJoin("class", `image-${parsed.layoutClass}`);
+    if (parsed.title) token.attrSet("title", parsed.title);
+    else if (token.attrGet("title") !== null) token.attrSet("title", "");
+  }
   return defaultImageRender(tokens, idx, options, env, self);
 };
 

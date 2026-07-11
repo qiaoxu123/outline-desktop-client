@@ -36,6 +36,8 @@ export interface ElectronAPI {
     method: string,
     params?: Record<string, unknown>,
   ) => Promise<unknown>;
+  /** Download a server attachment via Chromium (auth header injected in main). */
+  downloadUrl: (url: string) => Promise<unknown>;
   /** Pointer to the user's personal-notes folder on the server. */
   personalNotes: {
     getRoot: (profileId: string) => Promise<unknown>;
@@ -82,6 +84,7 @@ const api: ElectronAPI = {
   },
   call: (profileId, method, params) =>
     ipcRenderer.invoke("api:call", { profileId, method, params }),
+  downloadUrl: (url) => ipcRenderer.invoke("attachments:download", { url }),
   personalNotes: {
     getRoot: (profileId) =>
       ipcRenderer.invoke("personalNotes:getRoot", profileId),

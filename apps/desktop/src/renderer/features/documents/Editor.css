@@ -268,6 +268,152 @@
   line-height: 1.5;
 }
 
+/* ---------- image node: web-like adjustment UI ---------- */
+
+.image-node {
+  position: relative;
+  display: block;
+  text-align: center;
+  margin: 0.8em auto;
+  max-width: 100%;
+}
+
+.image-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.image-node img {
+  max-width: 100%;
+  border-radius: 8px;
+  vertical-align: bottom;
+}
+
+/* layout classes (same semantics as Outline web) */
+.image-node.image-left-50,
+.markdown-body img.image-left-50 {
+  float: left;
+  max-width: 50%;
+  margin: 0.3em 1.5em 0.6em 0;
+}
+
+.image-node.image-right-50,
+.markdown-body img.image-right-50 {
+  float: right;
+  max-width: 50%;
+  margin: 0.3em 0 0.6em 1.5em;
+}
+
+.image-node.image-full-width,
+.markdown-body img.image-full-width {
+  width: 100%;
+}
+
+.image-node.image-full-width .image-frame,
+.image-node.image-full-width img {
+  width: 100%;
+}
+
+/* selection ring */
+.image-node.ProseMirror-selectednode img {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* floating toolbar above the selected image */
+.image-toolbar {
+  display: none;
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.13),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
+  z-index: 20;
+}
+
+.image-node.ProseMirror-selectednode .image-toolbar {
+  display: flex;
+}
+
+.image-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.image-tool-btn:hover {
+  background: var(--color-bg-secondary);
+}
+
+.image-tool-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.image-tool-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: var(--color-border);
+}
+
+.image-size-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 0 2px;
+}
+
+/* side drag handles */
+.image-handle {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 48px;
+  max-height: 60%;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  cursor: col-resize;
+  z-index: 21;
+}
+
+.image-node.ProseMirror-selectednode .image-handle,
+.image-node:hover .image-handle {
+  display: block;
+}
+
+.image-handle-left {
+  left: 6px;
+}
+
+.image-handle-right {
+  right: 6px;
+}
+
+body.image-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 /* anchored-comment highlight (web-created comments located by anchorText) */
 .doc-editor .ProseMirror .comment-anchor {
   background: rgba(255, 212, 0, 0.18);
