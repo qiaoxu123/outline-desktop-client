@@ -276,10 +276,11 @@
   margin: 0;
 }
 
+/* full document width like Outline web — width:auto collapsed sparse
+   tables into a tiny content-hugging box */
 .doc-editor .ProseMirror table {
   border-collapse: collapse;
-  width: auto;
-  max-width: 100%;
+  width: 100%;
   margin: 0.8em 0;
   font-size: 14px;
 }

@@ -466,10 +466,9 @@
   font-family: var(--font-mono);
 }
 
-/* compact tables, content-width like Outline web (not stretched to 100%) */
+/* tables: full document width like Outline web, compact cell padding */
 .document-body table {
-  width: auto;
-  max-width: 100%;
+  width: 100%;
   border-collapse: collapse;
   margin: 0.8em 0;
   font-size: 14px;
