@@ -6,6 +6,7 @@ import {
   roleLabel,
   canUserEdit,
 } from "../../hooks/useOutline";
+import pkg from "../../../../package.json";
 import "./SettingsView.css";
 
 const SERVER_URL = "https://notes.jlu-mcns.site";
@@ -21,11 +22,21 @@ export default function SettingsView(): React.ReactElement {
   const avatar = absoluteUrl(user?.avatarUrl);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+  const contentWidth = useUIStore((s) => s.contentWidth);
+  const setContentWidth = useUIStore((s) => s.setContentWidth);
 
   const themeOptions: { value: "light" | "dark" | "system"; label: string }[] = [
     { value: "light", label: "浅色" },
     { value: "dark", label: "深色" },
     { value: "system", label: "跟随系统" },
+  ];
+
+  const widthOptions: { value: 1 | 2 | 3 | 4 | 5; label: string }[] = [
+    { value: 1, label: "最窄" },
+    { value: 2, label: "较窄" },
+    { value: 3, label: "适中" },
+    { value: 4, label: "较宽" },
+    { value: 5, label: "最宽" },
   ];
 
   const handleLogout = async () => {
@@ -88,6 +99,19 @@ export default function SettingsView(): React.ReactElement {
             </button>
           ))}
         </div>
+
+        <div className="settings-field-label">页面宽度</div>
+        <div className="settings-theme-toggle">
+          {widthOptions.map((opt) => (
+            <button
+              key={opt.value}
+              className={`settings-theme-option ${contentWidth === opt.value ? "active" : ""}`}
+              onClick={() => setContentWidth(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="settings-section">
@@ -121,7 +145,7 @@ export default function SettingsView(): React.ReactElement {
       <section className="settings-section">
         <h3>关于</h3>
         <p className="settings-description">
-          Outline Desktop v0.2 — macOS / Windows / Linux
+          Outline Desktop v{pkg.version} — macOS / Windows / Linux
         </p>
       </section>
     </div>

@@ -59,6 +59,13 @@
 }
 
 /* theme toggle (segmented) */
+.settings-field-label {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
 .settings-theme-toggle {
   display: inline-flex;
   padding: 3px;

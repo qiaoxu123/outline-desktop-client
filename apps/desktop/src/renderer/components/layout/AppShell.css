@@ -34,6 +34,7 @@
 
   --sidebar-width: 260px;
   --titlebar-height: 48px;
+  --breadcrumb-height: 36px;
 
   /* Font stacks. system-ui / -apple-system resolve to SF Pro on macOS for a
      native feel; Inter is intentionally omitted (not bundled). */
@@ -160,12 +161,37 @@ body {
   overflow: hidden;
 }
 
+/* path strip under the titlebar (tabs live in the titlebar, path below) */
+.breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  height: var(--breadcrumb-height);
+  min-height: var(--breadcrumb-height);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
 .app-content {
   flex: 1;
   overflow-y: auto;
   background: var(--color-bg);
   position: relative;
+  /* reading column width, adjustable in Settings (level 1 narrowest → 5 full) */
+  --reading-col: 920px;
 }
+
+.app-content[data-content-width="2"] {
+  --reading-col: 1100px;
+}
+.app-content[data-content-width="3"] {
+  --reading-col: 1280px;
+}
+.app-content[data-content-width="4"] {
+  --reading-col: 1460px;
+}
+/* level 5 → .full-width class (handled below) stretches to fill */
 
 .scroll-top-button {
   position: fixed;

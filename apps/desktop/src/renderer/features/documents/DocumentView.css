@@ -10,7 +10,7 @@
    side panel sits flush against the right side. */
 .document-layout {
   display: grid;
-  grid-template-columns: 1fr minmax(0, 920px) 1fr;
+  grid-template-columns: 1fr minmax(0, var(--reading-col, 920px)) 1fr;
   column-gap: 24px;
   align-items: start;
 }
@@ -18,7 +18,7 @@
 .document-layout .document-article {
   grid-column: 2;
   min-width: 0;
-  max-width: 920px;
+  max-width: var(--reading-col, 920px);
   margin: 0;
 }
 
@@ -34,7 +34,7 @@
   position: sticky;
   top: 16px;
   width: 240px;
-  max-height: calc(100vh - var(--titlebar-height) - 64px);
+  max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   overflow-y: auto;
   padding-left: 14px;
   border-left: 1px solid var(--color-border);
@@ -76,7 +76,7 @@
   top: 16px;
   width: 280px;
   flex-shrink: 0;
-  max-height: calc(100vh - var(--titlebar-height) - 64px);
+  max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   overflow-y: auto;
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -210,6 +210,18 @@
   max-width: 220px;
 }
 
+/* autosave status next to the document actions */
+.document-save-state {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  align-self: center;
+}
+
+.document-save-state.error {
+  color: var(--color-danger);
+}
+
 .document-icon-button {
   display: flex;
   align-items: center;
@@ -230,7 +242,10 @@
 }
 
 .document-button {
-  padding: 7px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
   border: 1px solid var(--color-border);
   border-radius: 7px;
   background: var(--color-bg);
@@ -244,6 +259,12 @@
 .document-button:hover:not(:disabled) {
   background: var(--color-bg-secondary);
   color: var(--color-text);
+}
+
+.document-button.active {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  border-color: var(--color-primary);
 }
 
 .document-button.primary {
@@ -535,7 +556,7 @@
   top: 16px;
   width: 300px;
   flex-shrink: 0;
-  max-height: calc(100vh - var(--titlebar-height) - 64px);
+  max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-border);
@@ -612,6 +633,103 @@
   margin-top: 2px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* threaded comments (web parity) */
+.comment-thread {
+  margin: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.comment-thread.focused {
+  border-color: var(--color-primary);
+  background: var(--color-bg-secondary);
+}
+
+.comment-thread.resolved {
+  opacity: 0.65;
+}
+
+.comment-anchor-quote {
+  margin: 8px 14px 0;
+  padding: 4px 10px;
+  border-left: 3px solid rgba(255, 212, 0, 0.85);
+  background: rgba(255, 212, 0, 0.1);
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.comment-reply {
+  margin-left: 24px;
+  border-left: 2px solid var(--color-border);
+}
+
+.comment-thread-ops {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 8px;
+}
+
+.comment-op {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.comment-op:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.comment-op.danger {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.comment-resolved-badge {
+  font-size: 11px;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.comment-reply-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.comment-quote-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-bg-secondary);
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.comment-quote-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .comments-composer {
@@ -704,7 +822,7 @@
    and the right rail (TOC / history / comments) stays beside it. */
 @media (max-width: 1400px) {
   .document-layout {
-    grid-template-columns: 0 minmax(0, 920px) auto;
+    grid-template-columns: 0 minmax(0, var(--reading-col, 920px)) auto;
     column-gap: 16px;
   }
 }

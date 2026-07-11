@@ -12,12 +12,15 @@ export interface UIState {
   showToc: boolean;
   /** Color theme (persisted). "system" follows OS preference. */
   theme: "light" | "dark" | "system";
+  /** Reading column width level 1 (narrowest) → 5 (full width). Persisted. */
+  contentWidth: 1 | 2 | 3 | 4 | 5;
 
   setActiveProfileId: (id: string | null) => void;
   toggleSidebar: () => void;
   toggleFullWidth: () => void;
   toggleToc: () => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
+  setContentWidth: (level: 1 | 2 | 3 | 4 | 5) => void;
   selectCollection: (id: string | null) => void;
   selectDocument: (id: string | null) => void;
   setGlobalSearchOpen: (open: boolean) => void;
@@ -34,6 +37,10 @@ export const useUIStore = create<UIState>((set) => ({
   theme:
     (localStorage.getItem("ui.theme") as "light" | "dark" | "system" | null) ??
     "system",
+  contentWidth: ((): 1 | 2 | 3 | 4 | 5 => {
+    const v = Number(localStorage.getItem("ui.contentWidth"));
+    return v >= 1 && v <= 5 ? (v as 1 | 2 | 3 | 4 | 5) : 1;
+  })(),
 
   setActiveProfileId: (id) => set({ activeProfileId: id }),
   toggleSidebar: () =>
@@ -53,6 +60,10 @@ export const useUIStore = create<UIState>((set) => ({
   setTheme: (theme) => {
     localStorage.setItem("ui.theme", theme);
     set({ theme });
+  },
+  setContentWidth: (level) => {
+    localStorage.setItem("ui.contentWidth", String(level));
+    set({ contentWidth: level });
   },
   selectCollection: (id) => set({ selectedCollectionId: id }),
   selectDocument: (id) => set({ selectedDocumentId: id }),

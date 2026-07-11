@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../sidebar/Sidebar";
 import TitleBar from "./TitleBar";
-import TabBar from "./TabBar";
+import Breadcrumb from "./Breadcrumb";
 import { useUIStore } from "../../state/uiStore";
 import "./AppShell.css";
 
 export default function AppShell(): React.ReactElement {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const fullWidth = useUIStore((s) => s.fullWidth);
+  const contentWidth = useUIStore((s) => s.contentWidth);
   const contentRef = useRef<HTMLElement>(null);
   const [showTop, setShowTop] = useState(false);
 
@@ -30,10 +31,13 @@ export default function AppShell(): React.ReactElement {
           </aside>
         )}
         <div className="app-main">
-          <TabBar />
+          <div className="breadcrumb-bar">
+            <Breadcrumb />
+          </div>
           <main
             ref={contentRef}
-            className={`app-content ${fullWidth ? "full-width" : ""}`}
+            className={`app-content ${fullWidth || contentWidth === 5 ? "full-width" : ""}`}
+            data-content-width={contentWidth}
           >
             <Outlet />
             {showTop && (

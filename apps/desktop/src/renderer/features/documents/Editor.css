@@ -33,24 +33,6 @@
   accent-color: var(--color-primary);
 }
 
-.doc-editor .ProseMirror table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 1em 0;
-}
-
-.doc-editor .ProseMirror th,
-.doc-editor .ProseMirror td {
-  border: 1px solid var(--color-border);
-  padding: 8px 14px;
-  text-align: left;
-}
-
-.doc-editor .ProseMirror th {
-  background: var(--color-bg-secondary);
-  font-weight: 600;
-}
-
 .doc-editor .ProseMirror pre {
   background: var(--color-code-bg);
   border: 1px solid var(--color-code-border);
@@ -212,25 +194,88 @@
   overflow-y: hidden;
 }
 
-/* TipTap Mathematics: the rendered KaTeX preview span */
-.Tiptap-mathematics-render {
+/* math nodes: KaTeX preview + click-to-edit LaTeX source */
+.math-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 0 2px;
-  cursor: pointer;
-}
-
-.Tiptap-mathematics-render--editable:hover {
-  background: var(--color-bg-secondary);
   border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-/* raw source shown while the caret is inside a formula */
-.Tiptap-mathematics-editor {
-  color: var(--color-primary);
+.math-node.math-node-block {
+  display: block;
+  text-align: center;
+  padding: 4px 8px;
+  white-space: normal;
+  cursor: default;
+}
+
+.math-node:hover,
+.math-node.ProseMirror-selectednode {
+  background: var(--color-bg-secondary);
+}
+
+.math-node .math-render.math-error {
+  color: #c0392b;
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
+.math-placeholder {
+  color: var(--color-placeholder);
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.math-src {
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  outline: none;
+  min-width: 4ch;
+}
+
+.math-src-block {
+  display: block;
+  width: 100%;
+  margin: 6px auto 0;
+  padding: 8px 10px;
+  resize: vertical;
+  text-align: left;
+  line-height: 1.5;
+}
+
+/* anchored-comment highlight (web-created comments located by anchorText) */
+.doc-editor .ProseMirror .comment-anchor {
+  background: rgba(255, 212, 0, 0.18);
+  border-bottom: 2px solid rgba(255, 212, 0, 0.85);
+  cursor: pointer;
+}
+
+.doc-editor .ProseMirror .comment-anchor:hover {
+  background: rgba(255, 212, 0, 0.32);
+}
+
 /* compact tables (match Outline web) */
+.doc-editor .tableWrapper,
+.markdown-body .tableWrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 0.8em 0;
+}
+
+.doc-editor .tableWrapper table,
+.markdown-body .tableWrapper table {
+  margin: 0;
+}
+
 .doc-editor .ProseMirror table {
   border-collapse: collapse;
   width: auto;

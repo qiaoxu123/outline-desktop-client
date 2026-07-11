@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUIStore, useTabsStore } from "../../state/uiStore";
@@ -11,12 +11,14 @@ import {
   absoluteUrl,
 } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
+import { sortDocsByTitle } from "../../lib/naturalSort";
 import { MarkdownRenderer } from "../../lib/markdown/renderer";
 import {
   useMarkdownEditor,
   getMarkdown,
   MarkdownEditorContent,
 } from "./Editor";
+import { commentHighlightsKey } from "./extensions/commentHighlights";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
 
@@ -241,24 +243,52 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
   );
 }
 
-/* ---------- comments panel ---------- */
+/* ---------- comments (threaded, aligned with Outline web) ---------- */
 
 interface Comment {
   id: string;
-  data?: { content?: string };
+  data?: { content?: unknown };
   text?: string;
   createdAt: string;
+  parentCommentId?: string | null;
+  /** Anchored comments carry the text they were attached to (web-created). */
+  anchorText?: string | null;
+  resolvedAt?: string | null;
   createdBy?: { id: string; name: string; avatarUrl?: string | null };
 }
 
+/** Shared comments query — panel, count badge and anchor decorations all
+ * read the same cache entry. */
+function useComments(documentId: string): {
+  comments: Comment[];
+  isLoading: boolean;
+  error: unknown;
+} {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["profile", activeProfileId, "comments", documentId],
+    queryFn: () =>
+      unwrapIpc<{ data: Comment[] }>(
+        api.call(activeProfileId!, "comments.list", {
+          documentId,
+          includeAnchorText: true,
+        }),
+      ),
+    enabled: !!activeProfileId,
+  });
+  return { comments: data?.data ?? [], isLoading, error };
+}
+
 function commentText(c: Comment): string {
-  // Outline stores rich comment data; fall back to any plain text field.
-  if (c.text) return c.text;
-  const content = c.data?.content;
-  if (typeof content === "string") return content;
-  if (content && typeof content === "object") {
+  // Outline stores comment bodies as a ProseMirror doc in `c.data`
+  // ({ type:"doc", content:[…] }); fall back to any plain text field.
+  if (c.text && c.text.trim()) return c.text;
+  const data = c.data as unknown;
+  if (typeof data === "string") return data;
+  if (data && typeof data === "object") {
     try {
-      return extractProseText(content);
+      return extractProseText(data).trim();
     } catch {
       return "";
     }
@@ -267,59 +297,180 @@ function commentText(c: Comment): string {
 }
 
 function extractProseText(node: unknown): string {
+  // Accept either a node ({ type, text?, content? }) or a raw content array,
+  // so passing the whole doc node walks its children correctly.
+  if (Array.isArray(node)) return node.map(extractProseText).join("");
   if (!node || typeof node !== "object") return "";
-  const n = node as { text?: string; content?: unknown[] };
+  const n = node as { type?: string; text?: string; content?: unknown };
   if (typeof n.text === "string") return n.text;
-  if (Array.isArray(n.content)) {
-    return n.content.map(extractProseText).join("");
-  }
-  return "";
+  const inner = Array.isArray(n.content)
+    ? n.content.map(extractProseText).join("")
+    : "";
+  // Separate block-level nodes with a newline so multi-line comments read.
+  return n.type === "paragraph" || n.type === "heading" ? `${inner}\n` : inner;
+}
+
+function CommentItem({
+  comment,
+  ownUserId,
+  onDelete,
+  deleting,
+}: {
+  comment: Comment;
+  ownUserId?: string;
+  onDelete: (id: string) => void;
+  deleting: boolean;
+}): React.ReactElement {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const url = absoluteUrl(comment.createdBy?.avatarUrl);
+  const own = !!ownUserId && comment.createdBy?.id === ownUserId;
+
+  return (
+    <div className="comment-item">
+      <div className="comment-avatar">
+        {url ? (
+          <img src={url} alt={comment.createdBy?.name} />
+        ) : (
+          <span className="comment-avatar-fallback">
+            {(comment.createdBy?.name || "?").slice(0, 1).toUpperCase()}
+          </span>
+        )}
+      </div>
+      <div className="comment-body">
+        <div className="comment-meta">
+          <span className="comment-author">{comment.createdBy?.name}</span>
+          <span className="comment-time">
+            {new Date(comment.createdAt).toLocaleString()}
+          </span>
+          {own && (
+            <button
+              className={`comment-op ${confirmDelete ? "danger" : ""}`}
+              disabled={deleting}
+              onClick={() =>
+                confirmDelete ? onDelete(comment.id) : setConfirmDelete(true)
+              }
+            >
+              {confirmDelete ? "确认删除？" : "删除"}
+            </button>
+          )}
+        </div>
+        <div className="comment-text">{commentText(comment)}</div>
+      </div>
+    </div>
+  );
 }
 
 function CommentsPanel({
   documentId,
   onClose,
+  focusedCommentId,
+  quote,
+  onQuoteChange,
 }: {
   documentId: string;
   onClose: () => void;
+  focusedCommentId?: string | null;
+  /** Selected text from the editor's 评论 button, quoted into a new comment. */
+  quote?: string;
+  onQuoteChange?: (quote: string) => void;
 }): React.ReactElement {
   const api = useElectronAPI();
   const queryClient = useQueryClient();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { user } = useUserInfo();
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["profile", activeProfileId, "comments", documentId],
-    queryFn: () =>
-      unwrapIpc<{ data: Comment[] }>(
-        api.call(activeProfileId!, "comments.list", { documentId }),
-      ),
-    enabled: !!activeProfileId,
-  });
+  const { comments, isLoading, error } = useComments(documentId);
+
+  const invalidate = () =>
+    void queryClient.invalidateQueries({
+      queryKey: ["profile", activeProfileId, "comments", documentId],
+    });
 
   const createMutation = useMutation({
-    mutationFn: (text: string) =>
-      unwrapIpc(
+    mutationFn: ({
+      text,
+      quoted,
+      parentCommentId,
+    }: {
+      text: string;
+      quoted?: string;
+      parentCommentId?: string;
+    }) => {
+      // Outline stores comment bodies as ProseMirror doc data. New comments
+      // from the desktop are unanchored (an anchor mark can't survive our
+      // markdown save path) — the selected text rides along as a blockquote.
+      const content: unknown[] = [];
+      if (quoted?.trim()) {
+        content.push({
+          type: "blockquote",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: quoted.trim() }],
+            },
+          ],
+        });
+      }
+      content.push({
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      });
+      return unwrapIpc(
         api.call(activeProfileId!, "comments.create", {
           documentId,
-          // Outline expects ProseMirror doc data; a single paragraph works.
-          data: {
-            type: "doc",
-            content: [
-              { type: "paragraph", content: [{ type: "text", text }] },
-            ],
-          },
+          ...(parentCommentId ? { parentCommentId } : {}),
+          data: { type: "doc", content },
         }),
-      ),
-    onSuccess: () => {
-      setDraft("");
-      void queryClient.invalidateQueries({
-        queryKey: ["profile", activeProfileId, "comments", documentId],
-      });
+      );
+    },
+    onSuccess: (_data, vars) => {
+      if (vars.parentCommentId) {
+        setReplyDraft("");
+        setReplyTo(null);
+      } else {
+        setDraft("");
+        onQuoteChange?.("");
+      }
+      invalidate();
     },
   });
 
-  const comments = data?.data ?? [];
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, resolved }: { id: string; resolved: boolean }) =>
+      unwrapIpc(
+        api.call(
+          activeProfileId!,
+          resolved ? "comments.unresolve" : "comments.resolve",
+          { id },
+        ),
+      ),
+    onSuccess: invalidate,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      unwrapIpc(api.call(activeProfileId!, "comments.delete", { id })),
+    onSuccess: invalidate,
+  });
+
+  // Scroll the focused thread (clicked anchor in the document) into view.
+  useEffect(() => {
+    if (!focusedCommentId) return;
+    const el = listRef.current?.querySelector(
+      `[data-thread-id="${focusedCommentId}"]`,
+    );
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusedCommentId, comments.length]);
+
+  const topLevel = comments.filter((c) => !c.parentCommentId);
+  const repliesFor = (id: string) =>
+    comments.filter((c) => c.parentCommentId === id);
+  const mutationFailed =
+    createMutation.isError || resolveMutation.isError || deleteMutation.isError;
 
   return (
     <div className="comments-panel">
@@ -332,39 +483,109 @@ function CommentsPanel({
 
       {isLoading && <p className="history-note">加载中…</p>}
       {!!error && <p className="history-note error">无法加载评论</p>}
+      {mutationFailed && (
+        <p className="history-note error">操作失败，请稍后重试</p>
+      )}
       {!isLoading && comments.length === 0 && (
         <p className="history-note">还没有评论，来写第一条吧。</p>
       )}
 
-      <div className="comments-list">
-        {comments.map((c) => {
-          const url = absoluteUrl(c.createdBy?.avatarUrl);
+      <div className="comments-list" ref={listRef}>
+        {topLevel.map((c) => {
+          const replies = repliesFor(c.id);
+          const resolved = !!c.resolvedAt;
           return (
-            <div key={c.id} className="comment-item">
-              <div className="comment-avatar">
-                {url ? (
-                  <img src={url} alt={c.createdBy?.name} />
-                ) : (
-                  <span className="comment-avatar-fallback">
-                    {(c.createdBy?.name || "?").slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="comment-body">
-                <div className="comment-meta">
-                  <span className="comment-author">{c.createdBy?.name}</span>
-                  <span className="comment-time">
-                    {new Date(c.createdAt).toLocaleString()}
-                  </span>
+            <div
+              key={c.id}
+              data-thread-id={c.id}
+              className={`comment-thread ${resolved ? "resolved" : ""} ${
+                focusedCommentId === c.id ? "focused" : ""
+              }`}
+            >
+              {c.anchorText && (
+                <div className="comment-anchor-quote" title="评论锚定的原文">
+                  {c.anchorText}
                 </div>
-                <div className="comment-text">{commentText(c)}</div>
+              )}
+              <CommentItem
+                comment={c}
+                ownUserId={user?.id}
+                onDelete={(id) => deleteMutation.mutate(id)}
+                deleting={deleteMutation.isPending}
+              />
+              {replies.map((r) => (
+                <div key={r.id} className="comment-reply">
+                  <CommentItem
+                    comment={r}
+                    ownUserId={user?.id}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                    deleting={deleteMutation.isPending}
+                  />
+                </div>
+              ))}
+              <div className="comment-thread-ops">
+                <button
+                  className="comment-op"
+                  onClick={() => {
+                    setReplyTo(replyTo === c.id ? null : c.id);
+                    setReplyDraft("");
+                  }}
+                >
+                  回复
+                </button>
+                <button
+                  className="comment-op"
+                  disabled={resolveMutation.isPending}
+                  onClick={() =>
+                    resolveMutation.mutate({ id: c.id, resolved })
+                  }
+                >
+                  {resolved ? "取消解决" : "解决"}
+                </button>
+                {resolved && <span className="comment-resolved-badge">已解决</span>}
               </div>
+              {replyTo === c.id && (
+                <div className="comment-reply-composer">
+                  <textarea
+                    className="comments-input"
+                    value={replyDraft}
+                    onChange={(e) => setReplyDraft(e.target.value)}
+                    placeholder="回复…"
+                    rows={2}
+                    autoFocus
+                  />
+                  <button
+                    className="document-button primary"
+                    disabled={createMutation.isPending || !replyDraft.trim()}
+                    onClick={() =>
+                      createMutation.mutate({
+                        text: replyDraft.trim(),
+                        parentCommentId: c.id,
+                      })
+                    }
+                  >
+                    {createMutation.isPending ? "发送中…" : "回复"}
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
       <div className="comments-composer">
+        {quote?.trim() && (
+          <div className="comment-quote-chip">
+            <span className="comment-quote-text">{quote}</span>
+            <button
+              className="history-close"
+              title="移除引用"
+              onClick={() => onQuoteChange?.("")}
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <textarea
           className="comments-input"
           value={draft}
@@ -374,7 +595,10 @@ function CommentsPanel({
         />
         <button
           className="document-button primary"
-          onClick={() => draft.trim() && createMutation.mutate(draft.trim())}
+          onClick={() =>
+            draft.trim() &&
+            createMutation.mutate({ text: draft.trim(), quoted: quote })
+          }
           disabled={createMutation.isPending || !draft.trim()}
         >
           {createMutation.isPending ? "发送中…" : "发表评论"}
@@ -422,7 +646,7 @@ function NestedDocuments({
     <section className="nested-docs">
       <div className="nested-docs-title">文档</div>
       <div className="nested-docs-list">
-        {children.map((child) => (
+        {sortDocsByTitle(children).map((child) => (
           <a
             key={child.id}
             href={`#/document/${child.id}`}
@@ -448,67 +672,162 @@ function NestedDocuments({
   );
 }
 
-/* ---------- editor pane (mounted only while editing) ---------- */
+function CommentIcon(): React.ReactElement {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3z" />
+    </svg>
+  );
+}
 
-function DocEditorPane({
+/* ---------- always-on editor (editors): open == editable, autosaves ---------- */
+
+function EditableDocument({
   doc,
-  onDone,
+  onRestored,
 }: {
   doc: OutlineDocument;
-  onDone: () => void;
+  onRestored: () => void;
 }): React.ReactElement {
   const api = useElectronAPI();
-  const queryClient = useQueryClient();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const showToc = useUIStore((s) => s.showToc);
+  const { starFor } = useStars();
+  const { toggle: toggleStar, isPending: starPending } = useToggleStar();
+  const star = starFor(doc.id);
+  const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
+  const { comments } = useComments(doc.id);
+  const commentCount = comments.length;
+  const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
+  const [commentQuote, setCommentQuote] = useState("");
 
   const [title, setTitle] = useState(doc.title);
-  const [dirty, setDirty] = useState(false);
-  const [saveError, setSaveError] = useState("");
+  // TOC + read-pipeline preview track the live markdown as you type.
+  const [tocSource, setTocSource] = useState(doc.text);
+  const [saveState, setSaveState] =
+    useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  const editor = useMarkdownEditor(doc.text, true);
+  // Clicking an anchored-comment highlight in the text opens its thread.
+  const onCommentClick = useCallback((id: string) => {
+    setFocusedCommentId(id);
+    setPanel("comments");
+  }, []);
 
+  const editor = useMarkdownEditor(doc.text, true, onCommentClick);
+
+  // Dev-only handle for round-trip debugging (compare
+  // __editor.storage.markdown.getMarkdown() against __docText in devtools).
+  useEffect(() => {
+    if (!import.meta.env.DEV || !editor) return;
+    const w = window as unknown as { __editor?: unknown; __docText?: string };
+    w.__editor = editor;
+    w.__docText = doc.text;
+  }, [editor, doc.text]);
+
+  // Push anchored comments into the editor's decoration plugin (meta-only
+  // transaction — no doc change, so it never triggers the autosave handler).
+  // Serialized so the effect only fires on real changes: dispatch re-renders
+  // the component, and depending on the array identity would loop forever.
+  const anchorsJson = useMemo(
+    () =>
+      JSON.stringify(
+        comments
+          .filter((c) => !c.parentCommentId && c.anchorText)
+          .map((c) => ({ id: c.id, anchorText: c.anchorText })),
+      ),
+    [comments],
+  );
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.view.dispatch(
+      editor.state.tr.setMeta(commentHighlightsKey, JSON.parse(anchorsJson)),
+    );
+  }, [editor, anchorsJson]);
+
+  // 评论 button in the selection toolbar: quote the selection into a new
+  // (unanchored) comment — an anchor mark can't survive the markdown save.
+  const onComment = useCallback((selectedText: string) => {
+    setCommentQuote(selectedText);
+    setFocusedCommentId(null);
+    setPanel("comments");
+  }, []);
+
+  // The pending payload is kept in a ref so the debounced/unmount save never
+  // touches the (possibly torn-down) editor instance.
+  const pendingRef = useRef({ title: doc.title, text: doc.text });
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doSave = useCallback(async () => {
+    setSaveState("saving");
+    try {
+      await unwrapIpc(
+        api.documents.update(activeProfileId!, {
+          id: doc.id,
+          title: pendingRef.current.title,
+          text: pendingRef.current.text,
+        }),
+      );
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  }, [api, activeProfileId, doc.id]);
+
+  const scheduleSave = useCallback(() => {
+    setSaveState("saving");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => void doSave(), 1200);
+  }, [doSave]);
+
+  // Autosave on every edit; also refresh the TOC source.
   useEffect(() => {
     if (!editor) return;
-    const handler = () => setDirty(true);
+    const handler = () => {
+      // Only persist genuine user edits: extensions normalize content on load
+      // (which fires "update" without focus) — saving then would rewrite every
+      // opened document through the markdown round-trip unnecessarily.
+      if (!editor.isFocused) return;
+      pendingRef.current.text = getMarkdown(editor);
+      setTocSource(pendingRef.current.text);
+      scheduleSave();
+    };
     editor.on("update", handler);
     return () => {
       editor.off("update", handler);
     };
-  }, [editor]);
+  }, [editor, scheduleSave]);
 
-  const saveMutation = useMutation({
-    mutationFn: () =>
-      unwrapIpc<DocumentInfoResponse>(
-        api.documents.update(activeProfileId!, {
-          id: doc.id,
-          title,
-          text: editor ? getMarkdown(editor) : doc.text,
-        }),
-      ),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["profile", activeProfileId],
-      });
-      onDone();
-    },
-    onError: (err) => {
-      setSaveError(err instanceof Error ? err.message : "保存失败，请重试");
-    },
-  });
+  // Flush any pending save when leaving the document.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        void doSave();
+      }
+    };
+  }, [doSave]);
 
-  // Ctrl/Cmd+S to save, Esc to leave the editor
+  // Cmd/Ctrl+S forces an immediate save.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        if (!saveMutation.isPending && title.trim()) saveMutation.mutate();
-      } else if (e.key === "Escape") {
-        onDone();
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        void doSave();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [title, saveMutation, onDone]);
+  }, [doSave]);
+
+  const saveLabel =
+    saveState === "saving"
+      ? "保存中…"
+      : saveState === "saved"
+        ? "已保存"
+        : saveState === "error"
+          ? "保存失败"
+          : "";
 
   return (
     <div className="document-layout">
@@ -520,82 +839,19 @@ function DocEditorPane({
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
-                setDirty(true);
+                pendingRef.current.title = e.target.value;
+                scheduleSave();
               }}
-              placeholder="标题"
-              autoFocus
+              placeholder="无标题"
             />
             <div className="document-actions">
-              {saveError && (
-                <span className="document-save-error">{saveError}</span>
+              {saveLabel && (
+                <span
+                  className={`document-save-state ${saveState === "error" ? "error" : ""}`}
+                >
+                  {saveLabel}
+                </span>
               )}
-              <button
-                className="document-button subtle"
-                onClick={onDone}
-                disabled={saveMutation.isPending}
-              >
-                取消
-              </button>
-              <button
-                className="document-button primary"
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || !title.trim()}
-              >
-                {saveMutation.isPending ? "保存中…" : "保存"}
-              </button>
-            </div>
-          </div>
-          <div className="document-meta">
-            <span className="document-meta-hint">
-              ⌘/Ctrl+S 保存 · Esc 退出编辑
-            </span>
-            {dirty && <span className="document-dirty">未保存</span>}
-            <span className="document-edit-note">
-              提示：复杂公式建议保持源码不动，保存后在阅读视图查看渲染效果
-            </span>
-          </div>
-        </header>
-
-        <div className="document-body">
-          <MarkdownEditorContent editor={editor} />
-        </div>
-      </article>
-    </div>
-  );
-}
-
-/* ---------- document with read view + edit toggle (editors) ---------- */
-
-function EditableDocument({
-  doc,
-  onRestored,
-}: {
-  doc: OutlineDocument;
-  onRestored: () => void;
-}): React.ReactElement {
-  const showToc = useUIStore((s) => s.showToc);
-  const { starFor } = useStars();
-  const { toggle: toggleStar, isPending: starPending } = useToggleStar();
-  const [editing, setEditing] = useState(false);
-  const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
-  const star = starFor(doc.id);
-
-  // While editing, the TipTap editor takes over; viewing always uses the
-  // proven read pipeline (KaTeX math, centered display, compact tables).
-  if (editing) {
-    return <DocEditorPane doc={doc} onDone={() => setEditing(false)} />;
-  }
-
-  return (
-    <div className="document-layout">
-      <article className="document-article">
-        <header className="document-header">
-          <div className="document-header-row">
-            <h1 className="document-title">
-              {doc.emoji && <span className="document-emoji">{doc.emoji}</span>}
-              {doc.title || "Untitled"}
-            </h1>
-            <div className="document-actions">
               <Viewers documentId={doc.id} />
               <button
                 className={`document-icon-button ${star ? "starred" : ""}`}
@@ -612,15 +868,14 @@ function EditableDocument({
                 </svg>
               </button>
               <button
-                className={`document-icon-button ${panel === "comments" ? "active" : ""}`}
+                className={`document-button subtle ${panel === "comments" ? "active" : ""}`}
                 onClick={() =>
                   setPanel(panel === "comments" ? "none" : "comments")
                 }
                 title="评论"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3z" />
-                </svg>
+                <CommentIcon />
+                <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
               </button>
               <button
                 className={`document-button subtle ${panel === "history" ? "active" : ""}`}
@@ -630,31 +885,20 @@ function EditableDocument({
               >
                 历史
               </button>
-              <button
-                className="document-button primary"
-                onClick={() => setEditing(true)}
-              >
-                编辑
-              </button>
             </div>
           </div>
           <div className="document-meta">
-            <span>更新于 {new Date(doc.updatedAt).toLocaleDateString()}</span>
-            {doc.updatedBy && <span>by {doc.updatedBy.name}</span>}
+            <span className="document-meta-hint">直接编辑，自动保存 · ⌘/Ctrl+S 立即保存</span>
           </div>
         </header>
 
         <div className="document-body">
-          {doc.text.trim() ? (
-            <MarkdownRenderer content={doc.text} />
-          ) : (
-            <p className="document-blank">此文档暂无内容，点击右上角“编辑”开始撰写。</p>
-          )}
+          <MarkdownEditorContent editor={editor} onComment={onComment} />
         </div>
         <NestedDocuments documentId={doc.id} />
       </article>
 
-      {showToc && panel === "none" && <Toc markdown={doc.text} />}
+      {showToc && panel === "none" && <Toc markdown={tocSource} />}
       {panel === "history" && (
         <HistoryPanel
           documentId={doc.id}
@@ -663,7 +907,16 @@ function EditableDocument({
         />
       )}
       {panel === "comments" && (
-        <CommentsPanel documentId={doc.id} onClose={() => setPanel("none")} />
+        <CommentsPanel
+          documentId={doc.id}
+          onClose={() => {
+            setPanel("none");
+            setFocusedCommentId(null);
+          }}
+          focusedCommentId={focusedCommentId}
+          quote={commentQuote}
+          onQuoteChange={setCommentQuote}
+        />
       )}
     </div>
   );
@@ -676,6 +929,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
   const { starFor } = useStars();
   const { toggle: toggleStar, isPending: starPending } = useToggleStar();
   const star = starFor(doc.id);
+  const commentCount = useComments(doc.id).comments.length;
   const [commentsOpen, setCommentsOpen] = useState(false);
 
   return (
@@ -704,13 +958,12 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
                 </svg>
               </button>
               <button
-                className={`document-icon-button ${commentsOpen ? "active" : ""}`}
+                className={`document-button subtle ${commentsOpen ? "active" : ""}`}
                 onClick={() => setCommentsOpen(!commentsOpen)}
                 title="评论"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3z" />
-                </svg>
+                <CommentIcon />
+                <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
               </button>
             </div>
           </div>

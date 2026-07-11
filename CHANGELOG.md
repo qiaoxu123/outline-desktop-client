@@ -1,3 +1,29 @@
+## [1.9.0] - 2026-07-11
+
+### Features
+- **Lossless LaTeX math nodes (web parity).** Replaced the decoration-based `@tiptap/extension-mathematics` with dedicated `MathInline` / `MathBlock` atom nodes (`features/documents/extensions/math.ts`), mirroring Outline web's `math_inline` / `math_block`. LaTeX lives in a `latex` attribute and serializes via `state.text(latex, false)` — **no markdown escaping**, so `\frac`, `_{i,j}`, backslashes and multiline `\begin{aligned}` blocks round-trip byte-identically. Parsing reuses `@vscode/markdown-it-katex` inside tiptap-markdown (same plugin as the read view, so read/edit semantics match by construction). `flattenBlockMath()` is gone. Node views render KaTeX and switch to a source input on click (Enter/blur commits, Esc cancels, empty deletes; block math commits on Cmd/Ctrl+Enter); `$...$` input rule and a ∑ bubble-menu button create formulas.
+- **Threaded comments aligned with web.** Comments panel now groups replies under their parent (`parentCommentId`), supports reply / resolve / unresolve (`comments.resolve|unresolve`) / delete-own (two-step confirm), and shows each thread's anchored source text. Web-created anchored comments are highlighted inline in the editor via a decoration plugin (`extensions/commentHighlights.ts`) that locates `anchorText` (from `comments.list … includeAnchorText: true`) by first exact text match; clicking a highlight opens the panel focused on that thread. A 💬 bubble-menu button creates a new comment quoting the selection (as a blockquote in the comment body — desktop-created comments are intentionally *unanchored*, see Caveats).
+- **Tabs on top, path below.** Document tabs moved into the titlebar (pill style, next to back/forward); the breadcrumb path moved to its own strip under the titlebar (`.breadcrumb-bar`, new `--breadcrumb-height` token) — matching the requested layout.
+- **Sidebar node actions (web parity).** Hovering a document row reveals “+” (new child document) and “…” (menu: 新建子文档 / 收藏 / 重命名 / 复制 / 归档 / 删除, destructive ops two-step) — `components/sidebar/DocActions.tsx`. Collection rows get a hover “+” to create a root document.
+- **Natural title sorting.** `lib/naturalSort.ts` (`Intl.Collator('zh-CN', {numeric: true})`) fixes "1, 10, 2" ordering: personal-notes children, star children, nested-document lists always sort naturally by title; collection trees only when the collection's own sort is `title` (manual index order untouched).
+- **Collapsible + persistent collections.** The 集合 section header now collapses like 星标, and both the section state and per-collection expansion persist to localStorage (`ui.collectionsOpen`, `ui.expandedCollections`) instead of resetting every remount.
+- **Also shipped (previously implemented, uncommitted):** always-on editing (open == editable with 1200ms-debounced autosave, save-state pill, ⌘S flush — replaces the separate 编辑 button), adjustable reading-column width (设置 → 最窄…最宽, 5 levels, `--reading-col`), one-click light/dark toggle in the titlebar, and the icon-only quick-nav row (搜索/主页/设置) in the sidebar.
+
+### Fixes
+- **Whole-sidebar scrolling.** The mouse wheel previously only worked over the collections section (`.sb-section-grow` owned the overflow). Everything between the pinned team header/quick-nav and the pinned account footer now lives in one `.sb-scroll` container — 星标/个人笔记/集合 scroll together.
+- **Table sizing.** Removed the conflicting duplicate `table { width: 100% }` block in `Editor.css` (the compact `width: auto` block now solely applies), and wide tables scroll horizontally inside a `.tableWrapper` div emitted by both pipelines (a `Table.extend` renderHTML in the editor; `table_open/close` renderer overrides in the markdown-it read path).
+- Settings 关于 now shows the real app version from `package.json` (was hardcoded "v0.2").
+
+### Design Rationale
+- Math as atom nodes (not text + decorations) is the only way to exempt LaTeX from markdown escaping — the serializer escapes *text* nodes, not attributes. Hand-rolled (~340 lines) instead of `@benrbray/prosemirror-math` because the latter embeds a nested EditorView per formula, which composes poorly with tiptap-markdown; zero new dependencies.
+- Desktop-created comments are unanchored by design: Outline's `comment` mark is deliberately not serialized to markdown (verified in outline/outline source), so an anchor created here could not survive our `documents.update` text save. Quoting the selection into the comment body gives context without fighting that constraint.
+- tiptap-markdown calls each extension's `parse.setup()` on *every* parse against one shared markdown-it instance — the katex plugin registration is guarded by a flag to avoid duplicate ruler entries.
+
+### Notes & Caveats
+- **Verify against the live server** (needs a signed-in profile): whether `documents.update` full-text saves preserve *web-created* anchor marks server-side (`documentUpdater` reportedly merges, unverified). This risk predates this release — the always-editable autosave already replaced full text — but anchored-comment display makes it visible. If anchors are lost after desktop edits, the inline highlights disappear while the panel still shows threads with their `anchorText`.
+- `comments.resolve` / `includeAnchorText` require a reasonably recent Outline server; on older servers resolve buttons will surface 操作失败 and anchors simply won't render.
+- Inline `$$…$$` display math inside a paragraph is normalized to a standalone block on the next save (semantically identical, renders the same in web).
+
 ## [1.8.0] - 2026-06-13
 
 ### Features

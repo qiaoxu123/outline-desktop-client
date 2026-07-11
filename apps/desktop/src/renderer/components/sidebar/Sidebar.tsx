@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
@@ -16,11 +16,39 @@ import {
   type PersonalRoot,
 } from "../../hooks/usePersonalNotes";
 import { unwrapIpc } from "../../lib/ipc";
+import { sortDocsByTitle } from "../../lib/naturalSort";
+import DocActions from "./DocActions";
 import type {
   OutlineCollection,
   OutlineCollectionDocument,
 } from "@outline/shared-types";
 import "./Sidebar.css";
+
+/** Natural title sort applied to every level of a collection tree. */
+function sortTreeByTitle(
+  nodes: OutlineCollectionDocument[],
+  direction: "asc" | "desc",
+): OutlineCollectionDocument[] {
+  return sortDocsByTitle(nodes, direction).map((n) =>
+    n.children?.length
+      ? { ...n, children: sortTreeByTitle(n.children, direction) }
+      : n,
+  );
+}
+
+/** Persisted Set<string> helper for sidebar expand state. */
+function loadIdSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveIdSet(key: string, ids: Set<string>): void {
+  localStorage.setItem(key, JSON.stringify([...ids]));
+}
 
 interface CollectionListResponse {
   data: OutlineCollection[];
@@ -82,10 +110,12 @@ function DocNode({
   doc,
   expanded,
   toggle,
+  collectionId,
 }: {
   doc: OutlineCollectionDocument;
   expanded: Set<string>;
   toggle: (id: string) => void;
+  collectionId?: string;
 }): React.ReactElement {
   const navigate = useNavigate();
   const selectDocument = useUIStore((s) => s.selectDocument);
@@ -122,6 +152,11 @@ function DocNode({
           {doc.emoji && <span className="sb-emoji">{doc.emoji}</span>}
           <span className="sb-title">{doc.title || "Untitled"}</span>
         </a>
+        <DocActions
+          docId={doc.id}
+          title={doc.title || "Untitled"}
+          collectionId={collectionId}
+        />
       </div>
       {hasChildren && isOpen && (
         <div className="sb-children">
@@ -131,6 +166,7 @@ function DocNode({
               doc={child}
               expanded={expanded}
               toggle={toggle}
+              collectionId={collectionId}
             />
           ))}
         </div>
@@ -143,8 +179,10 @@ function DocNode({
 
 function CollectionTree({
   collectionId,
+  sort,
 }: {
   collectionId: string;
+  sort?: { field: string; direction: "asc" | "desc" };
 }): React.ReactElement {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
@@ -171,15 +209,75 @@ function CollectionTree({
   if (isLoading) return <div className="sb-note">加载中…</div>;
   if (error) return <div className="sb-note">加载失败</div>;
 
-  const documents = data?.data ?? [];
+  let documents = data?.data ?? [];
   if (documents.length === 0) return <div className="sb-note">（空）</div>;
+  // Natural numeric title order for title-sorted collections (the server's
+  // title sort is lexicographic: 1, 10, 2 …); manual index order untouched.
+  if (sort?.field === "title") {
+    documents = sortTreeByTitle(documents, sort.direction);
+  }
 
   return (
     <div className="sb-tree sb-children">
       {documents.map((doc) => (
-        <DocNode key={doc.id} doc={doc} expanded={expanded} toggle={toggle} />
+        <DocNode
+          key={doc.id}
+          doc={doc}
+          expanded={expanded}
+          toggle={toggle}
+          collectionId={collectionId}
+        />
       ))}
     </div>
+  );
+}
+
+/** Hover “+” on a collection row — create a document at the collection root. */
+function CollectionAddDoc({
+  collectionId,
+}: {
+  collectionId: string;
+}): React.ReactElement {
+  const api = useElectronAPI();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const res = await unwrapIpc<{ data: { id: string } }>(
+        api.call(activeProfileId!, "documents.create", {
+          title: "新文档",
+          text: "",
+          collectionId,
+          publish: true,
+        }),
+      );
+      return res.data.id;
+    },
+    onSuccess: (id) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["profile", activeProfileId],
+      });
+      navigate(`/document/${id}`);
+    },
+  });
+
+  return (
+    <span className="sb-actions">
+      <button
+        className="sb-action-btn"
+        title="在此集合新建文档"
+        disabled={create.isPending}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          create.mutate();
+        }}
+      >
+        +
+      </button>
+    </span>
   );
 }
 
@@ -217,7 +315,7 @@ function ChildDocs({
 
   return (
     <div className="sb-children">
-      {children.map((child) => (
+      {sortDocsByTitle(children).map((child) => (
         <ChildNode key={child.id} doc={child} />
       ))}
     </div>
@@ -251,6 +349,7 @@ function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
           {doc.emoji && <span className="sb-emoji">{doc.emoji}</span>}
           <span className="sb-title">{doc.title || "Untitled"}</span>
         </a>
+        <DocActions docId={doc.id} title={doc.title || "Untitled"} />
       </div>
       {open && <ChildDocs parentDocumentId={doc.id} />}
     </div>
@@ -542,16 +641,29 @@ export default function Sidebar(): React.ReactElement {
   const selectCollection = useUIStore((s) => s.selectCollection);
   const { user, team } = useUserInfo();
   const { starred } = useStars();
+  // Expand state survives restarts (previously component state, reset on
+  // every remount/navigation).
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
-    new Set(),
+    () => loadIdSet("ui.expandedCollections"),
   );
   const [starsOpen, setStarsOpen] = useState(true);
+  const [collectionsOpen, setCollectionsOpen] = useState(
+    localStorage.getItem("ui.collectionsOpen") !== "0",
+  );
+
+  const toggleCollectionsSection = () => {
+    setCollectionsOpen((open) => {
+      localStorage.setItem("ui.collectionsOpen", open ? "0" : "1");
+      return !open;
+    });
+  };
 
   const toggleCollection = (id: string) => {
     setExpandedCollections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      saveIdSet("ui.expandedCollections", next);
       return next;
     });
   };
@@ -570,17 +682,19 @@ export default function Sidebar(): React.ReactElement {
     path: string,
     label: string,
     icon: React.ReactElement,
+    iconOnly = false,
   ): React.ReactElement => (
     <a
       href={`#${path}`}
-      className={`sb-nav-item ${location.pathname === path ? "active" : ""}`}
+      aria-label={iconOnly ? label : undefined}
+      className={`sb-nav-item ${iconOnly ? "icon-only" : ""} ${location.pathname === path ? "active" : ""}`}
       onClick={(e) => {
         e.preventDefault();
         navigate(path);
       }}
     >
       {icon}
-      <span>{label}</span>
+      {!iconOnly && <span>{label}</span>}
     </a>
   );
 
@@ -593,13 +707,14 @@ export default function Sidebar(): React.ReactElement {
         <span className="sb-team-name">{team?.name ?? "Outline"}</span>
       </div>
 
-      <nav className="sb-nav">
+      <nav className="sb-quick-nav">
         {navItem(
           "/search",
           "搜索",
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.975 1.975 0 00-.017.016zm-5.242.156a5 5 0 110-10 5 5 0 010 10z" />
           </svg>,
+          true,
         )}
         {navItem(
           "/",
@@ -607,7 +722,20 @@ export default function Sidebar(): React.ReactElement {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M8 1.5L1.5 7v7a1 1 0 001 1H6v-4.5h4V15h3.5a1 1 0 001-1V7L8 1.5z" />
           </svg>,
+          true,
         )}
+        {navItem(
+          "/settings",
+          "设置",
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+          </svg>,
+          true,
+        )}
+      </nav>
+
+      <div className="sb-scroll">
+      <nav className="sb-nav">
         {navItem(
           "/shares",
           "共享链接",
@@ -616,13 +744,6 @@ export default function Sidebar(): React.ReactElement {
             <path d="M11 2a3 3 0 100 6c.35 0 .69-.06 1-.17v.34A3 3 0 1011 14a3 3 0 002.83-4H14a3 3 0 00-3-8zm-6 4a3 3 0 100 6 3 3 0 000-6z" opacity="0" />
             <path d="M4.715 6.542L3.343 7.914a3 3 0 104.243 4.243l1.828-1.829A3 3 0 008.586 5.5L8 6.086a1 1 0 00-.154.199 2 2 0 01.861 3.337L6.88 11.45a2 2 0 11-2.83-2.83l.793-.792a4 4 0 01-.128-1.287z" />
             <path d="M6.586 4.672A3 3 0 007.414 9.5l.775-.776a2 2 0 01-.896-3.346L9.12 3.55a2 2 0 113.03 2.61l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 10-4.243-4.243L6.586 4.672z" />
-          </svg>,
-        )}
-        {navItem(
-          "/settings",
-          "设置",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 10a2 2 0 100-4 2 2 0 000 4zM14.3 8.7l-1.18-.68a5.09 5.09 0 000-1.04l1.18-.68a.3.3 0 00.11-.41l-1-1.73a.3.3 0 00-.41-.11l-1.18.68a5.09 5.09 0 00-.9-.52l-.18-1.37a.3.3 0 00-.3-.24H8.56a.3.3 0 00-.3.24l-.18 1.37c-.32.14-.62.32-.9.52l-1.18-.68a.3.3 0 00-.41.11l-1 1.73a.3.3 0 00.11.41l1.18.68a5.09 5.09 0 000 1.04l-1.18.68a.3.3 0 00-.11.41l1 1.73a.3.3 0 00.41.11l1.18-.68c.28.2.58.38.9.52l.18 1.37a.3.3 0 00.3.24h1.88a.3.3 0 00.3-.24l.18-1.37c.32-.14.62-.32.9-.52l1.18.68a.3.3 0 00.41-.11l1-1.73a.3.3 0 00-.11-.41z" />
           </svg>,
         )}
       </nav>
@@ -646,10 +767,15 @@ export default function Sidebar(): React.ReactElement {
       <PersonalNotesSection />
 
       <div className="sb-section sb-section-grow">
-        <div className="sb-section-header static">
+        <button
+          className="sb-section-header"
+          onClick={toggleCollectionsSection}
+          title={collectionsOpen ? "收起集合" : "展开集合"}
+        >
           <span>集合</span>
-        </div>
-        {isLoading && (
+          <Chevron open={collectionsOpen} />
+        </button>
+        {collectionsOpen && isLoading && (
           <div className="sb-loading">
             {[1, 2, 3, 4].map((i) => (
               <div
@@ -660,8 +786,10 @@ export default function Sidebar(): React.ReactElement {
             ))}
           </div>
         )}
-        {!!error && <div className="sb-note error">集合加载失败</div>}
-        {!isLoading && !error && (
+        {collectionsOpen && !!error && (
+          <div className="sb-note error">集合加载失败</div>
+        )}
+        {collectionsOpen && !isLoading && !error && (
           <div>
             {collections.map((col) => {
               const isOpen = expandedCollections.has(col.id);
@@ -690,13 +818,17 @@ export default function Sidebar(): React.ReactElement {
                       <CollectionIcon icon={col.icon} color={col.color} />
                       <span className="sb-title">{col.name}</span>
                     </a>
+                    <CollectionAddDoc collectionId={col.id} />
                   </div>
-                  {isOpen && <CollectionTree collectionId={col.id} />}
+                  {isOpen && (
+                    <CollectionTree collectionId={col.id} sort={col.sort} />
+                  )}
                 </div>
               );
             })}
           </div>
         )}
+      </div>
       </div>
 
       <a

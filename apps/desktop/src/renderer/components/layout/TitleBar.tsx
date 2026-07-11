@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
-import Breadcrumb from "./Breadcrumb";
+import TabBar from "./TabBar";
 import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
@@ -10,6 +10,14 @@ export default function TitleBar(): React.ReactElement {
   const toggleFullWidth = useUIStore((s) => s.toggleFullWidth);
   const showToc = useUIStore((s) => s.showToc);
   const toggleToc = useUIStore((s) => s.toggleToc);
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
+  // Effective dark state (resolving "system" against the OS preference) so the
+  // one-click toggle flips to the opposite of what's actually on screen.
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
   // Reserve space for macOS traffic lights; Windows/Linux use a native frame.
   const isMac = window.electronAPI.platform === "darwin";
 
@@ -48,7 +56,7 @@ export default function TitleBar(): React.ReactElement {
         </button>
       </div>
       <div className="titlebar-center">
-        <Breadcrumb />
+        <TabBar />
       </div>
       <div className="titlebar-right">
         <button
@@ -68,6 +76,21 @@ export default function TitleBar(): React.ReactElement {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M1 8l3.5-3v2h7V5L15 8l-3.5 3V9h-7v2L1 8z" />
           </svg>
+        </button>
+        <button
+          className="titlebar-button"
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+          title={isDark ? "切换到浅色" : "切换到深色"}
+        >
+          {isDark ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 11a3 3 0 100-6 3 3 0 000 6zM8 0a.75.75 0 01.75.75v1a.75.75 0 01-1.5 0v-1A.75.75 0 018 0zm0 12.5a.75.75 0 01.75.75v1a.75.75 0 01-1.5 0v-1A.75.75 0 018 12.5zM16 8a.75.75 0 01-.75.75h-1a.75.75 0 010-1.5h1A.75.75 0 0116 8zM3.5 8a.75.75 0 01-.75.75h-1a.75.75 0 010-1.5h1A.75.75 0 013.5 8zm9.96-4.46a.75.75 0 010 1.06l-.7.7a.75.75 0 11-1.06-1.06l.7-.7a.75.75 0 011.06 0zM4.3 11.7a.75.75 0 010 1.06l-.7.7a.75.75 0 01-1.06-1.06l.7-.7a.75.75 0 011.06 0zm8.16 1.76a.75.75 0 01-1.06 0l-.7-.7a.75.75 0 011.06-1.06l.7.7a.75.75 0 010 1.06zM4.3 4.3a.75.75 0 01-1.06 0l-.7-.7A.75.75 0 013.6 2.54l.7.7a.75.75 0 010 1.06z" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M6.2 1.4a6.5 6.5 0 108.4 8.4A5.5 5.5 0 016.2 1.4z" />
+            </svg>
+          )}
         </button>
         <a href="#/search" className="titlebar-button" title="Search">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">

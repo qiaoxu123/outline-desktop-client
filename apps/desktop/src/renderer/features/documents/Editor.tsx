@@ -16,8 +16,9 @@ import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import Placeholder from "@tiptap/extension-placeholder";
 import Highlight from "@tiptap/extension-highlight";
-import { Mathematics } from "@tiptap/extension-mathematics";
 import { Markdown } from "tiptap-markdown";
+import { MathInline, MathBlock } from "./extensions/math";
+import { CommentHighlights } from "./extensions/commentHighlights";
 import "katex/dist/katex.min.css";
 import "./Editor.css";
 
@@ -41,43 +42,19 @@ const MarkdownHighlight = Highlight.extend({
 }).configure({ multicolor: true });
 
 /**
- * Collapse multi-line block math (`$$` on its own lines) into a single
- * `$$ … $$` line so it lands in one text node and the Mathematics regex can
- * match it. Fenced code blocks are skipped so we don't touch real code.
+ * With Table resizable:false prosemirror-tables renders a bare <table>; wide
+ * tables then overflow the reading column. Wrapping in a scroll container
+ * (like Outline web's .tableWrapper) only changes the DOM, not the markdown.
  */
-function flattenBlockMath(markdown: string): string {
-  const lines = markdown.split("\n");
-  const out: string[] = [];
-  let inFence = false;
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    if (/^(```|~~~)/.test(line.trim())) {
-      inFence = !inFence;
-      out.push(line);
-      i++;
-      continue;
-    }
-    if (!inFence && line.trim() === "$$") {
-      // gather until the closing $$
-      const body: string[] = [];
-      let j = i + 1;
-      while (j < lines.length && lines[j].trim() !== "$$") {
-        body.push(lines[j].trim());
-        j++;
-      }
-      if (j < lines.length) {
-        out.push(`$$${body.join(" ").trim()}$$`);
-        i = j + 1;
-        continue;
-      }
-    }
-    out.push(line);
-    i++;
-  }
-  return out.join("\n");
-}
+const ScrollableTable = Table.extend({
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "div",
+      { class: "tableWrapper" },
+      ["table", HTMLAttributes, ["tbody", 0]],
+    ];
+  },
+}).configure({ resizable: false });
 
 /**
  * In-place rich text editor — TipTap (ProseMirror, the same engine Outline
@@ -87,6 +64,7 @@ function flattenBlockMath(markdown: string): string {
 export function useMarkdownEditor(
   initialMarkdown: string,
   editable: boolean,
+  onCommentClick?: (commentId: string) => void,
 ): TiptapEditor | null {
   // Created once per component mount (callers remount via key per document) —
   // recreating on every content/prop change would reset the cursor mid-typing.
@@ -99,22 +77,15 @@ export function useMarkdownEditor(
         Image,
         TaskList,
         TaskItem.configure({ nested: true }),
-        Table.configure({ resizable: false }),
+        ScrollableTable,
         TableRow,
         TableCell,
         TableHeader,
         Placeholder.configure({ placeholder: "开始编写…" }),
         MarkdownHighlight,
-        // Renders LaTeX with KaTeX while keeping the source text (so markdown
-        // round-trip is preserved). The default regex only matches inline
-        // `$...$`; we extend it to also catch block `$$...$$` (matched first),
-        // otherwise display formulas render as raw text in the editor.
-        Mathematics.configure({
-          regex: /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g,
-          // strict:false silences "Unicode text character used in math mode"
-          // for CJK punctuation that sometimes slips into formulas.
-          katexOptions: { throwOnError: false, strict: false },
-        }),
+        MathInline,
+        MathBlock,
+        CommentHighlights.configure({ onCommentClick }),
         Markdown.configure({
           html: false,
           linkify: true,
@@ -122,7 +93,7 @@ export function useMarkdownEditor(
           transformPastedText: true,
         }),
       ],
-      content: flattenBlockMath(initialMarkdown),
+      content: initialMarkdown,
     },
     [],
   );
@@ -229,9 +200,24 @@ function HighlightControl({
 
 function SelectionToolbar({
   editor,
+  onComment,
 }: {
   editor: TiptapEditor;
+  onComment?: (selectedText: string) => void;
 }): React.ReactElement {
+  const insertMath = () => {
+    const { from, to, empty } = editor.state.selection;
+    const latex = empty ? "" : editor.state.doc.textBetween(from, to, " ");
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(
+        { from, to },
+        { type: "mathInline", attrs: { latex } },
+      )
+      .run();
+  };
+
   const setLink = () => {
     const prev = (editor.getAttributes("link").href as string) ?? "";
     const url = window.prompt("链接地址", prev);
@@ -277,6 +263,13 @@ function SelectionToolbar({
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         {"</>"}
+      </ToolbarButton>
+      <ToolbarButton
+        title="公式（选中文本转为 LaTeX）"
+        active={editor.isActive("mathInline")}
+        onClick={insertMath}
+      >
+        ∑
       </ToolbarButton>
 
       <span className="bubble-divider" />
@@ -343,6 +336,17 @@ function SelectionToolbar({
       >
         🔗
       </ToolbarButton>
+      {onComment && (
+        <ToolbarButton
+          title="评论（引用选中文本）"
+          onClick={() => {
+            const { from, to } = editor.state.selection;
+            onComment(editor.state.doc.textBetween(from, to, " "));
+          }}
+        >
+          💬
+        </ToolbarButton>
+      )}
       <ToolbarButton
         title="清除格式"
         onClick={() =>
@@ -357,12 +361,14 @@ function SelectionToolbar({
 
 export function MarkdownEditorContent({
   editor,
+  onComment,
 }: {
   editor: TiptapEditor | null;
+  onComment?: (selectedText: string) => void;
 }): React.ReactElement {
   return (
     <>
-      {editor && <SelectionToolbar editor={editor} />}
+      {editor && <SelectionToolbar editor={editor} onComment={onComment} />}
       <EditorContent editor={editor} className="doc-editor" />
     </>
   );

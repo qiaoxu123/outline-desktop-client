@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 declare module "markdown-it-task-lists" {
   import type { PluginWithOptions } from "markdown-it";
   const taskLists: PluginWithOptions<{

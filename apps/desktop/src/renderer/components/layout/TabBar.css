@@ -1,14 +1,14 @@
+/* Tabs live inside the titlebar (like browser tabs next to the nav buttons).
+   Only the tabs themselves opt out of window dragging — empty strip space
+   stays draggable. */
 .tabbar {
   display: flex;
-  align-items: stretch;
-  gap: 2px;
-  /* no left padding — the first tab sits flush against the sidebar's right
-     edge (i.e. the content area's left edge) */
-  padding: 5px 8px 0 0;
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .tabbar::-webkit-scrollbar {
@@ -21,16 +21,18 @@
   gap: 6px;
   max-width: 200px;
   min-width: 90px;
-  padding: 6px 8px 6px 12px;
+  height: 30px;
+  padding: 0 6px 0 12px;
   border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 13px;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 
 .tab:hover {
@@ -38,13 +40,9 @@
 }
 
 .tab.active {
-  background: var(--color-bg);
+  background: var(--color-bg-secondary);
   border-color: var(--color-border);
   color: var(--color-text);
-  /* overlap the tabbar's bottom border so the active tab merges into the
-     content area below, like a real browser tab */
-  margin-bottom: -1px;
-  padding-bottom: 7px;
 }
 
 .tab-emoji {
@@ -71,6 +69,7 @@
   cursor: pointer;
   font-size: 11px;
   opacity: 0.6;
+  -webkit-app-region: no-drag;
 }
 
 .tab-close:hover {

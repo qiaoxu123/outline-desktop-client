@@ -48,6 +48,11 @@ md.use(
     (markPlugin as unknown as MdPlugin),
 );
 
+// Wide tables scroll inside their own container instead of overflowing the
+// reading column (same .tableWrapper the editor emits).
+md.renderer.rules.table_open = () => '<div class="tableWrapper"><table>';
+md.renderer.rules.table_close = () => "</table></div>";
+
 const defaultRender =
   md.renderer.rules.link_open ??
   ((tokens, idx, options, _env, self) =>
