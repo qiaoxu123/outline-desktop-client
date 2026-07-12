@@ -110,7 +110,7 @@ export function useTopics(collectionId: string | null): {
           parentDocumentId: null,
           sort: "updatedAt",
           direction: "DESC",
-          limit: 50,
+          limit: 100, // API page cap; pagination when the board outgrows it
         }),
       ),
     enabled: !!activeProfileId && !!collectionId,

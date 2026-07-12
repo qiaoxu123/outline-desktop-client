@@ -137,6 +137,8 @@ export default function Breadcrumb(): React.ReactElement {
     crumbs.push({ label: "设置" });
   } else if (path === "/discuss") {
     crumbs.push({ label: "讨论区" });
+  } else if (path === "/papers") {
+    crumbs.push({ label: "论文库" });
   } else {
     crumbs.push({ label: "主页" });
   }

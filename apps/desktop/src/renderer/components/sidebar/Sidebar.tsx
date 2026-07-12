@@ -761,6 +761,13 @@ export default function Sidebar(): React.ReactElement {
           discussNew,
         )}
         {navItem(
+          "/papers",
+          "论文库",
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M3 1.5h7.5L14 5v8.5A1.5 1.5 0 0112.5 15h-9A1.5 1.5 0 012 13.5v-10A1.5 1.5 0 013 1.5H3zm7 1.5H3.5v10.5h9V6H10V3zm-5 5h6v1.2H5V8zm0 2.6h6v1.2H5v-1.2z" />
+          </svg>,
+        )}
+        {navItem(
           "/shares",
           "共享链接",
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
