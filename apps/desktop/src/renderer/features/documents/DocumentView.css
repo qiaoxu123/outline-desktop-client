@@ -298,6 +298,11 @@
   line-height: 1.3;
   color: var(--color-text);
   padding: 0;
+  /* textarea: long titles wrap instead of clipping on the right */
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .document-title-input::placeholder {
@@ -335,14 +340,12 @@
 
 /* Sticky header keeps the title + edit/save/star/comment controls visible
    while scrolling a long document. */
+/* scrolls with the content (was sticky — long titles overlapped the body
+   headings while scrolling, which read as broken formatting on every doc) */
 .document-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   margin-bottom: 32px;
   padding: 16px 0 14px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
 }
 
 .document-title {

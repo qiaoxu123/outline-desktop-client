@@ -926,12 +926,21 @@ function EditableDocument({
       <article className="document-article">
         <header className="document-header">
           <div className="document-header-row">
-            <input
+            <textarea
               className="document-title-input"
               value={title}
+              rows={1}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = "auto";
+                  el.style.height = `${el.scrollHeight}px`;
+                }
+              }}
               onChange={(e) => {
-                setTitle(e.target.value);
-                pendingRef.current.title = e.target.value;
+                setTitle(e.target.value.replace(/\n/g, " "));
+                pendingRef.current.title = e.target.value.replace(/\n/g, " ");
+                e.target.style.height = "auto";
+                e.target.style.height = `${e.target.scrollHeight}px`;
                 scheduleSave();
               }}
               placeholder="无标题"
