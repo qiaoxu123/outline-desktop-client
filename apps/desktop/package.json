@@ -65,6 +65,7 @@
   },
   "build": {
     "appId": "com.outline.desktop",
+    "publish": null,
     "productName": "Outline Desktop",
     "directories": {
       "output": "dist",

@@ -29,12 +29,12 @@
   justify-self: end;
 }
 
-/* table of contents — floating card (like web): overlays the right edge
-   instead of claiming a grid column, so it never squeezes the article */
+/* table of contents — sticky right rail (like the history/comments panels):
+   occupies grid column 3, so at medium widths the article narrows instead of
+   the card overlaying the text */
 .document-toc {
-  position: fixed;
-  right: 20px;
-  top: calc(var(--titlebar-height) + var(--breadcrumb-height) + 20px);
+  position: sticky;
+  top: 16px;
   width: 240px;
   max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   overflow-y: auto;
@@ -42,8 +42,6 @@
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-bg);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
-  z-index: 15;
 }
 
 /* not useful when it would cover most of a narrow window */
