@@ -272,6 +272,17 @@ body.sidebar-resizing {
   max-width: none;
 }
 
+/* forum topics stay at the board's reading width even in full-width mode —
+   posts and the 论坛/论文库 lists share one narrow column */
+.app-content.full-width .document-layout.discuss-topic {
+  grid-template-columns: 1fr minmax(0, var(--reading-col, 920px)) 1fr;
+}
+
+.app-content.full-width .document-layout.discuss-topic .document-article {
+  grid-column: 2;
+  max-width: var(--reading-col, 920px);
+}
+
 .app-content.full-width .document-layout > .document-toc,
 .app-content.full-width .document-layout > .history-panel,
 .app-content.full-width .document-layout > .comments-panel {

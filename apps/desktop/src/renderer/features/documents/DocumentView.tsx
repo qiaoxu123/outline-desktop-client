@@ -874,7 +874,7 @@ function EditableDocument({
           : "";
 
   return (
-    <div className="document-layout">
+    <div className={`document-layout ${isDiscussTopic ? "discuss-topic" : ""}`}>
       <TopRightActions>
         <div className="document-actions">
           {saveLabel && (
@@ -1004,7 +1004,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
   const [commentsOpen, setCommentsOpen] = useState(false);
 
   return (
-    <div className="document-layout">
+    <div className={`document-layout ${isDiscussTopic ? "discuss-topic" : ""}`}>
       <TopRightActions>
         <div className="document-actions">
           <Viewers documentId={doc.id} />
