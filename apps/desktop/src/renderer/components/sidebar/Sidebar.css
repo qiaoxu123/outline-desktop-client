@@ -31,7 +31,7 @@
 }
 
 .sb-team-name {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -72,7 +72,7 @@
   border-radius: 6px;
   text-decoration: none;
   color: var(--sidebar-text);
-  font-weight: 500;
+  font-weight: 600;
   transition: background 0.08s;
 }
 
@@ -186,8 +186,8 @@
   padding: 4px 4px 4px 2px;
   text-decoration: none;
   color: var(--sidebar-text);
-  /* web parity: sidebar entries are medium weight, not regular */
-  font-weight: 500;
+  /* web parity: sidebar entries are bold (PingFang semibold) */
+  font-weight: 600;
 }
 
 .sb-title {

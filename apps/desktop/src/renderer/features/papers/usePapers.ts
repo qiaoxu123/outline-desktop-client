@@ -122,6 +122,24 @@ function collectPapers(
   }
 }
 
+const TREE_CACHE_KEY = "papers.treeCache.v1";
+
+interface TreeCache {
+  savedAt: string;
+  collectionId: string;
+  tree: OutlineCollectionDocument[];
+}
+
+function readTreeCache(collectionId: string): TreeCache | null {
+  try {
+    const raw = localStorage.getItem(TREE_CACHE_KEY);
+    const cache = raw ? (JSON.parse(raw) as TreeCache) : null;
+    return cache?.collectionId === collectionId ? cache : null;
+  } catch {
+    return null;
+  }
+}
+
 export function usePaperEntries(root: PapersRoot | null): {
   papers: PaperEntry[];
   isLoading: boolean;
@@ -136,11 +154,34 @@ export function usePaperEntries(root: PapersRoot | null): {
       root?.collectionId,
       "documents",
     ],
-    queryFn: () =>
-      unwrapIpc<{ data: OutlineCollectionDocument[] }>(
+    queryFn: async () => {
+      const res = await unwrapIpc<{ data: OutlineCollectionDocument[] }>(
         api.collections.documents(activeProfileId!, root!.collectionId),
-      ),
+      );
+      try {
+        const cache: TreeCache = {
+          savedAt: new Date().toISOString(),
+          collectionId: root!.collectionId,
+          tree: res.data,
+        };
+        localStorage.setItem(TREE_CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        // best-effort, same as the meta cache
+      }
+      return res;
+    },
     enabled: !!activeProfileId && !!root,
+    // Paint instantly from the persisted snapshot (survives restart AND the
+    // 5-min query GC that made every reopen show 加载论文列表…); marked stale
+    // by its saved timestamp so a silent background refresh still runs.
+    initialData: () => {
+      const cache = root ? readTreeCache(root.collectionId) : null;
+      return cache ? { data: cache.tree } : undefined;
+    },
+    initialDataUpdatedAt: () => {
+      const cache = root ? readTreeCache(root.collectionId) : null;
+      return cache ? new Date(cache.savedAt).getTime() : 0;
+    },
   });
 
   const papers: PaperEntry[] = [];
