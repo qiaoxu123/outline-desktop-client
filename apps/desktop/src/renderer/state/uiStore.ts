@@ -63,7 +63,10 @@ export const useUIStore = create<UIState>((set) => ({
   },
   setContentWidth: (level) => {
     localStorage.setItem("ui.contentWidth", String(level));
-    set({ contentWidth: level });
+    // The titlebar 全宽 toggle overrides width levels — picking a level in
+    // Settings must win, otherwise levels 1–4 silently do nothing.
+    localStorage.setItem("ui.fullWidth", "0");
+    set({ contentWidth: level, fullWidth: false });
   },
   selectCollection: (id) => set({ selectedCollectionId: id }),
   selectDocument: (id) => set({ selectedDocumentId: id }),
