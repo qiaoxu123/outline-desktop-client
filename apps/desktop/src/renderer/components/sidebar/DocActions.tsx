@@ -1,26 +1,36 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { useUIStore } from "../../state/uiStore";
+import { useUIStore, useTabsStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useStars, useToggleStar } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
 
-/**
- * Hover actions for a sidebar document node — “+” (new child) and “…” menu
- * (rename / star / duplicate / archive / delete), mirroring Outline web's
- * document context menu.
- */
-export default function DocActions({
-  docId,
-  title,
-  collectionId,
-}: {
+export interface DocActionsHandle {
+  /** Open the “…” menu at a screen position (right-click on the row). */
+  openMenu: (x: number, y: number) => void;
+}
+
+interface DocActionsProps {
   docId: string;
   title: string;
   /** Known for collection-tree nodes; looked up from the doc otherwise. */
   collectionId?: string;
-}): React.ReactElement {
+}
+
+/**
+ * Hover actions for a sidebar document node — “+” (new child) and “…” menu
+ * (open in new tab / rename / star / duplicate / archive / delete), mirroring
+ * Outline web's document context menu. Also opens via row right-click.
+ */
+const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
+  function DocActions({ docId, title, collectionId }, handleRef) {
   const api = useElectronAPI();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -35,6 +45,15 @@ export default function DocActions({
     null,
   );
   const menuRef = useRef<HTMLDivElement>(null);
+  const openTab = useTabsStore((s) => s.openTab);
+
+  useImperativeHandle(handleRef, () => ({
+    openMenu: (x, y) => {
+      setMenuPos({ top: y + 4, left: x });
+      setConfirming(null);
+      setMenuOpen(true);
+    },
+  }));
 
   // Structural ops touch children/collection/tree queries — invalidating the
   // whole profile keeps every affected list fresh (same pattern as
@@ -173,6 +192,11 @@ export default function DocActions({
           style={{ top: menuPos.top, left: menuPos.left }}
           onClick={(e) => e.stopPropagation()}
         >
+          {item("在新标签页打开", () => {
+            setMenuOpen(false);
+            openTab({ documentId: docId, title });
+          })}
+          <div className="sb-menu-divider" />
           {item("新建子文档", () => {
             setMenuOpen(false);
             createChild.mutate();
@@ -214,4 +238,6 @@ export default function DocActions({
       )}
     </span>
   );
-}
+});
+
+export default DocActions;

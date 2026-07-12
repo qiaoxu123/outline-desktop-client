@@ -29,15 +29,28 @@
   justify-self: end;
 }
 
-/* table of contents */
+/* table of contents — floating card (like web): overlays the right edge
+   instead of claiming a grid column, so it never squeezes the article */
 .document-toc {
-  position: sticky;
-  top: 16px;
+  position: fixed;
+  right: 20px;
+  top: calc(var(--titlebar-height) + var(--breadcrumb-height) + 20px);
   width: 240px;
   max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   overflow-y: auto;
-  padding-left: 14px;
-  border-left: 1px solid var(--color-border);
+  padding: 10px 6px 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  z-index: 15;
+}
+
+/* not useful when it would cover most of a narrow window */
+@media (max-width: 1100px) {
+  .document-toc {
+    display: none;
+  }
 }
 
 .document-toc-title {

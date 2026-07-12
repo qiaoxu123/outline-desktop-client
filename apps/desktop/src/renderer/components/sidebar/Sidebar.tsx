@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
@@ -21,7 +21,7 @@ import {
   discussCollectionId,
   useDiscussNewTopicCount,
 } from "../../features/discuss/useDiscuss";
-import DocActions from "./DocActions";
+import DocActions, { type DocActionsHandle } from "./DocActions";
 import type {
   OutlineCollection,
   OutlineCollectionDocument,
@@ -126,11 +126,16 @@ function DocNode({
   const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
   const hasChildren = doc.children && doc.children.length > 0;
   const isOpen = expanded.has(doc.id);
+  const actionsRef = useRef<DocActionsHandle>(null);
 
   return (
     <div className="sb-node">
       <div
         className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          actionsRef.current?.openMenu(e.clientX, e.clientY);
+        }}
       >
         <button
           className={`sb-chevron ${hasChildren ? "" : "hidden"}`}
@@ -157,6 +162,7 @@ function DocNode({
           <span className="sb-title">{doc.title || "Untitled"}</span>
         </a>
         <DocActions
+          ref={actionsRef}
           docId={doc.id}
           title={doc.title || "Untitled"}
           collectionId={collectionId}
@@ -331,11 +337,16 @@ function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
   const selectDocument = useUIStore((s) => s.selectDocument);
   const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
   const [open, setOpen] = useState(false);
+  const actionsRef = useRef<DocActionsHandle>(null);
 
   return (
     <div className="sb-node">
       <div
         className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          actionsRef.current?.openMenu(e.clientX, e.clientY);
+        }}
       >
         <button className="sb-chevron" onClick={() => setOpen(!open)}>
           <Chevron open={open} />
@@ -353,7 +364,11 @@ function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
           {doc.emoji && <span className="sb-emoji">{doc.emoji}</span>}
           <span className="sb-title">{doc.title || "Untitled"}</span>
         </a>
-        <DocActions docId={doc.id} title={doc.title || "Untitled"} />
+        <DocActions
+          ref={actionsRef}
+          docId={doc.id}
+          title={doc.title || "Untitled"}
+        />
       </div>
       {open && <ChildDocs parentDocumentId={doc.id} />}
     </div>

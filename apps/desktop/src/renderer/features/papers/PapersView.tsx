@@ -95,7 +95,7 @@ export default function PapersView(): React.ReactElement {
   const navigate = useNavigate();
   const { root, status } = usePapersRoot();
   const { papers, isLoading } = usePaperEntries(root);
-  const metas = usePaperMetas(papers);
+  const metas = usePaperMetas(root);
   const { stateFor, cycle } = useReadStates();
 
   const [q, setQ] = useState("");

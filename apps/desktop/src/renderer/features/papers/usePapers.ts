@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { unwrapIpc } from "../../lib/ipc";
@@ -205,34 +205,76 @@ export function parsePaperMeta(text: string): PaperMeta {
   };
 }
 
-/** Fetch + parse metadata for the given papers (capped; shares the
- * documents.info cache with DocumentView so opening a paper is instant). */
-export function usePaperMetas(
-  papers: PaperEntry[],
-  cap = 60,
-): Map<string, PaperMeta> {
+const META_CACHE_KEY = "papers.metaCache.v1";
+
+interface MetaCache {
+  savedAt: string;
+  metas: Record<string, PaperMeta>;
+}
+
+function readMetaCache(): MetaCache | null {
+  try {
+    const raw = localStorage.getItem(META_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as MetaCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Metadata for ALL papers in one query: pages through documents.list for the
+ * whole collection (~4 requests for 331 docs, text included) and parses every
+ * attribute table in one pass. The result persists to localStorage so
+ * reopening the view is instant (cache first, silent refresh in background).
+ * Replaces the previous per-document fan-out (60 concurrent documents.info
+ * calls, each re-rendering the list — the source of the open lag).
+ */
+export function usePaperMetas(root: PapersRoot | null): Map<string, PaperMeta> {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const slice = papers.slice(0, cap);
 
-  const queries = useQueries({
-    queries: slice.map((p) => ({
-      queryKey: ["profile", activeProfileId, "document", p.id],
-      queryFn: () =>
-        unwrapIpc<{ data: OutlineDocument }>(
-          api.documents.info(activeProfileId!, p.id),
-        ),
-      enabled: !!activeProfileId,
-      staleTime: 10 * 60_000,
-    })),
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "papers-meta", root?.collectionId],
+    queryFn: async () => {
+      const metas: Record<string, PaperMeta> = {};
+      for (let offset = 0; offset < 1000; offset += 100) {
+        const page = await unwrapIpc<{ data: OutlineDocument[] }>(
+          api.call(activeProfileId!, "documents.list", {
+            collectionId: root!.collectionId,
+            limit: 100,
+            offset,
+          }),
+        );
+        const docs = page.data ?? [];
+        for (const d of docs) {
+          if (typeof d.text === "string") metas[d.id] = parsePaperMeta(d.text);
+        }
+        if (docs.length < 100) break;
+      }
+      const cache: MetaCache = {
+        savedAt: new Date().toISOString(),
+        metas,
+      };
+      try {
+        localStorage.setItem(META_CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        // cache write is best-effort (quota etc.)
+      }
+      return metas;
+    },
+    enabled: !!activeProfileId && !!root,
+    staleTime: 10 * 60_000,
+    // instant paint from the persisted cache; marked stale so a background
+    // refresh still happens
+    initialData: () => readMetaCache()?.metas,
+    initialDataUpdatedAt: () => {
+      const cache = readMetaCache();
+      return cache ? new Date(cache.savedAt).getTime() : 0;
+    },
   });
 
-  const map = new Map<string, PaperMeta>();
-  slice.forEach((p, i) => {
-    const text = queries[i]?.data?.data?.text;
-    if (typeof text === "string") map.set(p.id, parsePaperMeta(text));
-  });
-  return map;
+  const metas = data ?? {};
+  return new Map(Object.entries(metas));
 }
 
 /* ---------- personal read state ---------- */
