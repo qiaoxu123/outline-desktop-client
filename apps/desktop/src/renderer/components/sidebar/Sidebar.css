@@ -91,6 +91,23 @@
   color: var(--color-text);
 }
 
+/* unread badge (forum updates) */
+.sb-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 /* sections */
 .sb-section {
   padding: 4px 8px;

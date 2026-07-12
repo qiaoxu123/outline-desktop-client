@@ -17,6 +17,7 @@ import {
 } from "../../hooks/usePersonalNotes";
 import { unwrapIpc } from "../../lib/ipc";
 import { sortDocsByTitle } from "../../lib/naturalSort";
+import { useForumUnreadCount } from "../../features/forum/useForumUpdates";
 import DocActions from "./DocActions";
 import type {
   OutlineCollection,
@@ -641,6 +642,7 @@ export default function Sidebar(): React.ReactElement {
   const selectCollection = useUIStore((s) => s.selectCollection);
   const { user, team } = useUserInfo();
   const { starred } = useStars();
+  const forumUnread = useForumUnreadCount();
   // Expand state survives restarts (previously component state, reset on
   // every remount/navigation).
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
@@ -683,6 +685,7 @@ export default function Sidebar(): React.ReactElement {
     label: string,
     icon: React.ReactElement,
     iconOnly = false,
+    badge = 0,
   ): React.ReactElement => (
     <a
       href={`#${path}`}
@@ -695,6 +698,11 @@ export default function Sidebar(): React.ReactElement {
     >
       {icon}
       {!iconOnly && <span>{label}</span>}
+      {badge > 0 && (
+        <span className="sb-badge" title={`${badge} 条新动态`}>
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </a>
   );
 
@@ -742,6 +750,8 @@ export default function Sidebar(): React.ReactElement {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3zm3 2.25c0-.41.34-.75.75-.75h4.5a.75.75 0 010 1.5h-4.5A.75.75 0 015 5.25zm0 2.5c0-.41.34-.75.75-.75h6.5a.75.75 0 010 1.5h-6.5A.75.75 0 015 7.75z" />
           </svg>,
+          false,
+          forumUnread,
         )}
         {navItem(
           "/shares",

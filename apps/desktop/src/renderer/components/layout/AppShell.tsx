@@ -4,6 +4,7 @@ import Sidebar from "../sidebar/Sidebar";
 import TitleBar from "./TitleBar";
 import Breadcrumb from "./Breadcrumb";
 import ForumPane from "../../features/forum/ForumPane";
+import { useForumSeenStore } from "../../features/forum/useForumUpdates";
 import { useUIStore } from "../../state/uiStore";
 import "./AppShell.css";
 
@@ -25,6 +26,12 @@ export default function AppShell(): React.ReactElement {
   // The forum pane stays mounted (hidden) so its session/history survive
   // switching to other views.
   const isForum = useLocation().pathname === "/forum";
+  const markForumSeen = useForumSeenStore((s) => s.markSeen);
+
+  // Opening the forum clears the sidebar unread badge.
+  useEffect(() => {
+    if (isForum) markForumSeen();
+  }, [isForum, markForumSeen]);
 
   // Drag the sidebar's right edge to resize (persisted).
   const startResize = useCallback((e: React.MouseEvent) => {

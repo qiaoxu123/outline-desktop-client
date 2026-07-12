@@ -10,6 +10,7 @@
 - **Also shipped (previously implemented, uncommitted):** always-on editing (open == editable with 1200ms-debounced autosave, save-state pill, ⌘S flush — replaces the separate 编辑 button), adjustable reading-column width (设置 → 最窄…最宽, 5 levels, `--reading-col`), one-click light/dark toggle in the titlebar, and the icon-only quick-nav row (搜索/主页/设置) in the sidebar.
 
 ### Features (post-release additions)
+- **Forum unread badge.** The 社区论坛 sidebar entry shows a count of topics bumped since the forum was last opened (main-process fetch of Discourse `/latest.json` with session cookies, 5-minute polling; watermark `forum.lastSeen` in localStorage starts at first run and resets on entering the forum). Hidden when logged out or the forum is unreachable.
 - **In-app community forum.** New 社区论坛 sidebar entry embeds https://forum.jlu-mcns.site/ via `<webview>` (`features/forum/ForumPane.tsx`): its own back/forward/reload toolbar + open-in-browser, links open externally, and the pane stays mounted while hidden so login session, history and scroll survive switching views. Main process enables `webviewTag` and routes webview popups to the system browser.
 
 ### Fixes
