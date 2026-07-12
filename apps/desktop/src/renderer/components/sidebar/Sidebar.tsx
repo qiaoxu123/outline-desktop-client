@@ -745,6 +745,13 @@ export default function Sidebar(): React.ReactElement {
       <div className="sb-scroll">
       <nav className="sb-nav">
         {navItem(
+          "/discuss",
+          "讨论区",
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M1.5 3A1.5 1.5 0 013 1.5h7A1.5 1.5 0 0111.5 3v5A1.5 1.5 0 0110 9.5H5l-2.5 2.5v-2.5H3A1.5 1.5 0 011.5 8V3zm11.5 2h.5A1.5 1.5 0 0115 6.5v5a1.5 1.5 0 01-1.5 1.5h-.5v2.5L10.5 13H6.8l1.5-1.5H13V5z" />
+          </svg>,
+        )}
+        {navItem(
           "/forum",
           "社区论坛",
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">

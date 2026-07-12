@@ -5,6 +5,7 @@ import CollectionsView from "./features/collections/CollectionsView";
 import DocumentView from "./features/documents/DocumentView";
 import HomeView from "./features/home/HomeView";
 import SharesView from "./features/shares/SharesView";
+import DiscussView from "./features/discuss/DiscussView";
 import SearchView from "./features/search/SearchView";
 import SettingsView from "./features/profiles/SettingsView";
 import LoginScreen from "./features/auth/LoginScreen";
@@ -188,6 +189,7 @@ export default function App(): React.ReactElement {
               <Route path="/shares" element={<SharesView />} />
               {/* content rendered by the persistent ForumPane in AppShell */}
               <Route path="/forum" element={<></>} />
+              <Route path="/discuss" element={<DiscussView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/settings" element={<SettingsView />} />
             </Route>

@@ -635,6 +635,40 @@
   word-break: break-word;
 }
 
+/* inline (forum) variant: full-width reply stream under the article body */
+.comments-panel.comments-inline {
+  position: static;
+  width: auto;
+  max-height: none;
+  border: none;
+  border-top: 2px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  margin-top: 40px;
+}
+
+.comments-inline-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  padding: 14px 0 4px;
+}
+
+.comments-inline .comments-list {
+  overflow: visible;
+  padding: 4px 0;
+}
+
+.comments-inline .comment-thread {
+  margin: 8px 0;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.comments-inline .comments-composer {
+  border-top: none;
+  padding: 12px 0;
+}
+
 /* threaded comments (web parity) */
 .comment-thread {
   margin: 4px 8px;

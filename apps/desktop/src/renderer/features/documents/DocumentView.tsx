@@ -20,6 +20,7 @@ import {
   MarkdownEditorContent,
 } from "./Editor";
 import { commentHighlightsKey } from "./extensions/commentHighlights";
+import { discussCollectionId } from "../discuss/useDiscuss";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
 
@@ -367,6 +368,7 @@ function CommentsPanel({
   focusedCommentId,
   quote,
   onQuoteChange,
+  inline = false,
 }: {
   documentId: string;
   onClose: () => void;
@@ -374,6 +376,9 @@ function CommentsPanel({
   /** Selected text from the editor's 评论 button, quoted into a new comment. */
   quote?: string;
   onQuoteChange?: (quote: string) => void;
+  /** Forum layout: full-width reply stream under the article body instead of
+   * the side panel (no header/close). */
+  inline?: boolean;
 }): React.ReactElement {
   const api = useElectronAPI();
   const queryClient = useQueryClient();
@@ -474,13 +479,19 @@ function CommentsPanel({
     createMutation.isError || resolveMutation.isError || deleteMutation.isError;
 
   return (
-    <div className="comments-panel">
-      <div className="comments-header">
-        <span>评论{comments.length > 0 ? ` (${comments.length})` : ""}</span>
-        <button className="history-close" onClick={onClose} title="关闭">
-          ✕
-        </button>
-      </div>
+    <div className={`comments-panel ${inline ? "comments-inline" : ""}`}>
+      {inline ? (
+        <div className="comments-inline-title">
+          {comments.length > 0 ? `${comments.length} 条回复` : "回复"}
+        </div>
+      ) : (
+        <div className="comments-header">
+          <span>评论{comments.length > 0 ? ` (${comments.length})` : ""}</span>
+          <button className="history-close" onClick={onClose} title="关闭">
+            ✕
+          </button>
+        </div>
+      )}
 
       {isLoading && <p className="history-note">加载中…</p>}
       {!!error && <p className="history-note error">无法加载评论</p>}
@@ -708,6 +719,11 @@ function EditableDocument({
   const { starFor } = useStars();
   const { toggle: toggleStar, isPending: starPending } = useToggleStar();
   const star = starFor(doc.id);
+  // Forum topics (讨论区 collection) show replies as a full-width stream
+  // under the article body instead of the side panel.
+  const isDiscussTopic =
+    !!doc.collectionId && doc.collectionId === discussCollectionId();
+  const inlineCommentsRef = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
   const { comments } = useComments(doc.id);
   const commentCount = comments.length;
@@ -720,11 +736,22 @@ function EditableDocument({
   const [saveState, setSaveState] =
     useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  // Clicking an anchored-comment highlight in the text opens its thread.
-  const onCommentClick = useCallback((id: string) => {
-    setFocusedCommentId(id);
-    setPanel("comments");
+  const scrollToInlineComments = useCallback(() => {
+    inlineCommentsRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }, []);
+
+  // Clicking an anchored-comment highlight in the text opens its thread.
+  const onCommentClick = useCallback(
+    (id: string) => {
+      setFocusedCommentId(id);
+      if (isDiscussTopic) scrollToInlineComments();
+      else setPanel("comments");
+    },
+    [isDiscussTopic, scrollToInlineComments],
+  );
 
   const editor = useMarkdownEditor(doc.text, true, onCommentClick);
 
@@ -759,11 +786,15 @@ function EditableDocument({
 
   // 评论 button in the selection toolbar: quote the selection into a new
   // (unanchored) comment — an anchor mark can't survive the markdown save.
-  const onComment = useCallback((selectedText: string) => {
-    setCommentQuote(selectedText);
-    setFocusedCommentId(null);
-    setPanel("comments");
-  }, []);
+  const onComment = useCallback(
+    (selectedText: string) => {
+      setCommentQuote(selectedText);
+      setFocusedCommentId(null);
+      if (isDiscussTopic) scrollToInlineComments();
+      else setPanel("comments");
+    },
+    [isDiscussTopic, scrollToInlineComments],
+  );
 
   // The pending payload is kept in a ref so the debounced/unmount save never
   // touches the (possibly torn-down) editor instance.
@@ -870,13 +901,17 @@ function EditableDocument({
           </button>
           <button
             className={`document-button subtle ${panel === "comments" ? "active" : ""}`}
-            onClick={() =>
-              setPanel(panel === "comments" ? "none" : "comments")
-            }
-            title="评论"
+            onClick={() => {
+              if (isDiscussTopic) scrollToInlineComments();
+              else setPanel(panel === "comments" ? "none" : "comments");
+            }}
+            title={isDiscussTopic ? "跳到回复" : "评论"}
           >
             <CommentIcon />
-            <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
+            <span>
+              {isDiscussTopic ? "回复" : "评论"}
+              {commentCount > 0 ? ` ${commentCount}` : ""}
+            </span>
           </button>
           <button
             className={`document-button subtle ${panel === "history" ? "active" : ""}`}
@@ -907,6 +942,18 @@ function EditableDocument({
         <div className="document-body">
           <MarkdownEditorContent editor={editor} onComment={onComment} />
         </div>
+        {isDiscussTopic && (
+          <div ref={inlineCommentsRef}>
+            <CommentsPanel
+              inline
+              documentId={doc.id}
+              onClose={() => undefined}
+              focusedCommentId={focusedCommentId}
+              quote={commentQuote}
+              onQuoteChange={setCommentQuote}
+            />
+          </div>
+        )}
         <NestedDocuments documentId={doc.id} />
       </article>
 
@@ -942,6 +989,9 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
   const { toggle: toggleStar, isPending: starPending } = useToggleStar();
   const star = starFor(doc.id);
   const commentCount = useComments(doc.id).comments.length;
+  const isDiscussTopic =
+    !!doc.collectionId && doc.collectionId === discussCollectionId();
+  const inlineCommentsRef = useRef<HTMLDivElement>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
   return (
@@ -965,11 +1015,23 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
           </button>
           <button
             className={`document-button subtle ${commentsOpen ? "active" : ""}`}
-            onClick={() => setCommentsOpen(!commentsOpen)}
-            title="评论"
+            onClick={() => {
+              if (isDiscussTopic) {
+                inlineCommentsRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              } else {
+                setCommentsOpen(!commentsOpen);
+              }
+            }}
+            title={isDiscussTopic ? "跳到回复" : "评论"}
           >
             <CommentIcon />
-            <span>评论{commentCount > 0 ? ` ${commentCount}` : ""}</span>
+            <span>
+              {isDiscussTopic ? "回复" : "评论"}
+              {commentCount > 0 ? ` ${commentCount}` : ""}
+            </span>
           </button>
         </div>
       </TopRightActions>
@@ -994,6 +1056,15 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
             <p className="document-blank">此文档暂无内容</p>
           )}
         </div>
+        {isDiscussTopic && (
+          <div ref={inlineCommentsRef}>
+            <CommentsPanel
+              inline
+              documentId={doc.id}
+              onClose={() => undefined}
+            />
+          </div>
+        )}
         <NestedDocuments documentId={doc.id} />
       </article>
       {showToc && !commentsOpen && <Toc markdown={doc.text} />}

@@ -1,0 +1,145 @@
+.discuss-view {
+  max-width: var(--reading-col, 920px);
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 40px) 60px;
+}
+
+.discuss-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.discuss-header h2 {
+  font-size: var(--text-2xl);
+  margin-bottom: 4px;
+}
+
+.discuss-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.discuss-composer {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.discuss-title-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  outline: none;
+}
+
+.discuss-title-input:focus {
+  border-color: var(--color-primary);
+}
+
+.discuss-note {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: 24px 0;
+  text-align: center;
+}
+
+.discuss-note.error {
+  color: var(--color-danger);
+}
+
+.topic-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.topic-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 10px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  border-radius: 8px;
+}
+
+.topic-row:hover {
+  background: var(--color-bg-secondary);
+}
+
+.topic-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.topic-dot.unread {
+  background: var(--color-primary);
+}
+
+.topic-avatar img,
+.topic-avatar-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.topic-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.topic-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topic-title {
+  font-size: var(--text-md);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic-title.unread {
+  font-weight: 600;
+}
+
+.topic-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.topic-replies {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.topic-replies.empty {
+  color: var(--color-placeholder);
+}

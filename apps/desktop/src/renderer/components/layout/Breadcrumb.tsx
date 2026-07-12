@@ -132,6 +132,8 @@ export default function Breadcrumb(): React.ReactElement {
     crumbs.push({ label: "设置" });
   } else if (path === "/forum") {
     crumbs.push({ label: "社区论坛" });
+  } else if (path === "/discuss") {
+    crumbs.push({ label: "讨论区" });
   } else {
     crumbs.push({ label: "主页" });
   }

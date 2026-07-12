@@ -30,6 +30,9 @@ const ALLOWED_METHODS = new Set([
   "documents.recently_viewed",
   "documents.drafts",
   "documents.create",
+  "documents.update",
+  "documents.duplicate",
+  "documents.archive",
   "documents.delete",
   "documents.restore",
   // revisions (history)
@@ -39,11 +42,14 @@ const ALLOWED_METHODS = new Set([
   "comments.list",
   "comments.create",
   "comments.delete",
+  "comments.resolve",
+  "comments.unresolve",
   // views / presence
   "views.list",
   "views.create",
   // collections
   "collections.info",
+  "collections.create",
 ]);
 
 const CallSchema = z.object({
