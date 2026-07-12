@@ -4,6 +4,7 @@ import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
+import { discussCollectionId } from "../../features/discuss/useDiscuss";
 import type {
   OutlineCollection,
   OutlineCollectionDocument,
@@ -97,10 +98,14 @@ export default function Breadcrumb(): React.ReactElement {
       ? collections.find((c) => c.id === doc.collectionId)
       : undefined;
     if (col) {
+      // Forum topics navigate back to the 讨论区 board, not the raw
+      // collection view — that's where the user came from.
+      const isDiscuss = col.id === discussCollectionId();
       crumbs.push({
         label: col.name,
         emoji: col.icon,
-        onClick: () => navigate(`/collection/${col.id}`),
+        onClick: () =>
+          navigate(isDiscuss ? "/discuss" : `/collection/${col.id}`),
       });
     }
     // Full ancestor chain within the collection (parent documents), then the
@@ -130,8 +135,6 @@ export default function Breadcrumb(): React.ReactElement {
     crumbs.push({ label: "共享链接" });
   } else if (path === "/settings") {
     crumbs.push({ label: "设置" });
-  } else if (path === "/forum") {
-    crumbs.push({ label: "社区论坛" });
   } else if (path === "/discuss") {
     crumbs.push({ label: "讨论区" });
   } else {

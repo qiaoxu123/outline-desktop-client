@@ -50,6 +50,7 @@ const ALLOWED_METHODS = new Set([
   // collections
   "collections.info",
   "collections.create",
+  "collections.delete",
 ]);
 
 const CallSchema = z.object({

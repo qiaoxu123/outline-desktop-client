@@ -31,32 +31,6 @@ function registerAllIpcHandlers(): void {
   registerApiHandlers();
   registerPersonalNotesHandlers();
 
-  // Latest forum topics for the sidebar unread badge. Uses Chromium's
-  // default session (credentials: include) so the cookies from an in-app
-  // forum login apply; the login-required Discourse returns 403 until then.
-  ipcMain.handle("forum:latest", async () => {
-    try {
-      const res = await net.fetch("https://forum.jlu-mcns.site/latest.json", {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-      const body = (await res.json()) as {
-        topic_list?: {
-          topics?: { id: number; title: string; bumped_at: string }[];
-        };
-      };
-      const topics = (body.topic_list?.topics ?? []).map((t) => ({
-        id: t.id,
-        title: t.title,
-        bumpedAt: t.bumped_at,
-      }));
-      return { ok: true, data: topics };
-    } catch (err) {
-      return { ok: false, error: String(err) };
-    }
-  });
-
   // Attachment download: Chromium's downloader gets the Authorization header
   // from the webRequest hook above, so a plain downloadURL just works and
   // shows the native save dialog.
@@ -91,8 +65,6 @@ function createMainWindow(): BrowserWindow {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      // in-app forum panel (features/forum) embeds the site via <webview>
-      webviewTag: true,
     },
   });
 
@@ -146,17 +118,6 @@ app.whenReady().then(() => {
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
-  });
-
-  // Links inside embedded webviews (forum) open in the system browser,
-  // same policy as the main window.
-  app.on("web-contents-created", (_event, contents) => {
-    if (contents.getType() === "webview") {
-      contents.setWindowOpenHandler((details) => {
-        void shell.openExternal(details.url);
-        return { action: "deny" };
-      });
-    }
   });
 
   // Document images are served by the Outline server behind authentication

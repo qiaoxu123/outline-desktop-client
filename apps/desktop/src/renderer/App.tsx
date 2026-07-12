@@ -187,8 +187,6 @@ export default function App(): React.ReactElement {
               <Route path="/collection/:collectionId" element={<CollectionsView />} />
               <Route path="/document/:documentId" element={<DocumentView />} />
               <Route path="/shares" element={<SharesView />} />
-              {/* content rendered by the persistent ForumPane in AppShell */}
-              <Route path="/forum" element={<></>} />
               <Route path="/discuss" element={<DiscussView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/settings" element={<SettingsView />} />

@@ -17,7 +17,10 @@ import {
 } from "../../hooks/usePersonalNotes";
 import { unwrapIpc } from "../../lib/ipc";
 import { sortDocsByTitle } from "../../lib/naturalSort";
-import { useForumUnreadCount } from "../../features/forum/useForumUpdates";
+import {
+  discussCollectionId,
+  useDiscussNewTopicCount,
+} from "../../features/discuss/useDiscuss";
 import DocActions from "./DocActions";
 import type {
   OutlineCollection,
@@ -642,7 +645,7 @@ export default function Sidebar(): React.ReactElement {
   const selectCollection = useUIStore((s) => s.selectCollection);
   const { user, team } = useUserInfo();
   const { starred } = useStars();
-  const forumUnread = useForumUnreadCount();
+  const discussNew = useDiscussNewTopicCount();
   // Expand state survives restarts (previously component state, reset on
   // every remount/navigation).
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
@@ -677,7 +680,11 @@ export default function Sidebar(): React.ReactElement {
     enabled: !!activeProfileId,
   });
 
-  const collections = data?.data ?? [];
+  // 讨论区 has its own dedicated nav entry — showing the raw collection here
+  // too would create a confusing second click-path into the same content.
+  const collections = (data?.data ?? []).filter(
+    (c) => c.id !== discussCollectionId(),
+  );
   const avatar = absoluteUrl(user?.avatarUrl);
 
   const navItem = (
@@ -750,15 +757,8 @@ export default function Sidebar(): React.ReactElement {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M1.5 3A1.5 1.5 0 013 1.5h7A1.5 1.5 0 0111.5 3v5A1.5 1.5 0 0110 9.5H5l-2.5 2.5v-2.5H3A1.5 1.5 0 011.5 8V3zm11.5 2h.5A1.5 1.5 0 0115 6.5v5a1.5 1.5 0 01-1.5 1.5h-.5v2.5L10.5 13H6.8l1.5-1.5H13V5z" />
           </svg>,
-        )}
-        {navItem(
-          "/forum",
-          "社区论坛",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3zm3 2.25c0-.41.34-.75.75-.75h4.5a.75.75 0 010 1.5h-4.5A.75.75 0 015 5.25zm0 2.5c0-.41.34-.75.75-.75h6.5a.75.75 0 010 1.5h-6.5A.75.75 0 015 7.75z" />
-          </svg>,
           false,
-          forumUnread,
+          discussNew,
         )}
         {navItem(
           "/shares",

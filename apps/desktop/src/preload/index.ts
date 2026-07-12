@@ -38,8 +38,6 @@ export interface ElectronAPI {
   ) => Promise<unknown>;
   /** Download a server attachment via Chromium (auth header injected in main). */
   downloadUrl: (url: string) => Promise<unknown>;
-  /** Latest forum topics (session cookies; 403 until logged into the forum). */
-  forumLatest: () => Promise<unknown>;
   /** Pointer to the user's personal-notes folder on the server. */
   personalNotes: {
     getRoot: (profileId: string) => Promise<unknown>;
@@ -87,7 +85,6 @@ const api: ElectronAPI = {
   call: (profileId, method, params) =>
     ipcRenderer.invoke("api:call", { profileId, method, params }),
   downloadUrl: (url) => ipcRenderer.invoke("attachments:download", { url }),
-  forumLatest: () => ipcRenderer.invoke("forum:latest"),
   personalNotes: {
     getRoot: (profileId) =>
       ipcRenderer.invoke("personalNotes:getRoot", profileId),

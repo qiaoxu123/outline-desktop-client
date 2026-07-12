@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
-import { absoluteUrl } from "../../hooks/useOutline";
+import { absoluteUrl, useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
 import {
   useDiscussCollection,
-  useTopics,
-  useTopicReplies,
+  useTopicsWithActivity,
   useTopicSeen,
-  type Topic,
+  markDiscussVisited,
+  type TopicWithActivity,
 } from "./useDiscuss";
 import "./DiscussView.css";
 
@@ -27,22 +27,28 @@ function timeAgo(iso: string): string {
 }
 
 function TopicRow({
-  topic,
+  row,
+  ownUserId,
   onOpen,
+  onDelete,
+  deleting,
   isUnread,
 }: {
-  topic: Topic;
+  row: TopicWithActivity;
+  ownUserId?: string;
   onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+  deleting: boolean;
   isUnread: (id: string, lastActivity: string) => boolean;
 }): React.ReactElement {
-  const { count, lastReplyAt } = useTopicReplies(topic.id);
-  const lastActivity =
-    lastReplyAt && lastReplyAt > topic.updatedAt ? lastReplyAt : topic.updatedAt;
+  const { topic, replyCount, lastActivity } = row;
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const unread = isUnread(topic.id, lastActivity);
   const avatar = absoluteUrl(topic.createdBy?.avatarUrl);
+  const own = !!ownUserId && topic.createdBy?.id === ownUserId;
 
   return (
-    <button className="topic-row" onClick={() => onOpen(topic.id)}>
+    <div className="topic-row" onClick={() => onOpen(topic.id)}>
       <span className={`topic-dot ${unread ? "unread" : ""}`} />
       <span className="topic-avatar">
         {avatar ? (
@@ -61,10 +67,25 @@ function TopicRow({
           {topic.createdBy?.name} · 最后活动 {timeAgo(lastActivity)}
         </span>
       </span>
-      <span className={`topic-replies ${count > 0 ? "" : "empty"}`}>
-        {count > 0 ? `${count} 回复` : "暂无回复"}
+      <span className={`topic-replies ${replyCount > 0 ? "" : "empty"}`}>
+        {replyCount > 0 ? `${replyCount} 回复` : "暂无回复"}
       </span>
-    </button>
+      {own && (
+        <button
+          className={`topic-delete ${confirmDelete ? "danger" : ""}`}
+          disabled={deleting}
+          title={confirmDelete ? "再次点击确认删除" : "删除帖子"}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirmDelete) onDelete(topic.id);
+            else setConfirmDelete(true);
+          }}
+          onMouseLeave={() => setConfirmDelete(false)}
+        >
+          {confirmDelete ? "确认删除？" : "删除"}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -73,11 +94,22 @@ export default function DiscussView(): React.ReactElement {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { user } = useUserInfo();
   const { collectionId, status } = useDiscussCollection();
-  const { topics, isLoading, error } = useTopics(collectionId);
+  const { rows, isLoading, error } = useTopicsWithActivity(collectionId);
   const { isUnread, markSeen } = useTopicSeen();
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState("");
+
+  // Opening the board clears the sidebar "new topics" badge.
+  useEffect(() => {
+    markDiscussVisited();
+  }, []);
+
+  const invalidateTopics = () =>
+    void queryClient.invalidateQueries({
+      queryKey: ["profile", activeProfileId, "discuss", collectionId],
+    });
 
   const createTopic = useMutation({
     mutationFn: async (topicTitle: string) => {
@@ -94,12 +126,16 @@ export default function DiscussView(): React.ReactElement {
     onSuccess: (id) => {
       setComposing(false);
       setTitle("");
-      void queryClient.invalidateQueries({
-        queryKey: ["profile", activeProfileId, "discuss", collectionId],
-      });
+      invalidateTopics();
       markSeen(id);
       navigate(`/document/${id}`);
     },
+  });
+
+  const deleteTopic = useMutation({
+    mutationFn: (id: string) =>
+      unwrapIpc(api.call(activeProfileId!, "documents.delete", { id })),
+    onSuccess: invalidateTopics,
   });
 
   const openTopic = (id: string) => {
@@ -116,13 +152,22 @@ export default function DiscussView(): React.ReactElement {
             主题即文档、回复即评论,与知识库同一账号 — 好帖可直接移入知识库。
           </p>
         </div>
-        <button
-          className="document-button primary"
-          onClick={() => setComposing(true)}
-          disabled={status !== "ready"}
-        >
-          发新帖
-        </button>
+        <div className="discuss-header-actions">
+          <button
+            className="document-button subtle"
+            onClick={invalidateTopics}
+            title="刷新列表"
+          >
+            刷新
+          </button>
+          <button
+            className="document-button primary"
+            onClick={() => setComposing(true)}
+            disabled={status !== "ready"}
+          >
+            发新帖
+          </button>
+        </div>
       </header>
 
       {composing && (
@@ -167,13 +212,21 @@ export default function DiscussView(): React.ReactElement {
       )}
       {isLoading && <p className="discuss-note">加载主题中…</p>}
       {!!error && <p className="discuss-note error">主题列表加载失败</p>}
-      {status === "ready" && !isLoading && topics.length === 0 && (
+      {status === "ready" && !isLoading && rows.length === 0 && (
         <p className="discuss-note">还没有帖子,来发第一帖吧。</p>
       )}
 
       <div className="topic-list">
-        {topics.map((t) => (
-          <TopicRow key={t.id} topic={t} onOpen={openTopic} isUnread={isUnread} />
+        {rows.map((row) => (
+          <TopicRow
+            key={row.topic.id}
+            row={row}
+            ownUserId={user?.id}
+            onOpen={openTopic}
+            onDelete={(id) => deleteTopic.mutate(id)}
+            deleting={deleteTopic.isPending}
+            isUnread={isUnread}
+          />
         ))}
       </div>
     </div>
