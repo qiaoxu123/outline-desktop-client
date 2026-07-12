@@ -275,12 +275,12 @@ body.sidebar-resizing {
 /* forum topics stay at the board's fixed width regardless of the Settings
    reading width — posts and the 论坛/论文库 lists share one narrow column */
 .app-content .document-layout.discuss-topic {
-  grid-template-columns: 1fr minmax(0, 920px) 1fr;
+  grid-template-columns: 1fr minmax(0, 1280px) 1fr;
 }
 
 .app-content .document-layout.discuss-topic .document-article {
   grid-column: 2;
-  max-width: 920px;
+  max-width: 1280px;
 }
 
 .app-content.full-width .document-layout > .document-toc,
