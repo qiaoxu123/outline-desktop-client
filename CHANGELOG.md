@@ -1,3 +1,8 @@
+## [1.9.1] - 2026-07-12
+
+### Fixes
+- **邮箱验证码登录报 "Redirect was cancelled"。** Electron 的 `session.fetch` 不支持 `redirect: "manual"`——服务器验证成功返回 302 时请求被直接取消抛错，客户端在读到会话 cookie 前就失败（验证码却已被消费）。改为 `redirect: "follow"` 并以 cookie jar 为准判定登录成功；失败时从最终 URL 的 `?notice=…` 解析具体原因。已对 notes.jlu-mcns.site 做完整验证码往返验证。
+
 ## [1.9.0] - 2026-07-11
 
 ### Features
