@@ -1,6 +1,7 @@
 .home-view {
   padding: clamp(20px, 4vw, 48px);
-  max-width: 720px;
+  /* match 论坛/论文库 board width */
+  max-width: 1280px;
   margin: 0 auto;
 }
 
