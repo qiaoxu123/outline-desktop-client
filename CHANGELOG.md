@@ -10,6 +10,7 @@
 - **Also shipped (previously implemented, uncommitted):** always-on editing (open == editable with 1200ms-debounced autosave, save-state pill, ⌘S flush — replaces the separate 编辑 button), adjustable reading-column width (设置 → 最窄…最宽, 5 levels, `--reading-col`), one-click light/dark toggle in the titlebar, and the icon-only quick-nav row (搜索/主页/设置) in the sidebar.
 
 ### Features (post-release additions)
+- **讨论区 / 论文库 right-click → open in new tab.** Topic rows and paper rows now share a lightweight context menu (`hooks/useDocContextMenu.tsx`, reusing the sidebar `.sb-menu` styles) with 在新标签页打开 — adds a background tab without navigating, matching the sidebar row behavior.
 - **论文库 instant open (persistent cache).** Metadata now comes from paging `documents.list` over the whole collection (~4 requests, text included) parsed in one pass, instead of 60 concurrent per-document fetches that each re-rendered the list; the parsed result persists to localStorage (`papers.metaCache.v1`) so reopening paints instantly (331 rows < 400ms) with a silent background refresh.
 - **Floating TOC.** The document table of contents is now a floating card overlaying the right edge (web-like) instead of claiming a grid column — it no longer squeezes the article at medium widths; hidden ≤1100px.
 - **Sidebar right-click menu + open in new tab.** Right-clicking a document row opens the “…” actions menu at the cursor; new 在新标签页打开 item adds a background tab without navigating.

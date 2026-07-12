@@ -5,6 +5,7 @@ import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { absoluteUrl, useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
+import { useDocContextMenu } from "../../hooks/useDocContextMenu";
 import {
   useDiscussCollection,
   useTopicsWithActivity,
@@ -35,6 +36,7 @@ function TopicRow({
   onDelete,
   deleting,
   isUnread,
+  onContextMenu,
 }: {
   row: TopicWithActivity;
   ownUserId?: string;
@@ -42,6 +44,7 @@ function TopicRow({
   onDelete: (id: string) => void;
   deleting: boolean;
   isUnread: (id: string, lastActivity: string) => boolean;
+  onContextMenu: (e: React.MouseEvent) => void;
 }): React.ReactElement {
   const { topic, replyCount, lastActivity } = row;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -50,7 +53,11 @@ function TopicRow({
   const own = !!ownUserId && topic.createdBy?.id === ownUserId;
 
   return (
-    <div className="topic-row" onClick={() => onOpen(topic.id)}>
+    <div
+      className="topic-row"
+      onClick={() => onOpen(topic.id)}
+      onContextMenu={onContextMenu}
+    >
       <span className={`topic-dot ${unread ? "unread" : ""}`} />
       <span className="topic-avatar">
         {avatar ? (
@@ -104,6 +111,7 @@ export default function DiscussView(): React.ReactElement {
   const { rows, categories, isLoading, error } =
     useTopicsWithActivity(collectionId);
   const { isUnread, markSeen } = useTopicSeen();
+  const { menu: contextMenu, onContextMenu } = useDocContextMenu();
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState("");
   const [composeCategory, setComposeCategory] = useState<string>(UNCATEGORIZED);
@@ -274,9 +282,16 @@ export default function DiscussView(): React.ReactElement {
             onDelete={(id) => deleteTopic.mutate(id)}
             deleting={deleteTopic.isPending}
             isUnread={isUnread}
+            onContextMenu={(e) =>
+              onContextMenu(e, {
+                documentId: row.topic.id,
+                title: row.topic.title || "无标题",
+              })
+            }
           />
         ))}
       </div>
+      {contextMenu}
     </div>
   );
 }

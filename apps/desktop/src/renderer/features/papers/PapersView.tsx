@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDocContextMenu } from "../../hooks/useDocContextMenu";
 import {
   usePapersRoot,
   usePaperEntries,
@@ -24,6 +25,7 @@ function PaperRow({
   onOpen,
   onCycleRead,
   onTagClick,
+  onContextMenu,
 }: {
   paper: PaperEntry;
   meta?: PaperMeta;
@@ -31,9 +33,10 @@ function PaperRow({
   onOpen: () => void;
   onCycleRead: () => void;
   onTagClick: (tag: string) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }): React.ReactElement {
   return (
-    <div className="paper-row" onClick={onOpen}>
+    <div className="paper-row" onClick={onOpen} onContextMenu={onContextMenu}>
       <div className="paper-main">
         <div className="paper-title">
           {paper.emoji && <span>{paper.emoji} </span>}
@@ -97,6 +100,7 @@ export default function PapersView(): React.ReactElement {
   const { papers, isLoading } = usePaperEntries(root);
   const metas = usePaperMetas(root);
   const { stateFor, cycle } = useReadStates();
+  const { menu: contextMenu, onContextMenu } = useDocContextMenu();
 
   const [q, setQ] = useState("");
   const [year, setYear] = useState<number | null>(null);
@@ -244,9 +248,17 @@ export default function PapersView(): React.ReactElement {
             onOpen={() => navigate(`/document/${p.id}`)}
             onCycleRead={() => cycle(p.id)}
             onTagClick={(t) => setTag(tag === t ? null : t)}
+            onContextMenu={(e) =>
+              onContextMenu(e, {
+                documentId: p.id,
+                title: p.title.replace(/^📖\s*/, "") || "无标题",
+                emoji: p.emoji,
+              })
+            }
           />
         ))}
       </div>
+      {contextMenu}
     </div>
   );
 }
