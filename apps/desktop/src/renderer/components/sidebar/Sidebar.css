@@ -89,6 +89,7 @@
 .sb-nav-item.active {
   background: var(--sidebar-active);
   color: var(--color-text);
+  font-weight: 600;
 }
 
 /* unread badge (forum updates) */
@@ -173,7 +174,7 @@
 
 .sb-item.active .sb-link {
   color: var(--color-text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .sb-link {
@@ -185,6 +186,8 @@
   padding: 4px 4px 4px 2px;
   text-decoration: none;
   color: var(--sidebar-text);
+  /* web parity: sidebar entries are medium weight, not regular */
+  font-weight: 500;
 }
 
 .sb-title {
