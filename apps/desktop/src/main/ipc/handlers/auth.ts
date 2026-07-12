@@ -185,66 +185,60 @@ export function registerAuthHandlers(): void {
       // Drop any stale session cookie so the jar reflects only this attempt
       await ses.cookies.remove(OUTLINE_URL, "accessToken").catch(() => {});
 
-      // Walk redirects manually: Chromium still records Set-Cookie on every
-      // hop, but we only follow same-origin hops with a hard timeout per
-      // request. (redirect:"follow" can hang indefinitely if the server's
-      // post-login redirect target — its configured team URL — points
-      // somewhere unreachable, which shows up as an infinite spinner.)
-      let url = `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`;
-      let lastStatus = 0;
-      let lastResponse: Response | null = null;
+      // Electron's session.fetch rejects redirect:"manual" responses with
+      // "Redirect was cancelled" (the net stack cancels instead of returning
+      // the 302), so follow redirects and treat the cookie jar as the source
+      // of truth: Set-Cookie is recorded on every hop, and the abort signal
+      // bounds the case where the post-login redirect target is unreachable.
+      const url = `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`;
+      console.log(`[auth] callback: GET ${url}`);
 
-      for (let hop = 0; hop < 5; hop++) {
-        console.log(`[auth] callback hop ${hop}: GET ${url}`);
-        const response = await ses.fetch(url, {
+      let response: Response | null = null;
+      let finalUrl = "";
+      try {
+        response = await ses.fetch(url, {
           credentials: "include",
-          redirect: "manual",
+          redirect: "follow",
           cache: "no-store",
           headers: { Accept: "text/html,application/json" },
           signal: AbortSignal.timeout(15_000),
         });
-        lastStatus = response.status;
-        lastResponse = response;
-        console.log(`[auth] callback hop ${hop}: status ${response.status}`);
+        finalUrl = response.url;
+        console.log(`[auth] callback: status ${response.status} at ${finalUrl}`);
+      } catch (fetchErr) {
+        // A hop may have set the session cookie before the failure — check
+        // the jar before giving up.
+        console.warn("[auth] callback fetch error (checking jar):", fetchErr);
+      }
 
-        // Session established? (jar is updated even on redirect responses)
-        const token = await getCookieValue(ses, "accessToken");
-        if (token) {
-          console.log("[auth] accessToken acquired");
-          return ok({ token, cookieName: "accessToken" });
-        }
+      const token = await getCookieValue(ses, "accessToken");
+      if (token) {
+        console.log("[auth] accessToken acquired");
+        return ok({ token, cookieName: "accessToken" });
+      }
 
-        const location = response.headers.get("location");
-        if (!location) break;
-
-        const next = new URL(location, url);
-        console.log(`[auth] callback redirect -> ${next.toString()}`);
-
-        const notice = next.searchParams.get("notice");
+      // No session — the server redirects failures to /?notice=…
+      if (finalUrl) {
+        const params = new URL(finalUrl).searchParams;
+        const notice = params.get("notice");
         if (notice) {
-          const description = next.searchParams.get("description");
+          const description = params.get("description");
           return fail(
             "NOTICE",
             NOTICE_MESSAGES[notice] ??
               `登录失败（${notice}${description ? `: ${description}` : ""}）`,
           );
         }
-
-        if (!next.toString().startsWith(OUTLINE_URL)) {
-          console.warn("[auth] off-origin redirect, not following:", next.origin);
-          break;
-        }
-        url = next.toString();
       }
 
-      if (lastStatus >= 400 && lastResponse) {
-        const body = (await lastResponse.json().catch(() => ({}))) as {
+      if (response && response.status >= 400) {
+        const body = (await response.json().catch(() => ({}))) as {
           message?: string;
           error?: string;
         };
         return fail(
           "CALLBACK_FAILED",
-          body.message ?? body.error ?? `服务器返回 ${lastStatus}`,
+          body.message ?? body.error ?? `服务器返回 ${response.status}`,
         );
       }
 
