@@ -24,10 +24,6 @@ export default function SettingsView(): React.ReactElement {
   const setTheme = useUIStore((s) => s.setTheme);
   const contentWidth = useUIStore((s) => s.contentWidth);
   const setContentWidth = useUIStore((s) => s.setContentWidth);
-  const fullWidth = useUIStore((s) => s.fullWidth);
-  // The titlebar 全宽 toggle displays as level 5 here — highlighting the
-  // stored level while full width is active would misstate what's on screen.
-  const effectiveWidth = fullWidth ? 5 : contentWidth;
 
   const themeOptions: { value: "light" | "dark" | "system"; label: string }[] = [
     { value: "light", label: "浅色" },
@@ -109,7 +105,7 @@ export default function SettingsView(): React.ReactElement {
           {widthOptions.map((opt) => (
             <button
               key={opt.value}
-              className={`settings-theme-option ${effectiveWidth === opt.value ? "active" : ""}`}
+              className={`settings-theme-option ${contentWidth === opt.value ? "active" : ""}`}
               onClick={() => setContentWidth(opt.value)}
             >
               {opt.label}

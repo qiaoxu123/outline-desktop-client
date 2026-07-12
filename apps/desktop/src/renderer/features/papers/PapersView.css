@@ -1,5 +1,6 @@
 .papers-view {
-  max-width: var(--reading-col, 920px);
+  /* fixed library width — deliberately NOT tied to the Settings reading width */
+  max-width: 920px;
   margin: 0 auto;
   padding: 28px clamp(16px, 4vw, 40px) 60px;
 }

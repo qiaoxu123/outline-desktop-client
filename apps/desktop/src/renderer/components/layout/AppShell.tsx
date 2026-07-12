@@ -16,7 +16,6 @@ function loadSidebarWidth(): number {
 
 export default function AppShell(): React.ReactElement {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
-  const fullWidth = useUIStore((s) => s.fullWidth);
   const contentWidth = useUIStore((s) => s.contentWidth);
   const contentRef = useRef<HTMLElement>(null);
   const [showTop, setShowTop] = useState(false);
@@ -83,7 +82,7 @@ export default function AppShell(): React.ReactElement {
           </div>
           <main
             ref={contentRef}
-            className={`app-content ${fullWidth || contentWidth === 5 ? "full-width" : ""}`}
+            className={`app-content ${contentWidth === 5 ? "full-width" : ""}`}
             data-content-width={contentWidth}
           >
             <Outlet />

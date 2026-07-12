@@ -6,8 +6,6 @@ import "./TitleBar.css";
 export default function TitleBar(): React.ReactElement {
   const navigate = useNavigate();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const fullWidth = useUIStore((s) => s.fullWidth);
-  const toggleFullWidth = useUIStore((s) => s.toggleFullWidth);
   const showToc = useUIStore((s) => s.showToc);
   const toggleToc = useUIStore((s) => s.toggleToc);
   const theme = useUIStore((s) => s.theme);
@@ -66,15 +64,6 @@ export default function TitleBar(): React.ReactElement {
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M5 3h9v1.5H5V3zm0 4h9v1.5H5V7zm0 4h9v1.5H5V11zM2 3.75a.75.75 0 111.5 0 .75.75 0 01-1.5 0zm0 4a.75.75 0 111.5 0 .75.75 0 01-1.5 0zm0 4a.75.75 0 111.5 0 .75.75 0 01-1.5 0z" />
-          </svg>
-        </button>
-        <button
-          className={`titlebar-button ${fullWidth ? "active" : ""}`}
-          onClick={toggleFullWidth}
-          title={fullWidth ? "标准宽度" : "全宽显示"}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M1 8l3.5-3v2h7V5L15 8l-3.5 3V9h-7v2L1 8z" />
           </svg>
         </button>
         <button

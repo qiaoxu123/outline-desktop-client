@@ -6,8 +6,6 @@ export interface UIState {
   selectedCollectionId: string | null;
   selectedDocumentId: string | null;
   globalSearchOpen: boolean;
-  /** One toggle widens every view (persisted). */
-  fullWidth: boolean;
   /** Show the document table of contents panel (persisted). */
   showToc: boolean;
   /** Color theme (persisted). "system" follows OS preference. */
@@ -17,7 +15,6 @@ export interface UIState {
 
   setActiveProfileId: (id: string | null) => void;
   toggleSidebar: () => void;
-  toggleFullWidth: () => void;
   toggleToc: () => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
   setContentWidth: (level: 1 | 2 | 3 | 4 | 5) => void;
@@ -32,7 +29,6 @@ export const useUIStore = create<UIState>((set) => ({
   selectedCollectionId: null,
   selectedDocumentId: null,
   globalSearchOpen: false,
-  fullWidth: localStorage.getItem("ui.fullWidth") === "1",
   showToc: localStorage.getItem("ui.showToc") !== "0",
   theme:
     (localStorage.getItem("ui.theme") as "light" | "dark" | "system" | null) ??
@@ -45,12 +41,6 @@ export const useUIStore = create<UIState>((set) => ({
   setActiveProfileId: (id) => set({ activeProfileId: id }),
   toggleSidebar: () =>
     set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-  toggleFullWidth: () =>
-    set((s) => {
-      const fullWidth = !s.fullWidth;
-      localStorage.setItem("ui.fullWidth", fullWidth ? "1" : "0");
-      return { fullWidth };
-    }),
   toggleToc: () =>
     set((s) => {
       const showToc = !s.showToc;
@@ -63,10 +53,7 @@ export const useUIStore = create<UIState>((set) => ({
   },
   setContentWidth: (level) => {
     localStorage.setItem("ui.contentWidth", String(level));
-    // The titlebar 全宽 toggle overrides width levels — picking a level in
-    // Settings must win, otherwise levels 1–4 silently do nothing.
-    localStorage.setItem("ui.fullWidth", "0");
-    set({ contentWidth: level, fullWidth: false });
+    set({ contentWidth: level });
   },
   selectCollection: (id) => set({ selectedCollectionId: id }),
   selectDocument: (id) => set({ selectedDocumentId: id }),
