@@ -14,6 +14,8 @@ import {
 } from "./useDiscuss";
 import "./DiscussView.css";
 
+const UNCATEGORIZED = "__none__";
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60_000);
@@ -64,6 +66,9 @@ function TopicRow({
           {topic.title || "无标题"}
         </span>
         <span className="topic-meta">
+          {row.category && (
+            <span className="topic-category">{row.category.title}</span>
+          )}
           {topic.createdBy?.name} · 最后活动 {timeAgo(lastActivity)}
         </span>
       </span>
@@ -96,10 +101,13 @@ export default function DiscussView(): React.ReactElement {
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { user } = useUserInfo();
   const { collectionId, status } = useDiscussCollection();
-  const { rows, isLoading, error } = useTopicsWithActivity(collectionId);
+  const { rows, categories, isLoading, error } =
+    useTopicsWithActivity(collectionId);
   const { isUnread, markSeen } = useTopicSeen();
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState("");
+  const [composeCategory, setComposeCategory] = useState<string>(UNCATEGORIZED);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   // Opening the board clears the sidebar "new topics" badge.
   useEffect(() => {
@@ -118,6 +126,9 @@ export default function DiscussView(): React.ReactElement {
           title: topicTitle,
           text: "",
           collectionId,
+          ...(composeCategory !== UNCATEGORIZED
+            ? { parentDocumentId: composeCategory }
+            : {}),
           publish: true,
         }),
       );
@@ -172,6 +183,19 @@ export default function DiscussView(): React.ReactElement {
 
       {composing && (
         <div className="discuss-composer">
+          <select
+            className="discuss-category-select"
+            value={composeCategory}
+            onChange={(e) => setComposeCategory(e.target.value)}
+            title="选择版块"
+          >
+            <option value={UNCATEGORIZED}>不分版块</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
           <input
             className="discuss-title-input"
             value={title}
@@ -202,6 +226,28 @@ export default function DiscussView(): React.ReactElement {
         </div>
       )}
 
+      {categories.length > 0 && (
+        <div className="discuss-categorybar">
+          <button
+            className={`paper-tag ${categoryFilter === null ? "active" : ""}`}
+            onClick={() => setCategoryFilter(null)}
+          >
+            全部
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c.id}
+              className={`paper-tag ${categoryFilter === c.id ? "active" : ""}`}
+              onClick={() =>
+                setCategoryFilter(categoryFilter === c.id ? null : c.id)
+              }
+            >
+              {c.title}
+            </button>
+          ))}
+        </div>
+      )}
+
       {status === "resolving" && (
         <p className="discuss-note">正在初始化讨论区（首次会在服务器上创建集合）…</p>
       )}
@@ -217,7 +263,9 @@ export default function DiscussView(): React.ReactElement {
       )}
 
       <div className="topic-list">
-        {rows.map((row) => (
+        {rows
+          .filter((row) => !categoryFilter || row.category?.id === categoryFilter)
+          .map((row) => (
           <TopicRow
             key={row.topic.id}
             row={row}

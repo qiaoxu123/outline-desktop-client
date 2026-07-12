@@ -3,9 +3,14 @@ import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { unwrapIpc } from "../../lib/ipc";
-import type { OutlineCollection } from "@outline/shared-types";
+import type {
+  OutlineCollection,
+  OutlineCollectionDocument,
+} from "@outline/shared-types";
 
-const COLLECTION_NAME = "讨论区";
+/** Accepted names, newest first — the user renamed 讨论区 → 论坛空间. */
+const COLLECTION_NAMES = ["论坛空间", "讨论区"];
+const CREATE_NAME = "论坛空间";
 const COLLECTION_ID_KEY = "discuss.collectionId";
 const SEEN_KEY = "discuss.seen";
 
@@ -48,11 +53,15 @@ export function useDiscussCollection(): {
       const collections = Array.isArray(list)
         ? (list as unknown as OutlineCollection[])
         : (list.data ?? []);
-      let hit = collections.find((c) => c.name === COLLECTION_NAME);
+      let hit: OutlineCollection | undefined;
+      for (const name of COLLECTION_NAMES) {
+        hit = collections.find((c) => c.name === name);
+        if (hit) break;
+      }
       if (!hit) {
         const created = await unwrapIpc<{ data: OutlineCollection }>(
           api.call(activeProfileId, "collections.create", {
-            name: COLLECTION_NAME,
+            name: CREATE_NAME,
             description:
               "组内交流板块 — 由 Outline Desktop 创建,主题即文档,回复即评论。",
             permission: "read_write",
@@ -105,9 +114,9 @@ export function useTopics(collectionId: string | null): {
     queryKey: ["profile", activeProfileId, "discuss", collectionId],
     queryFn: () =>
       unwrapIpc<{ data: Topic[] }>(
+        // whole collection (topics live under category parent docs)
         api.call(activeProfileId!, "documents.list", {
           collectionId,
-          parentDocumentId: null,
           sort: "updatedAt",
           direction: "DESC",
           limit: 100, // API page cap; pagination when the board outgrows it
@@ -119,11 +128,56 @@ export function useTopics(collectionId: string | null): {
   return { topics: data?.data ?? [], isLoading, error };
 }
 
+/* ---------- categories (版块 = root docs that have children) ---------- */
+
+export interface DiscussCategory {
+  id: string;
+  title: string;
+}
+
+export function useDiscussCategories(collectionId: string | null): {
+  categories: DiscussCategory[];
+  /** topic doc id → its category (topics nested at any depth). */
+  categoryOf: Map<string, DiscussCategory>;
+  /** category container doc ids — excluded from the topic list. */
+  containerIds: Set<string>;
+} {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  // Same cache entry the sidebar/breadcrumb use for this collection's tree.
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "collection", collectionId, "documents"],
+    queryFn: () =>
+      unwrapIpc<{ data: OutlineCollectionDocument[] }>(
+        api.collections.documents(activeProfileId!, collectionId!),
+      ),
+    enabled: !!activeProfileId && !!collectionId,
+  });
+
+  const categories: DiscussCategory[] = [];
+  const categoryOf = new Map<string, DiscussCategory>();
+  const containerIds = new Set<string>();
+  for (const root of data?.data ?? []) {
+    if (!root.children?.length) continue;
+    const category = { id: root.id, title: root.title || "未命名版块" };
+    categories.push(category);
+    containerIds.add(root.id);
+    const stack = [...root.children];
+    while (stack.length) {
+      const node = stack.pop()!;
+      categoryOf.set(node.id, category);
+      stack.push(...(node.children ?? []));
+    }
+  }
+  return { categories, categoryOf, containerIds };
+}
+
 export interface TopicWithActivity {
   topic: Topic;
   replyCount: number;
   /** max(doc updatedAt, latest reply createdAt) — the forum sort key. */
   lastActivity: string;
+  category: DiscussCategory | null;
 }
 
 /**
@@ -134,12 +188,18 @@ export interface TopicWithActivity {
  */
 export function useTopicsWithActivity(collectionId: string | null): {
   rows: TopicWithActivity[];
+  categories: DiscussCategory[];
   isLoading: boolean;
   error: unknown;
 } {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const { topics, isLoading, error } = useTopics(collectionId);
+  const { topics: allDocs, isLoading, error } = useTopics(collectionId);
+  const { categories, categoryOf, containerIds } =
+    useDiscussCategories(collectionId);
+
+  // Category container docs are structure, not topics.
+  const topics = allDocs.filter((t) => !containerIds.has(t.id));
 
   const replyQueries = useQueries({
     queries: topics.map((t) => ({
@@ -167,11 +227,12 @@ export function useTopicsWithActivity(collectionId: string | null): {
       replyCount: comments.length,
       lastActivity:
         lastReply && lastReply > topic.updatedAt ? lastReply : topic.updatedAt,
+      category: categoryOf.get(topic.id) ?? null,
     };
   });
   rows.sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
 
-  return { rows, isLoading, error };
+  return { rows, categories, isLoading, error };
 }
 
 /**

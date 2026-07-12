@@ -150,6 +150,35 @@
   flex-shrink: 0;
 }
 
+/* category (版块) filter chips — .paper-tag base style is shared */
+.discuss-categorybar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.discuss-category-select {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  max-width: 160px;
+}
+
+.topic-category {
+  display: inline-block;
+  padding: 0 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
 /* delete own topic — appears on row hover */
 .topic-delete {
   display: none;
