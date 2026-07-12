@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../sidebar/Sidebar";
 import TitleBar from "./TitleBar";
 import Breadcrumb from "./Breadcrumb";
+import ForumPane from "../../features/forum/ForumPane";
 import { useUIStore } from "../../state/uiStore";
 import "./AppShell.css";
 
@@ -21,6 +22,9 @@ export default function AppShell(): React.ReactElement {
   const contentRef = useRef<HTMLElement>(null);
   const [showTop, setShowTop] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+  // The forum pane stays mounted (hidden) so its session/history survive
+  // switching to other views.
+  const isForum = useLocation().pathname === "/forum";
 
   // Drag the sidebar's right edge to resize (persisted).
   const startResize = useCallback((e: React.MouseEvent) => {
@@ -81,10 +85,12 @@ export default function AppShell(): React.ReactElement {
                 viewers / star / comments / history) into this slot */}
             <div className="breadcrumb-actions" id="doc-actions-slot" />
           </div>
+          <ForumPane visible={isForum} />
           <main
             ref={contentRef}
             className={`app-content ${fullWidth || contentWidth === 5 ? "full-width" : ""}`}
             data-content-width={contentWidth}
+            style={isForum ? { display: "none" } : undefined}
           >
             <Outlet />
             {showTop && (

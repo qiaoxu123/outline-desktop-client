@@ -65,6 +65,8 @@ function createMainWindow(): BrowserWindow {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
+      // in-app forum panel (features/forum) embeds the site via <webview>
+      webviewTag: true,
     },
   });
 
@@ -118,6 +120,17 @@ app.whenReady().then(() => {
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
+  });
+
+  // Links inside embedded webviews (forum) open in the system browser,
+  // same policy as the main window.
+  app.on("web-contents-created", (_event, contents) => {
+    if (contents.getType() === "webview") {
+      contents.setWindowOpenHandler((details) => {
+        void shell.openExternal(details.url);
+        return { action: "deny" };
+      });
+    }
   });
 
   // Document images are served by the Outline server behind authentication

@@ -130,6 +130,8 @@ export default function Breadcrumb(): React.ReactElement {
     crumbs.push({ label: "共享链接" });
   } else if (path === "/settings") {
     crumbs.push({ label: "设置" });
+  } else if (path === "/forum") {
+    crumbs.push({ label: "社区论坛" });
   } else {
     crumbs.push({ label: "主页" });
   }
