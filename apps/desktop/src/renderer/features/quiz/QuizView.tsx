@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MarkdownRenderer } from "../../lib/markdown/renderer";
 import { useQuiz, type Card, type Grade } from "./useQuiz";
 import { QUIZ_CATEGORIES } from "./quizData";
 import "./QuizView.css";
@@ -67,7 +68,9 @@ function ReviewMode({
         <div className="quiz-card-question">{card.question}</div>
 
         {revealed ? (
-          <div className="quiz-card-answer">{card.answer || "（暂无参考答案）"}</div>
+          <div className="quiz-card-answer markdown-body">
+            <MarkdownRenderer content={card.answer || "（暂无参考答案）"} />
+          </div>
         ) : (
           <button className="quiz-btn reveal" onClick={() => setRevealed(true)}>
             显示答案
@@ -340,8 +343,10 @@ export default function QuizView(): React.ReactElement {
                       </div>
                       {isOpen && (
                         <div className="quiz-row-body">
-                          <div className="quiz-row-answer">
-                            {c.answer || "（暂无参考答案，点编辑补充）"}
+                          <div className="quiz-row-answer markdown-body">
+                            <MarkdownRenderer
+                              content={c.answer || "（暂无参考答案，点编辑补充）"}
+                            />
                           </div>
                           <div className="quiz-row-tools">
                             <button

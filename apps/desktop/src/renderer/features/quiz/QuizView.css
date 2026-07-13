@@ -268,7 +268,6 @@
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text-secondary);
-  white-space: pre-wrap;
 }
 
 .quiz-row-tools {
@@ -331,9 +330,59 @@
   font-size: 15px;
   line-height: 1.8;
   color: var(--color-text-secondary);
-  white-space: pre-wrap;
   border-top: 1px solid var(--color-border);
   padding-top: 20px;
+}
+
+/* markdown answers: tighten the app's article spacing for a compact card */
+.quiz-card-answer.markdown-body :first-child,
+.quiz-row-answer.markdown-body :first-child {
+  margin-top: 0;
+}
+.quiz-card-answer.markdown-body :last-child,
+.quiz-row-answer.markdown-body :last-child {
+  margin-bottom: 0;
+}
+.quiz-card-answer.markdown-body p,
+.quiz-row-answer.markdown-body p {
+  margin: 0 0 10px;
+}
+.quiz-card-answer.markdown-body ul,
+.quiz-card-answer.markdown-body ol,
+.quiz-row-answer.markdown-body ul,
+.quiz-row-answer.markdown-body ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.quiz-card-answer.markdown-body li,
+.quiz-row-answer.markdown-body li {
+  margin: 2px 0;
+}
+.quiz-card-answer.markdown-body strong,
+.quiz-row-answer.markdown-body strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.quiz-card-answer.markdown-body table,
+.quiz-row-answer.markdown-body table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.95em;
+}
+.quiz-card-answer.markdown-body th,
+.quiz-card-answer.markdown-body td,
+.quiz-row-answer.markdown-body th,
+.quiz-row-answer.markdown-body td {
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.quiz-card-answer.markdown-body code,
+.quiz-row-answer.markdown-body code {
+  font-size: 0.9em;
+  background: var(--color-bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 
 .quiz-btn.reveal {
