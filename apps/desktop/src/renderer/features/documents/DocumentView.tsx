@@ -66,7 +66,7 @@ function Toc({ markdown }: { markdown: string }): React.ReactElement | null {
     els[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  return (
+  const nav = (
     <nav className="document-toc">
       <div className="document-toc-title">目录</div>
       {headings.map((h, i) => (
@@ -82,6 +82,11 @@ function Toc({ markdown }: { markdown: string }): React.ReactElement | null {
       ))}
     </nav>
   );
+
+  // dock into the AppShell slot at the far right (outside the content
+  // scroller) so the TOC scrolls independently and never covers the article
+  const slot = document.getElementById("toc-slot");
+  return slot ? createPortal(nav, slot) : nav;
 }
 
 /* ---------- revision history ---------- */

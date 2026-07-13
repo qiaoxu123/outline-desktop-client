@@ -80,26 +80,31 @@ export default function AppShell(): React.ReactElement {
                 viewers / star / comments / history) into this slot */}
             <div className="breadcrumb-actions" id="doc-actions-slot" />
           </div>
-          <main
-            ref={contentRef}
-            className={`app-content ${contentWidth === 5 ? "full-width" : ""}`}
-            data-content-width={contentWidth}
-          >
-            <Outlet />
-            {showTop && (
-              <button
-                className="scroll-top-button"
-                onClick={() =>
-                  contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-                }
-                title="回到顶部"
-              >
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 3.5l5 5-1.06 1.06L8 5.62 4.06 9.56 3 8.5l5-5z" />
-                </svg>
-              </button>
-            )}
-          </main>
+          <div className="app-content-row">
+            <main
+              ref={contentRef}
+              className={`app-content ${contentWidth === 5 ? "full-width" : ""}`}
+              data-content-width={contentWidth}
+            >
+              <Outlet />
+              {showTop && (
+                <button
+                  className="scroll-top-button"
+                  onClick={() =>
+                    contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+                  }
+                  title="回到顶部"
+                >
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 3.5l5 5-1.06 1.06L8 5.62 4.06 9.56 3 8.5l5-5z" />
+                  </svg>
+                </button>
+              )}
+            </main>
+            {/* document views portal the TOC here — a docked, independently
+                scrolling rail at the far right, outside the content scroller */}
+            <div className="toc-slot" id="toc-slot" />
+          </div>
         </div>
       </div>
     </div>

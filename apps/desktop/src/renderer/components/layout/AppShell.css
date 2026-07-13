@@ -205,8 +205,30 @@ body.sidebar-resizing {
   flex-shrink: 0;
 }
 
+/* horizontal row: the scrolling content + the docked TOC rail at the right */
+.app-content-row {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* slot the document TOC portals into; collapses when no TOC is rendered */
+.toc-slot {
+  flex-shrink: 0;
+}
+.toc-slot:empty {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .toc-slot {
+    display: none;
+  }
+}
+
 .app-content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   background: var(--color-bg);
   position: relative;
@@ -283,7 +305,6 @@ body.sidebar-resizing {
   max-width: 1280px;
 }
 
-.app-content.full-width .document-layout > .document-toc,
 .app-content.full-width .document-layout > .history-panel,
 .app-content.full-width .document-layout > .comments-panel {
   grid-column: 2;

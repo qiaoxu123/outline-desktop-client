@@ -23,35 +23,22 @@
   margin: 0;
 }
 
-.document-layout > .document-toc,
 .document-layout > .history-panel,
 .document-layout > .comments-panel {
   grid-column: 3;
   justify-self: end;
 }
 
-/* table of contents — sticky right rail (like the history/comments panels):
-   occupies grid column 3, so at medium widths the article narrows instead of
-   the card overlaying the text */
+/* table of contents — docked rail portaled into .toc-slot (AppShell), flush
+   against the window's right edge, full height, scrolls independently of the
+   document */
 .document-toc {
-  position: sticky;
-  top: 16px;
-  width: 240px;
-  /* hug the window edge (20px total) instead of sitting inset by the view padding */
-  margin-right: calc(20px - var(--doc-pad, 40px));
-  max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
+  width: 248px;
+  height: 100%;
   overflow-y: auto;
-  padding: 10px 6px 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
+  padding: 14px 10px 24px 14px;
+  border-left: 1px solid var(--color-border);
   background: var(--color-bg);
-}
-
-/* not useful when it would cover most of a narrow window */
-@media (max-width: 1100px) {
-  .document-toc {
-    display: none;
-  }
 }
 
 .document-toc-title {
@@ -888,9 +875,6 @@
   .document-layout .document-article {
     grid-column: 1;
     max-width: 100%;
-  }
-  .document-layout > .document-toc {
-    display: none;
   }
   .document-layout > .history-panel,
   .document-layout > .comments-panel {
