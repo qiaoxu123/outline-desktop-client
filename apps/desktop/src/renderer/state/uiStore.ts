@@ -34,8 +34,18 @@ export const useUIStore = create<UIState>((set) => ({
     (localStorage.getItem("ui.theme") as "light" | "dark" | "system" | null) ??
     "system",
   contentWidth: ((): 1 | 2 | 3 | 4 | 5 => {
+    // Default is 适中 (1280px) so documents match the pinned 论坛/论文库/主页
+    // width. One-time migration: the old default was 最窄 (1); stored 1s from
+    // that era are moved to 适中 unless re-chosen afterwards.
+    if (!localStorage.getItem("ui.contentWidth.defaultMigrated")) {
+      localStorage.setItem("ui.contentWidth.defaultMigrated", "1");
+      const old = Number(localStorage.getItem("ui.contentWidth"));
+      if (!(old >= 2 && old <= 5)) {
+        localStorage.setItem("ui.contentWidth", "3");
+      }
+    }
     const v = Number(localStorage.getItem("ui.contentWidth"));
-    return v >= 1 && v <= 5 ? (v as 1 | 2 | 3 | 4 | 5) : 1;
+    return v >= 1 && v <= 5 ? (v as 1 | 2 | 3 | 4 | 5) : 3;
   })(),
 
   setActiveProfileId: (id) => set({ activeProfileId: id }),
