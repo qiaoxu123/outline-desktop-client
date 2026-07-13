@@ -1,8 +1,141 @@
 import { useMemo, useState } from "react";
 import { MarkdownRenderer } from "../../lib/markdown/renderer";
 import { useQuiz, type Card, type Grade } from "./useQuiz";
+import { useCardInteractions } from "./useCardInteractions";
 import { QUIZ_CATEGORIES } from "./quizData";
 import "./QuizView.css";
+
+type Interactions = ReturnType<typeof useCardInteractions>;
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* ---------- per-card likes + comments (shared) ---------- */
+
+function CardInteractionBar({
+  cardId,
+  ix,
+}: {
+  cardId: string;
+  ix: Interactions;
+}): React.ReactElement {
+  const s = ix.summaryFor(cardId);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+
+  return (
+    <div className="quiz-ix">
+      <div className="quiz-ix-actions">
+        <button
+          className={`quiz-ix-like ${s.likedByMe ? "liked" : ""}`}
+          onClick={() => ix.toggleLike(cardId)}
+          title={s.likers.length ? `赞：${s.likers.join("、")}` : "点赞"}
+        >
+          👍{s.likeCount > 0 ? ` ${s.likeCount}` : ""}
+        </button>
+        <button
+          className={`quiz-ix-comment-btn ${open ? "active" : ""}`}
+          onClick={() => setOpen((v) => !v)}
+        >
+          💬 评论{s.comments.length > 0 ? ` ${s.comments.length}` : ""}
+        </button>
+      </div>
+
+      {open && (
+        <div className="quiz-ix-comments">
+          {s.comments.map((c) => (
+            <div key={c.id} className="quiz-ix-comment">
+              <div className="quiz-ix-comment-head">
+                <b>{c.name}</b>
+                <span className="quiz-ix-comment-time">
+                  {fmtTime(c.at)}
+                  {c.editedAt ? "（已编辑）" : ""}
+                </span>
+              </div>
+              {editingId === c.id ? (
+                <div className="quiz-ix-edit">
+                  <textarea
+                    className="quiz-input"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="quiz-ix-edit-actions">
+                    <button
+                      className="quiz-btn ghost sm"
+                      onClick={() => setEditingId(null)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      className="quiz-btn primary sm"
+                      disabled={!editText.trim()}
+                      onClick={() => {
+                        ix.editComment(cardId, c.id, editText);
+                        setEditingId(null);
+                      }}
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="quiz-ix-comment-text">{c.text}</div>
+              )}
+              {ix.me?.id === c.userId && editingId !== c.id && (
+                <div className="quiz-ix-comment-tools">
+                  <button
+                    className="quiz-btn ghost sm"
+                    onClick={() => {
+                      setEditingId(c.id);
+                      setEditText(c.text);
+                    }}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    className="quiz-btn ghost sm danger"
+                    onClick={() => {
+                      if (confirm("删除这条评论？")) ix.deleteComment(cardId, c.id);
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {s.comments.length === 0 && (
+            <p className="quiz-ix-empty">还没有评论，来写第一条。</p>
+          )}
+          <div className="quiz-ix-add">
+            <textarea
+              className="quiz-input"
+              placeholder="写评论…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button
+              className="quiz-btn primary sm"
+              disabled={!draft.trim()}
+              onClick={() => {
+                ix.addComment(cardId, draft);
+                setDraft("");
+              }}
+            >
+              发表
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STATUS_LABEL: Record<string, string> = {
   new: "未学",
@@ -21,10 +154,12 @@ const GRADE_BUTTONS: { grade: Grade; label: string; hint: string }[] = [
 
 function ReviewMode({
   queue,
+  ix,
   onGrade,
   onExit,
 }: {
   queue: Card[];
+  ix: Interactions;
   onGrade: (id: string, g: Grade) => void;
   onExit: () => void;
 }): React.ReactElement {
@@ -76,6 +211,7 @@ function ReviewMode({
             显示答案
           </button>
         )}
+        {revealed && <CardInteractionBar cardId={card.id} ix={ix} />}
       </div>
 
       {revealed && (
@@ -176,6 +312,7 @@ export default function QuizView(): React.ReactElement {
     offline: "离线（本地已存）",
   };
 
+  const ix = useCardInteractions();
   const [mode, setMode] = useState<"browse" | "review">("browse");
   const [reviewQueue, setReviewQueue] = useState<Card[]>([]);
   const [q, setQ] = useState("");
@@ -218,6 +355,7 @@ export default function QuizView(): React.ReactElement {
       <div className="quiz-view">
         <ReviewMode
           queue={reviewQueue}
+          ix={ix}
           onGrade={grade}
           onExit={() => setMode("browse")}
         />
@@ -364,6 +502,7 @@ export default function QuizView(): React.ReactElement {
                               删除
                             </button>
                           </div>
+                          <CardInteractionBar cardId={c.id} ix={ix} />
                         </div>
                       )}
                     </>
