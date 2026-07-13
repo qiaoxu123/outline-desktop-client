@@ -422,15 +422,18 @@ function CommentsPanel({
     }) => {
       // Outline stores comment bodies as ProseMirror doc data. New comments
       // from the desktop are unanchored (an anchor mark can't survive our
-      // markdown save path) — the selected text rides along as a blockquote.
+      // markdown save path) — the selected text rides along as an italic
+      // 「…」 line. (Outline's comment schema rejects blockquote nodes with
+      // "data: Invalid data", so we can't quote with a real blockquote.)
       const content: unknown[] = [];
       if (quoted?.trim()) {
         content.push({
-          type: "blockquote",
+          type: "paragraph",
           content: [
             {
-              type: "paragraph",
-              content: [{ type: "text", text: quoted.trim() }],
+              type: "text",
+              marks: [{ type: "em" }],
+              text: `「${quoted.trim()}」`,
             },
           ],
         });
