@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
+import { useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
 import type {
   OutlineCollection,
@@ -246,11 +247,57 @@ export function parsePaperMeta(text: string): PaperMeta {
   };
 }
 
-const META_CACHE_KEY = "papers.metaCache.v1";
+/* ---------- shared likes/ratings registry (one doc in the collection) ---------- */
+
+export const REGISTRY_TITLE = "⚙️ 论文互动数据（客户端自动维护，请勿手动编辑）";
+const REGISTRY_TITLE_PREFIX = "⚙️ 论文互动数据";
+
+export interface InteractionEntry {
+  name: string;
+  like?: boolean;
+  /** 1-5 stars */
+  score?: number;
+  at: string;
+}
+
+export interface InteractionData {
+  version: 1;
+  /** paperDocId -> userId -> entry */
+  papers: Record<string, Record<string, InteractionEntry>>;
+}
+
+const EMPTY_INTERACTIONS: InteractionData = { version: 1, papers: {} };
+
+export function parseRegistry(text: string): InteractionData | null {
+  const m = /```json\s*\n([\s\S]*?)\n```/.exec(text);
+  if (!m) return null;
+  try {
+    const data = JSON.parse(m[1]) as InteractionData;
+    return data && typeof data.papers === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function serializeRegistry(data: InteractionData): string {
+  return [
+    "本文档由 Outline Desktop 客户端自动维护，存放论文库的点赞与评分数据。",
+    "**请勿手动编辑**（手动改动可能被覆盖或导致数据丢失）。",
+    "",
+    "```json",
+    JSON.stringify(data, null, 2),
+    "```",
+    "",
+  ].join("\n");
+}
+
+const META_CACHE_KEY = "papers.metaCache.v2";
 
 interface MetaCache {
   savedAt: string;
   metas: Record<string, PaperMeta>;
+  registryDocId: string | null;
+  registry: InteractionData | null;
 }
 
 function readMetaCache(): MetaCache | null {
@@ -270,14 +317,33 @@ function readMetaCache(): MetaCache | null {
  * Replaces the previous per-document fan-out (60 concurrent documents.info
  * calls, each re-rendering the list — the source of the open lag).
  */
-export function usePaperMetas(root: PapersRoot | null): Map<string, PaperMeta> {
+export interface PapersMetaResult {
+  metas: Record<string, PaperMeta>;
+  registryDocId: string | null;
+  registry: InteractionData | null;
+}
+
+export function papersMetaQueryKey(
+  activeProfileId: string | null,
+  collectionId: string | undefined,
+): unknown[] {
+  return ["profile", activeProfileId, "papers-meta", collectionId];
+}
+
+export function usePaperMetas(root: PapersRoot | null): {
+  metas: Map<string, PaperMeta>;
+  registryDocId: string | null;
+  registry: InteractionData;
+} {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
 
   const { data } = useQuery({
-    queryKey: ["profile", activeProfileId, "papers-meta", root?.collectionId],
-    queryFn: async () => {
+    queryKey: papersMetaQueryKey(activeProfileId, root?.collectionId),
+    queryFn: async (): Promise<PapersMetaResult> => {
       const metas: Record<string, PaperMeta> = {};
+      let registryDocId: string | null = null;
+      let registry: InteractionData | null = null;
       for (let offset = 0; offset < 1000; offset += 100) {
         const page = await unwrapIpc<{ data: OutlineDocument[] }>(
           api.call(activeProfileId!, "documents.list", {
@@ -288,6 +354,12 @@ export function usePaperMetas(root: PapersRoot | null): Map<string, PaperMeta> {
         );
         const docs = page.data ?? [];
         for (const d of docs) {
+          if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) {
+            // the shared likes/ratings registry rides along in the same sweep
+            registryDocId = d.id;
+            if (typeof d.text === "string") registry = parseRegistry(d.text);
+            continue;
+          }
           if (typeof d.text === "string") metas[d.id] = parsePaperMeta(d.text);
         }
         if (docs.length < 100) break;
@@ -295,27 +367,292 @@ export function usePaperMetas(root: PapersRoot | null): Map<string, PaperMeta> {
       const cache: MetaCache = {
         savedAt: new Date().toISOString(),
         metas,
+        registryDocId,
+        registry,
       };
       try {
         localStorage.setItem(META_CACHE_KEY, JSON.stringify(cache));
       } catch {
         // cache write is best-effort (quota etc.)
       }
-      return metas;
+      return { metas, registryDocId, registry };
     },
     enabled: !!activeProfileId && !!root,
     staleTime: 10 * 60_000,
     // instant paint from the persisted cache; marked stale so a background
     // refresh still happens
-    initialData: () => readMetaCache()?.metas,
+    initialData: () => {
+      const cache = readMetaCache();
+      return cache
+        ? {
+            metas: cache.metas,
+            registryDocId: cache.registryDocId ?? null,
+            registry: cache.registry ?? null,
+          }
+        : undefined;
+    },
     initialDataUpdatedAt: () => {
       const cache = readMetaCache();
       return cache ? new Date(cache.savedAt).getTime() : 0;
     },
   });
 
-  const metas = data ?? {};
-  return new Map(Object.entries(metas));
+  return {
+    metas: new Map(Object.entries(data?.metas ?? {})),
+    registryDocId: data?.registryDocId ?? null,
+    registry: data?.registry ?? EMPTY_INTERACTIONS,
+  };
+}
+
+/* ---------- likes & star ratings (shared via the registry doc) ---------- */
+
+export interface PaperInteractionSummary {
+  likes: number;
+  myLike: boolean;
+  scoreAvg: number | null;
+  scoreCount: number;
+  myScore: number | null;
+}
+
+export function summarizeInteractions(
+  registry: InteractionData,
+  paperId: string,
+  myUserId: string | undefined,
+): PaperInteractionSummary {
+  const users = registry.papers[paperId] ?? {};
+  let likes = 0;
+  let scoreSum = 0;
+  let scoreCount = 0;
+  let myLike = false;
+  let myScore: number | null = null;
+  for (const [uid, e] of Object.entries(users)) {
+    if (e.like) likes++;
+    if (typeof e.score === "number") {
+      scoreSum += e.score;
+      scoreCount++;
+    }
+    if (uid === myUserId) {
+      myLike = !!e.like;
+      myScore = typeof e.score === "number" ? e.score : null;
+    }
+  }
+  return {
+    likes,
+    myLike,
+    scoreAvg: scoreCount > 0 ? scoreSum / scoreCount : null,
+    scoreCount,
+    myScore,
+  };
+}
+
+/**
+ * Toggle-like / set-score against the shared registry document.
+ * Writes are read-modify-write on the latest server text, merging ONLY the
+ * current user's entry (lab-scale traffic; last-writer-wins acceptable).
+ * Consecutive clicks are chained so they can't clobber each other locally.
+ */
+export function usePaperInteractions(root: PapersRoot | null): {
+  registry: InteractionData;
+  summaryFor: (paperId: string) => PaperInteractionSummary;
+  toggleLike: (paperId: string) => void;
+  setScore: (paperId: string, score: number | null) => void;
+  canInteract: boolean;
+} {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { user } = useUserInfo();
+  const queryClient = useQueryClient();
+  const { registry, registryDocId } = usePaperMetas(root);
+  const chainRef = useRef<Promise<void>>(Promise.resolve());
+  // survives across renders within the session so a just-created registry doc
+  // is reused by follow-up writes even before the next meta refresh
+  const docIdRef = useRef<string | null>(null);
+  if (registryDocId) docIdRef.current = registryDocId;
+
+  const apply = (patch: { like?: boolean; score?: number | null }, paperId: string) => {
+    if (!activeProfileId || !user || !root) return;
+    const metaKey = papersMetaQueryKey(activeProfileId, root.collectionId);
+
+    // optimistic local update
+    queryClient.setQueryData<PapersMetaResult>(metaKey, (old) => {
+      if (!old) return old;
+      const base = old.registry ?? EMPTY_INTERACTIONS;
+      const next = mergeEntry(base, paperId, user.id, user.name ?? "", patch);
+      return { ...old, registry: next };
+    });
+
+    chainRef.current = chainRef.current.then(async () => {
+      try {
+        let docId = docIdRef.current;
+        let latest: InteractionData = EMPTY_INTERACTIONS;
+        if (docId) {
+          const info = await unwrapIpc<{ data: OutlineDocument }>(
+            api.documents.info(activeProfileId, docId),
+          );
+          latest = parseRegistry(info.data.text ?? "") ?? EMPTY_INTERACTIONS;
+        }
+        const next = mergeEntry(latest, paperId, user.id, user.name ?? "", patch);
+        const text = serializeRegistry(next);
+        if (docId) {
+          await unwrapIpc(
+            api.call(activeProfileId, "documents.update", { id: docId, text }),
+          );
+        } else {
+          const created = await unwrapIpc<{ data: OutlineDocument }>(
+            api.call(activeProfileId, "documents.create", {
+              title: REGISTRY_TITLE,
+              text,
+              collectionId: root.collectionId,
+              publish: true,
+            }),
+          );
+          docId = created.data.id;
+          docIdRef.current = docId;
+        }
+        // reconcile the cache with what the server now holds
+        queryClient.setQueryData<PapersMetaResult>(metaKey, (old) =>
+          old ? { ...old, registry: next, registryDocId: docId } : old,
+        );
+      } catch (err) {
+        console.error("[papers] interaction write failed:", err);
+      }
+    });
+  };
+
+  const summaryFor = (paperId: string) =>
+    summarizeInteractions(registry, paperId, user?.id);
+
+  return {
+    registry,
+    summaryFor,
+    toggleLike: (paperId) => {
+      const mine = summaryFor(paperId).myLike;
+      apply({ like: !mine }, paperId);
+    },
+    setScore: (paperId, score) => apply({ score }, paperId),
+    canInteract: !!user && !!activeProfileId && !!root,
+  };
+}
+
+function mergeEntry(
+  data: InteractionData,
+  paperId: string,
+  userId: string,
+  userName: string,
+  patch: { like?: boolean; score?: number | null },
+): InteractionData {
+  const users = { ...(data.papers[paperId] ?? {}) };
+  const prev = users[userId];
+  const entry: InteractionEntry = {
+    name: userName,
+    like: prev?.like,
+    score: prev?.score,
+    at: new Date().toISOString(),
+  };
+  if (patch.like !== undefined) entry.like = patch.like || undefined;
+  if (patch.score !== undefined) entry.score = patch.score ?? undefined;
+  if (!entry.like && entry.score === undefined) {
+    delete users[userId];
+  } else {
+    users[userId] = entry;
+  }
+  const papers = { ...data.papers };
+  if (Object.keys(users).length === 0) delete papers[paperId];
+  else papers[paperId] = users;
+  return { version: 1, papers };
+}
+
+/* ---------- per-paper view counts (background batch fetch + cache) ---------- */
+
+const VIEWS_CACHE_KEY = "papers.viewsCache.v1";
+const VIEWS_REFRESH_MS = 30 * 60_000;
+
+interface ViewsCache {
+  savedAt: string;
+  views: Record<string, number>;
+}
+
+function readViewsCache(): ViewsCache | null {
+  try {
+    const raw = localStorage.getItem(VIEWS_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as ViewsCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Total view counts for all papers. There is no bulk views endpoint, so this
+ * walks views.list per paper in small concurrent batches, painting
+ * incrementally and persisting to localStorage. A fresh cache (<30 min)
+ * skips the sweep entirely.
+ */
+export function usePaperViews(papers: PaperEntry[]): Map<string, number> {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const [views, setViews] = useState<Record<string, number>>(
+    () => readViewsCache()?.views ?? {},
+  );
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!activeProfileId || papers.length === 0 || startedRef.current) return;
+    const cache = readViewsCache();
+    if (
+      cache &&
+      Date.now() - new Date(cache.savedAt).getTime() < VIEWS_REFRESH_MS
+    ) {
+      return;
+    }
+    startedRef.current = true;
+    let cancelled = false;
+    const ids = papers.map((p) => p.id);
+    void (async () => {
+      const acc: Record<string, number> = { ...(cache?.views ?? {}) };
+      const CONCURRENCY = 8;
+      for (let i = 0; i < ids.length; i += CONCURRENCY) {
+        if (cancelled) return;
+        const batch = ids.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const res = await unwrapIpc<{ data: { count?: number }[] }>(
+                api.call(activeProfileId, "views.list", { documentId: id }),
+              );
+              const total = (res.data ?? []).reduce(
+                (sum, v) => sum + (v.count ?? 1),
+                0,
+              );
+              return [id, total] as const;
+            } catch {
+              return [id, acc[id] ?? 0] as const;
+            }
+          }),
+        );
+        for (const [id, n] of results) acc[id] = n;
+        const done = Math.min(i + CONCURRENCY, ids.length);
+        if (!cancelled && (done % 40 < CONCURRENCY || done >= ids.length)) {
+          setViews({ ...acc });
+        }
+      }
+      try {
+        localStorage.setItem(
+          VIEWS_CACHE_KEY,
+          JSON.stringify({
+            savedAt: new Date().toISOString(),
+            views: acc,
+          } satisfies ViewsCache),
+        );
+      } catch {
+        // best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, activeProfileId, papers]);
+
+  return useMemo(() => new Map(Object.entries(views)), [views]);
 }
 
 /* ---------- personal read state ---------- */

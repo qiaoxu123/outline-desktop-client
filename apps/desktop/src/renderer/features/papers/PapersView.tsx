@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocContextMenu } from "../../hooks/useDocContextMenu";
+import { sortDocsByTitle } from "../../lib/naturalSort";
 import {
   usePapersRoot,
   usePaperEntries,
   usePaperMetas,
+  usePaperInteractions,
+  usePaperViews,
   useReadStates,
   type PaperEntry,
   type PaperMeta,
+  type PaperInteractionSummary,
   type ReadState,
 } from "./usePapers";
 import "./PapersView.css";
@@ -18,23 +22,72 @@ const READ_LABEL: Record<ReadState, string> = {
   read: "已读",
 };
 
+type SortKey = "recommended" | "views" | "likes" | "score" | "title";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recommended", label: "推荐时间 新→旧" },
+  { value: "views", label: "阅读量 多→少" },
+  { value: "likes", label: "点赞 多→少" },
+  { value: "score", label: "评分 高→低" },
+  { value: "title", label: "标题 A→Z" },
+];
+
+function StarPicker({
+  myScore,
+  onPick,
+}: {
+  myScore: number | null;
+  onPick: (score: number | null) => void;
+}): React.ReactElement {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="paper-star-pop" onClick={(e) => e.stopPropagation()}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <button
+          key={s}
+          className={`paper-star ${s <= (hover || myScore || 0) ? "on" : ""}`}
+          onMouseEnter={() => setHover(s)}
+          onMouseLeave={() => setHover(0)}
+          onClick={() => onPick(s === myScore ? null : s)}
+          title={s === myScore ? "再点一次清除我的评分" : `打 ${s} 星`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PaperRow({
   paper,
   meta,
   readState,
+  interaction,
+  viewCount,
+  canInteract,
   onOpen,
   onCycleRead,
   onTagClick,
+  onToggleLike,
+  onSetScore,
   onContextMenu,
 }: {
   paper: PaperEntry;
   meta?: PaperMeta;
   readState: ReadState;
+  interaction: PaperInteractionSummary;
+  viewCount: number | undefined;
+  canInteract: boolean;
   onOpen: () => void;
   onCycleRead: () => void;
   onTagClick: (tag: string) => void;
+  onToggleLike: () => void;
+  onSetScore: (score: number | null) => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }): React.ReactElement {
+  const [starOpen, setStarOpen] = useState(false);
+  const { likes, myLike, scoreAvg, scoreCount, myScore } = interaction;
+
   return (
     <div className="paper-row" onClick={onOpen} onContextMenu={onContextMenu}>
       <div className="paper-main">
@@ -64,8 +117,58 @@ function PaperRow({
           {meta && !meta.parsed && (
             <span className="paper-unparsed">未整理</span>
           )}
+          {(viewCount ?? 0) > 0 && (
+            <span className="paper-views">{viewCount} 阅读</span>
+          )}
         </div>
       </div>
+
+      <button
+        className={`paper-like-btn ${myLike ? "liked" : ""}`}
+        disabled={!canInteract}
+        title={myLike ? "取消点赞" : "点赞"}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleLike();
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8.86 1.5a1 1 0 00-.95.68L6.6 6H3a1 1 0 00-1 1v6a1 1 0 001 1h8.53a2 2 0 001.97-1.67l.83-5A2 2 0 0012.36 5H9.9l.42-2.06A1.2 1.2 0 009.14 1.5h-.28zM5 7.2V13H3.5V7.2H5z" />
+        </svg>
+        {likes > 0 && <span>{likes}</span>}
+      </button>
+
+      <div
+        className="paper-score-wrap"
+        onMouseLeave={() => setStarOpen(false)}
+      >
+        <button
+          className={`paper-score-chip ${myScore ? "rated" : ""}`}
+          disabled={!canInteract}
+          title={
+            scoreCount > 0
+              ? `平均 ${scoreAvg!.toFixed(1)} 分 · ${scoreCount} 人评分${myScore ? ` · 我的 ${myScore} 星` : ""}`
+              : "还没有人评分，点击打分"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            setStarOpen((v) => !v);
+          }}
+        >
+          ★{scoreCount > 0 ? ` ${scoreAvg!.toFixed(1)}` : ""}
+          {scoreCount > 0 && <span className="paper-score-n">({scoreCount})</span>}
+        </button>
+        {starOpen && (
+          <StarPicker
+            myScore={myScore}
+            onPick={(s) => {
+              onSetScore(s);
+              setStarOpen(false);
+            }}
+          />
+        )}
+      </div>
+
       {meta?.link && (
         <button
           className="paper-link-btn"
@@ -98,7 +201,10 @@ export default function PapersView(): React.ReactElement {
   const navigate = useNavigate();
   const { root, status } = usePapersRoot();
   const { papers, isLoading } = usePaperEntries(root);
-  const metas = usePaperMetas(root);
+  const { metas } = usePaperMetas(root);
+  const { summaryFor, toggleLike, setScore, canInteract } =
+    usePaperInteractions(root);
+  const views = usePaperViews(papers);
   const { stateFor, cycle } = useReadStates();
   const { menu: contextMenu, onContextMenu } = useDocContextMenu();
 
@@ -107,6 +213,7 @@ export default function PapersView(): React.ReactElement {
   const [month, setMonth] = useState<number | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [readFilter, setReadFilter] = useState<ReadState | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("recommended");
 
   const years = useMemo(
     () =>
@@ -150,6 +257,27 @@ export default function PapersView(): React.ReactElement {
     }
     return true;
   });
+
+  const sorted = useMemo(() => {
+    // papers arrive pre-sorted by recommendation time (usePaperEntries)
+    if (sortKey === "recommended") return filtered;
+    if (sortKey === "title") return sortDocsByTitle(filtered);
+    const cmp: Record<
+      Exclude<SortKey, "recommended" | "title">,
+      (p: PaperEntry) => number
+    > = {
+      views: (p) => views.get(p.id) ?? 0,
+      likes: (p) => summaryFor(p.id).likes,
+      score: (p) => {
+        const s = summaryFor(p.id);
+        // avg dominates; rater count breaks ties among equal averages
+        return (s.scoreAvg ?? 0) * 100 + s.scoreCount;
+      },
+    };
+    const key = cmp[sortKey];
+    return [...filtered].sort((a, b) => key(b) - key(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sortKey, views, summaryFor]);
 
   const readCount = papers.filter((p) => stateFor(p.id) === "read").length;
 
@@ -211,6 +339,18 @@ export default function PapersView(): React.ReactElement {
           <option value="reading">在读</option>
           <option value="read">已读</option>
         </select>
+        <select
+          className="papers-select"
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value as SortKey)}
+          title="排序"
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {allTags.length > 0 && (
@@ -234,20 +374,25 @@ export default function PapersView(): React.ReactElement {
         </p>
       )}
       {isLoading && <p className="papers-note">加载论文列表…</p>}
-      {status === "ready" && !isLoading && filtered.length === 0 && (
+      {status === "ready" && !isLoading && sorted.length === 0 && (
         <p className="papers-note">没有匹配的论文。</p>
       )}
 
       <div className="papers-list">
-        {filtered.map((p) => (
+        {sorted.map((p) => (
           <PaperRow
             key={p.id}
             paper={p}
             meta={metas.get(p.id)}
             readState={stateFor(p.id)}
+            interaction={summaryFor(p.id)}
+            viewCount={views.get(p.id)}
+            canInteract={canInteract}
             onOpen={() => navigate(`/document/${p.id}`)}
             onCycleRead={() => cycle(p.id)}
             onTagClick={(t) => setTag(tag === t ? null : t)}
+            onToggleLike={() => toggleLike(p.id)}
+            onSetScore={(s) => setScore(p.id, s)}
             onContextMenu={(e) =>
               onContextMenu(e, {
                 documentId: p.id,

@@ -173,6 +173,103 @@
   color: var(--color-primary);
 }
 
+/* views count in the meta line */
+.paper-views {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* like button */
+.paper-like-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.paper-like-btn:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.paper-like-btn.liked {
+  color: var(--color-primary);
+}
+
+/* star rating chip + popover */
+.paper-score-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.paper-score-chip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.paper-score-chip:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.paper-score-chip.rated {
+  color: var(--color-star, #f5a623);
+}
+
+.paper-score-n {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.paper-star-pop {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  padding: 4px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.paper-star {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 3px;
+  color: var(--color-border);
+  cursor: pointer;
+  transition: color 0.05s;
+}
+
+.paper-star.on {
+  color: var(--color-star, #f5a623);
+}
+
 .paper-read-badge {
   flex-shrink: 0;
   border: 1px solid var(--color-border);
