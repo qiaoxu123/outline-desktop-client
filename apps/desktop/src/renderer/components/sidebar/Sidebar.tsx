@@ -762,17 +762,14 @@ export default function Sidebar(): React.ReactElement {
           </svg>,
           true,
         )}
-      </nav>
-
-      <div className="sb-scroll">
-      <nav className="sb-nav">
+        <span className="sb-nav-divider" aria-hidden="true">｜</span>
         {navItem(
           "/discuss",
           "讨论区",
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M1.5 3A1.5 1.5 0 013 1.5h7A1.5 1.5 0 0111.5 3v5A1.5 1.5 0 0110 9.5H5l-2.5 2.5v-2.5H3A1.5 1.5 0 011.5 8V3zm11.5 2h.5A1.5 1.5 0 0115 6.5v5a1.5 1.5 0 01-1.5 1.5h-.5v2.5L10.5 13H6.8l1.5-1.5H13V5z" />
           </svg>,
-          false,
+          true,
           discussNew,
         )}
         {navItem(
@@ -781,6 +778,7 @@ export default function Sidebar(): React.ReactElement {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M3 1.5h7.5L14 5v8.5A1.5 1.5 0 0112.5 15h-9A1.5 1.5 0 012 13.5v-10A1.5 1.5 0 013 1.5H3zm7 1.5H3.5v10.5h9V6H10V3zm-5 5h6v1.2H5V8zm0 2.6h6v1.2H5v-1.2z" />
           </svg>,
+          true,
         )}
         {navItem(
           "/quiz",
@@ -788,18 +786,20 @@ export default function Sidebar(): React.ReactElement {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M3 1.5h10A1.5 1.5 0 0114.5 3v8A1.5 1.5 0 0113 12.5H8.4l-3 2.6a.6.6 0 01-1-.46V12.5H3A1.5 1.5 0 011.5 11V3A1.5 1.5 0 013 1.5zm5 2.1a2 2 0 00-1.98 1.71l1.28.2A.72.72 0 118 7.2a.64.64 0 00-.64.64v.86h1.28v-.42A2 2 0 008 3.6zm-.64 5.3v1.28h1.28V8.9H7.36z" />
           </svg>,
+          true,
         )}
         {navItem(
           "/shares",
           "共享链接",
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M13.5 4.5a2.5 2.5 0 10-2.45-2H11a4.5 4.5 0 00-4.39 3.55 2.5 2.5 0 100 4.9A4.5 4.5 0 0011 14h.05a2.5 2.5 0 102.45-3 2.49 2.49 0 00-1.8.77A3.49 3.49 0 0111 12.5h-.05a2.5 2.5 0 000-4.99H11c.27 0 .53.03.78.09.43.49 1.05.8 1.72.8z" opacity="0" />
-            <path d="M11 2a3 3 0 100 6c.35 0 .69-.06 1-.17v.34A3 3 0 1011 14a3 3 0 002.83-4H14a3 3 0 00-3-8zm-6 4a3 3 0 100 6 3 3 0 000-6z" opacity="0" />
             <path d="M4.715 6.542L3.343 7.914a3 3 0 104.243 4.243l1.828-1.829A3 3 0 008.586 5.5L8 6.086a1 1 0 00-.154.199 2 2 0 01.861 3.337L6.88 11.45a2 2 0 11-2.83-2.83l.793-.792a4 4 0 01-.128-1.287z" />
             <path d="M6.586 4.672A3 3 0 007.414 9.5l.775-.776a2 2 0 01-.896-3.346L9.12 3.55a2 2 0 113.03 2.61l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 10-4.243-4.243L6.586 4.672z" />
           </svg>,
+          true,
         )}
       </nav>
+
+      <div className="sb-scroll">
 
       {starred.length > 0 && (
         <div className="sb-section">

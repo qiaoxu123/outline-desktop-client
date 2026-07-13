@@ -42,11 +42,14 @@
 .sb-quick-nav {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 2px;
   padding: 0 10px 6px;
 }
 
 .sb-nav-item.icon-only {
+  position: relative;
   justify-content: center;
   padding: 6px;
   gap: 0;
@@ -54,6 +57,27 @@
 
 .sb-nav-item.icon-only svg {
   opacity: 0.75;
+}
+
+/* divider between the content-space icons and 设置 */
+.sb-nav-divider {
+  color: var(--color-text-muted);
+  opacity: 0.45;
+  font-size: 14px;
+  user-select: none;
+  margin: 0 1px;
+}
+
+/* unread badge shrinks to a corner dot when the entry is icon-only */
+.sb-nav-item.icon-only .sb-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  margin-left: 0;
 }
 
 /* primary nav */
