@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { MarkdownRenderer } from "../../lib/markdown/renderer";
+import { useUserInfo, roleLabel } from "../../hooks/useOutline";
 import { useQuiz, type Card, type Grade } from "./useQuiz";
 import { useCardInteractions } from "./useCardInteractions";
 import { QUIZ_CATEGORIES } from "./quizData";
@@ -204,7 +205,7 @@ function ReviewMode({
 
         {revealed ? (
           <div className="quiz-card-answer markdown-body">
-            <MarkdownRenderer content={card.answer || "（暂无参考答案）"} />
+            <MarkdownRenderer content={card.answer || "（暂无参考答案）"} breaks />
           </div>
         ) : (
           <button className="quiz-btn reveal" onClick={() => setRevealed(true)}>
@@ -234,6 +235,9 @@ function ReviewMode({
 
 /* ---------- add / edit form ---------- */
 
+/** Toolbar actions that wrap/prefix the current selection in the textarea. */
+type FormatKind = "bold" | "highlight" | "code" | "bullet" | "number" | "br";
+
 function CardForm({
   initial,
   onSave,
@@ -246,6 +250,78 @@ function CardForm({
   const [category, setCategory] = useState(initial?.category ?? QUIZ_CATEGORIES[0]);
   const [question, setQuestion] = useState(initial?.question ?? "");
   const [answer, setAnswer] = useState(initial?.answer ?? "");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Apply a markdown format to the current selection, then restore focus.
+  const applyFormat = (kind: FormatKind) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const before = answer.slice(0, start);
+    const sel = answer.slice(start, end);
+    const after = answer.slice(end);
+
+    let next = answer;
+    let caretStart = start;
+    let caretEnd = end;
+
+    const wrap = (mark: string, placeholder: string) => {
+      const body = sel || placeholder;
+      next = `${before}${mark}${body}${mark}${after}`;
+      caretStart = start + mark.length;
+      caretEnd = caretStart + body.length;
+    };
+    const prefixLines = (prefix: (i: number) => string) => {
+      const body = sel || "要点";
+      const lines = body.split("\n");
+      const out = lines.map((ln, i) => `${prefix(i)}${ln}`).join("\n");
+      // ensure the list starts on its own line
+      const lead = before.length === 0 || before.endsWith("\n") ? "" : "\n";
+      next = `${before}${lead}${out}${after}`;
+      caretStart = start + lead.length;
+      caretEnd = caretStart + out.length;
+    };
+
+    switch (kind) {
+      case "bold":
+        wrap("**", "重点");
+        break;
+      case "highlight":
+        wrap("==", "高亮");
+        break;
+      case "code":
+        wrap("`", "code");
+        break;
+      case "bullet":
+        prefixLines(() => "- ");
+        break;
+      case "number":
+        prefixLines((i) => `${i + 1}. `);
+        break;
+      case "br": {
+        // hard line break at the caret
+        next = `${before}\n${after}`;
+        caretStart = caretEnd = start + 1;
+        break;
+      }
+    }
+
+    setAnswer(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(caretStart, caretEnd);
+    });
+  };
+
+  const TOOLS: { kind: FormatKind; label: string; title: string }[] = [
+    { kind: "bold", label: "加粗", title: "**重点**" },
+    { kind: "highlight", label: "高亮", title: "==高亮==（黄底标记）" },
+    { kind: "code", label: "代码", title: "`code`" },
+    { kind: "bullet", label: "• 列表", title: "无序列表" },
+    { kind: "number", label: "1. 列表", title: "有序列表" },
+    { kind: "br", label: "↵ 换行", title: "插入换行（题库中单个换行即生效）" },
+  ];
 
   return (
     <div className="quiz-form">
@@ -267,12 +343,39 @@ function CardForm({
         onChange={(e) => setQuestion(e.target.value)}
         autoFocus
       />
+
+      <div className="quiz-format-toolbar">
+        {TOOLS.map((t) => (
+          <button
+            key={t.kind}
+            type="button"
+            className="quiz-fmt-btn"
+            title={t.title}
+            onMouseDown={(e) => e.preventDefault() /* keep textarea selection */}
+            onClick={() => applyFormat(t.kind)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <textarea
+        ref={taRef}
         className="quiz-input quiz-textarea"
-        placeholder="参考答案（可留空）"
+        placeholder="参考答案（支持 Markdown：**加粗** ==高亮== `代码` - 列表；直接回车即换行）"
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
       />
+
+      {answer.trim() && (
+        <div className="quiz-form-preview">
+          <div className="quiz-form-preview-label">预览</div>
+          <div className="quiz-row-answer markdown-body">
+            <MarkdownRenderer content={answer} breaks />
+          </div>
+        </div>
+      )}
+
       <div className="quiz-form-actions">
         <button className="quiz-btn ghost" onClick={onCancel}>
           取消
@@ -313,6 +416,9 @@ export default function QuizView(): React.ReactElement {
   };
 
   const ix = useCardInteractions();
+  const { user } = useUserInfo();
+  const isAdmin = !!(user?.isAdmin || (user?.role ?? "").toLowerCase() === "admin");
+
   const [mode, setMode] = useState<"browse" | "review">("browse");
   const [reviewQueue, setReviewQueue] = useState<Card[]>([]);
   const [q, setQ] = useState("");
@@ -376,7 +482,8 @@ export default function QuizView(): React.ReactElement {
         <div>
           <h2>自测题库</h2>
           <p className="quiz-hint">
-            Anki 式间隔重排 — 翻卡自评，系统按记忆曲线安排下次复习。数据仅存于本机。
+            Anki 式间隔重排 — 翻卡自评，系统按记忆曲线安排下次复习。题库全组共享，进度按各自账号保存。
+            {isAdmin ? "（你是管理员，可编辑题目）" : `（题目由管理员维护，你的身份：${roleLabel(user)}）`}
           </p>
         </div>
         <div className="quiz-stats">
@@ -399,9 +506,11 @@ export default function QuizView(): React.ReactElement {
             ? `开始复习（${dueCards.length} 张）`
             : "今日已全部复习 🎉"}
         </button>
-        <button className="quiz-btn ghost" onClick={() => setAdding(true)}>
-          + 添加题目
-        </button>
+        {isAdmin && (
+          <button className="quiz-btn ghost" onClick={() => setAdding(true)}>
+            + 添加题目
+          </button>
+        )}
         <button
           className="quiz-btn ghost"
           title="清空所有复习进度（题目保留）"
@@ -440,7 +549,7 @@ export default function QuizView(): React.ReactElement {
         ))}
       </div>
 
-      {adding && (
+      {adding && isAdmin && (
         <CardForm
           onSave={(data) => {
             addCard(data);
@@ -461,7 +570,7 @@ export default function QuizView(): React.ReactElement {
               const isOpen = expanded.has(c.id);
               return (
                 <div key={c.id} className={`quiz-row ${status}`}>
-                  {editingId === c.id ? (
+                  {editingId === c.id && isAdmin ? (
                     <CardForm
                       initial={c}
                       onSave={(data) => {
@@ -484,24 +593,27 @@ export default function QuizView(): React.ReactElement {
                           <div className="quiz-row-answer markdown-body">
                             <MarkdownRenderer
                               content={c.answer || "（暂无参考答案，点编辑补充）"}
+                              breaks
                             />
                           </div>
-                          <div className="quiz-row-tools">
-                            <button
-                              className="quiz-btn ghost sm"
-                              onClick={() => setEditingId(c.id)}
-                            >
-                              编辑
-                            </button>
-                            <button
-                              className="quiz-btn ghost sm danger"
-                              onClick={() => {
-                                if (confirm("删除这道题？")) deleteCard(c.id);
-                              }}
-                            >
-                              删除
-                            </button>
-                          </div>
+                          {isAdmin && (
+                            <div className="quiz-row-tools">
+                              <button
+                                className="quiz-btn ghost sm"
+                                onClick={() => setEditingId(c.id)}
+                              >
+                                编辑
+                              </button>
+                              <button
+                                className="quiz-btn ghost sm danger"
+                                onClick={() => {
+                                  if (confirm("删除这道题？")) deleteCard(c.id);
+                                }}
+                              >
+                                删除
+                              </button>
+                            </div>
+                          )}
                           <CardInteractionBar cardId={c.id} ix={ix} />
                         </div>
                       )}
