@@ -783,6 +783,13 @@ export default function Sidebar(): React.ReactElement {
           </svg>,
         )}
         {navItem(
+          "/quiz",
+          "自测题库",
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M3 1.5h10A1.5 1.5 0 0114.5 3v8A1.5 1.5 0 0113 12.5H8.4l-3 2.6a.6.6 0 01-1-.46V12.5H3A1.5 1.5 0 011.5 11V3A1.5 1.5 0 013 1.5zm5 2.1a2 2 0 00-1.98 1.71l1.28.2A.72.72 0 118 7.2a.64.64 0 00-.64.64v.86h1.28v-.42A2 2 0 008 3.6zm-.64 5.3v1.28h1.28V8.9H7.36z" />
+          </svg>,
+        )}
+        {navItem(
           "/shares",
           "共享链接",
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">

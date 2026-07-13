@@ -7,6 +7,7 @@ import HomeView from "./features/home/HomeView";
 import SharesView from "./features/shares/SharesView";
 import DiscussView from "./features/discuss/DiscussView";
 import PapersView from "./features/papers/PapersView";
+import QuizView from "./features/quiz/QuizView";
 import SearchView from "./features/search/SearchView";
 import SettingsView from "./features/profiles/SettingsView";
 import LoginScreen from "./features/auth/LoginScreen";
@@ -190,6 +191,7 @@ export default function App(): React.ReactElement {
               <Route path="/shares" element={<SharesView />} />
               <Route path="/discuss" element={<DiscussView />} />
               <Route path="/papers" element={<PapersView />} />
+              <Route path="/quiz" element={<QuizView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/settings" element={<SettingsView />} />
             </Route>
