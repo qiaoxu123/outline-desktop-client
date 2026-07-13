@@ -196,6 +196,7 @@ interface Viewer {
   id: string;
   user: { id: string; name: string; avatarUrl?: string | null };
   lastViewedAt?: string;
+  count?: number;
 }
 
 function Viewers({ documentId }: { documentId: string }): React.ReactElement | null {
@@ -215,6 +216,8 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
 
   const viewers = data?.data ?? [];
   if (viewers.length === 0) return null;
+
+  const totalViews = viewers.reduce((sum, v) => sum + (v.count ?? 1), 0);
 
   // Most recent first, cap at 5 avatars + overflow count
   const sorted = [...viewers].sort((a, b) =>
@@ -246,6 +249,12 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
         );
       })}
       {extra > 0 && <div className="viewer-avatar viewer-more">+{extra}</div>}
+      <span
+        className="viewer-count"
+        title={`${sorted.length} 人浏览过，共 ${totalViews} 次`}
+      >
+        {totalViews} 次浏览
+      </span>
     </div>
   );
 }
@@ -709,6 +718,17 @@ function CommentIcon(): React.ReactElement {
   );
 }
 
+function HistoryIcon(): React.ReactElement {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+    >
+      <path d="M8 2.5a5.5 5.5 0 11-5.3 4M2.5 3v3.5H6" />
+      <path d="M8 5.5V8l2 1.5" />
+    </svg>
+  );
+}
+
 /* ---------- always-on editor (editors): open == editable, autosaves ---------- */
 
 function EditableDocument({
@@ -905,26 +925,26 @@ function EditableDocument({
             </svg>
           </button>
           <button
-            className={`document-button subtle ${panel === "comments" ? "active" : ""}`}
+            className={`document-icon-button ${panel === "comments" ? "active" : ""}`}
             onClick={() => {
               if (isDiscussTopic) scrollToInlineComments();
               else setPanel(panel === "comments" ? "none" : "comments");
             }}
-            title={isDiscussTopic ? "跳到回复" : "评论"}
+            title={`${isDiscussTopic ? "回复" : "评论"}${commentCount > 0 ? ` (${commentCount})` : ""}`}
           >
             <CommentIcon />
-            <span>
-              {isDiscussTopic ? "回复" : "评论"}
-              {commentCount > 0 ? ` ${commentCount}` : ""}
-            </span>
+            {commentCount > 0 && (
+              <span className="icon-button-count">{commentCount}</span>
+            )}
           </button>
           <button
-            className={`document-button subtle ${panel === "history" ? "active" : ""}`}
+            className={`document-icon-button ${panel === "history" ? "active" : ""}`}
             onClick={() =>
               setPanel(panel === "history" ? "none" : "history")
             }
+            title="历史版本"
           >
-            历史
+            <HistoryIcon />
           </button>
         </div>
       </TopRightActions>
@@ -1028,7 +1048,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
             </svg>
           </button>
           <button
-            className={`document-button subtle ${commentsOpen ? "active" : ""}`}
+            className={`document-icon-button ${commentsOpen ? "active" : ""}`}
             onClick={() => {
               if (isDiscussTopic) {
                 inlineCommentsRef.current?.scrollIntoView({
@@ -1039,13 +1059,12 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
                 setCommentsOpen(!commentsOpen);
               }
             }}
-            title={isDiscussTopic ? "跳到回复" : "评论"}
+            title={`${isDiscussTopic ? "回复" : "评论"}${commentCount > 0 ? ` (${commentCount})` : ""}`}
           >
             <CommentIcon />
-            <span>
-              {isDiscussTopic ? "回复" : "评论"}
-              {commentCount > 0 ? ` ${commentCount}` : ""}
-            </span>
+            {commentCount > 0 && (
+              <span className="icon-button-count">{commentCount}</span>
+            )}
           </button>
         </div>
       </TopRightActions>
@@ -1114,6 +1133,23 @@ export default function DocumentView(): React.ReactElement {
     if (!documentId) return;
     openTab({ documentId, title: "加载中…" });
   }, [documentId, openTab]);
+
+  // Record a view (like web) so 浏览次数 counts desktop reads too, then
+  // refresh the viewers row.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!documentId || !activeProfileId) return;
+    void (async () => {
+      try {
+        await api.call(activeProfileId, "views.create", { documentId });
+        await queryClient.invalidateQueries({
+          queryKey: ["profile", activeProfileId, "views", documentId],
+        });
+      } catch {
+        /* view tracking is best-effort */
+      }
+    })();
+  }, [documentId, activeProfileId, api, queryClient]);
 
   useEffect(() => {
     if (documentId && data?.data) {
