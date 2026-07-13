@@ -39,6 +39,20 @@
   font-weight: 600;
 }
 
+.quiz-sync {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.quiz-sync.saving {
+  color: var(--color-primary);
+}
+.quiz-sync.offline {
+  color: #e8590c;
+}
+.quiz-sync.synced {
+  color: #2f9e44;
+}
+
 /* action bar */
 .quiz-actions-bar {
   display: flex;

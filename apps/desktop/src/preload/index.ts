@@ -30,6 +30,11 @@ export interface ElectronAPI {
     requestEmailLogin: (email: string) => Promise<unknown>;
     completeEmailLogin: (input: string, email?: string) => Promise<unknown>;
   };
+  /** WebDAV storage for the self-test quiz (paths under the shared quiz dir). */
+  webdav: {
+    get: (path: string) => Promise<unknown>;
+    put: (path: string, content: string) => Promise<unknown>;
+  };
   /** Whitelisted pass-through to the Outline API (see main api.ts). */
   call: (
     profileId: string,
@@ -81,6 +86,10 @@ const api: ElectronAPI = {
       ipcRenderer.invoke("auth:requestEmailLogin", { email }),
     completeEmailLogin: (input, email) =>
       ipcRenderer.invoke("auth:completeEmailLogin", { input, email }),
+  },
+  webdav: {
+    get: (path) => ipcRenderer.invoke("webdav:get", { path }),
+    put: (path, content) => ipcRenderer.invoke("webdav:put", { path, content }),
   },
   call: (profileId, method, params) =>
     ipcRenderer.invoke("api:call", { profileId, method, params }),

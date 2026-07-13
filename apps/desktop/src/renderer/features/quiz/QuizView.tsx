@@ -155,7 +155,7 @@ function CardForm({
 export default function QuizView(): React.ReactElement {
   const {
     cards,
-    today,
+    sync,
     statusFor,
     dueCards,
     counts,
@@ -165,6 +165,13 @@ export default function QuizView(): React.ReactElement {
     deleteCard,
     resetProgress,
   } = useQuiz();
+
+  const SYNC_LABEL: Record<string, string> = {
+    loading: "载入中…",
+    saving: "同步中…",
+    synced: "已同步",
+    offline: "离线（本地已存）",
+  };
 
   const [mode, setMode] = useState<"browse" | "review">("browse");
   const [reviewQueue, setReviewQueue] = useState<Card[]>([]);
@@ -235,6 +242,9 @@ export default function QuizView(): React.ReactElement {
           <span>共 {counts.total}</span>
           <span className="quiz-stat-due">待复习 {counts.due + counts.new}</span>
           <span>已掌握 {counts.done}</span>
+          <span className={`quiz-sync ${sync}`} title="题库与进度同步到坚果云 WebDAV">
+            {SYNC_LABEL[sync]}
+          </span>
         </div>
       </header>
 
