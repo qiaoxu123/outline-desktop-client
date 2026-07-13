@@ -744,6 +744,8 @@ function EditableDocument({
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const showToc = useUIStore((s) => s.showToc);
+  const queryClient = useQueryClient();
+  const updateTab = useTabsStore((s) => s.updateTab);
   const { starFor } = useStars();
   const { toggle: toggleStar, isPending: starPending } = useToggleStar();
   const star = starFor(doc.id);
@@ -828,22 +830,59 @@ function EditableDocument({
   // touches the (possibly torn-down) editor instance.
   const pendingRef = useRef({ title: doc.title, text: doc.text });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // last title the sidebar/tabs have been synced to; a save only refreshes
+  // those caches when the title actually changed (text edits don't)
+  const syncedTitleRef = useRef(doc.title);
 
   const doSave = useCallback(async () => {
     setSaveState("saving");
+    const savingTitle = pendingRef.current.title;
     try {
       await unwrapIpc(
         api.documents.update(activeProfileId!, {
           id: doc.id,
-          title: pendingRef.current.title,
+          title: savingTitle,
           text: pendingRef.current.text,
         }),
       );
       setSaveState("saved");
+      // The sidebar tree and tabs cache titles independently of the editor;
+      // refresh them so a renamed doc updates everywhere without a reload.
+      if (savingTitle !== syncedTitleRef.current) {
+        syncedTitleRef.current = savingTitle;
+        updateTab(doc.id, { title: savingTitle || "Untitled" });
+        void queryClient.invalidateQueries({
+          queryKey: [
+            "profile",
+            activeProfileId,
+            "collection",
+            doc.collectionId,
+            "documents",
+          ],
+        });
+        if (doc.parentDocumentId) {
+          void queryClient.invalidateQueries({
+            queryKey: [
+              "profile",
+              activeProfileId,
+              "children",
+              doc.parentDocumentId,
+            ],
+          });
+        }
+      }
     } catch {
       setSaveState("error");
     }
-  }, [api, activeProfileId, doc.id]);
+  }, [
+    api,
+    activeProfileId,
+    doc.id,
+    doc.collectionId,
+    doc.parentDocumentId,
+    queryClient,
+    updateTab,
+  ]);
 
   const scheduleSave = useCallback(() => {
     setSaveState("saving");
