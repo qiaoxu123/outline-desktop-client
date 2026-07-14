@@ -31,8 +31,8 @@ export interface ReviewState {
 type IpcResult<T> = { ok: boolean; data?: T; error?: { message: string } };
 type DavGet = { found: boolean; content: string | null };
 
-const BANK_FILE = "bank.json";
-const progressFile = (uid: string) => `progress-${uid}.json`;
+const BANK_FILE = "自测题库/bank.json";
+const progressFile = (uid: string) => `自测题库/progress-${uid}.json`;
 const BANK_CACHE = "quiz.bank.cache.v1";
 const reviewCache = (uid: string) => `quiz.review.cache.${uid}`;
 

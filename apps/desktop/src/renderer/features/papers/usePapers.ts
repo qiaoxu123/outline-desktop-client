@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUserInfo } from "../../hooks/useOutline";
@@ -247,9 +247,11 @@ export function parsePaperMeta(text: string): PaperMeta {
   };
 }
 
-/* ---------- shared likes/ratings registry (one doc in the collection) ---------- */
+/* ---------- shared likes / star ratings ---------- */
 
-export const REGISTRY_TITLE = "⚙️ 论文互动数据（客户端自动维护，请勿手动编辑）";
+// Legacy: interactions used to live in an Outline doc titled with this prefix.
+// It now lives on WebDAV (see usePaperInteractions); the prefix is kept only so
+// any leftover/unarchived registry doc is never mistaken for a paper.
 const REGISTRY_TITLE_PREFIX = "⚙️ 论文互动数据";
 
 export interface InteractionEntry {
@@ -268,36 +270,11 @@ export interface InteractionData {
 
 const EMPTY_INTERACTIONS: InteractionData = { version: 1, papers: {} };
 
-export function parseRegistry(text: string): InteractionData | null {
-  const m = /```json\s*\n([\s\S]*?)\n```/.exec(text);
-  if (!m) return null;
-  try {
-    const data = JSON.parse(m[1]) as InteractionData;
-    return data && typeof data.papers === "object" ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-export function serializeRegistry(data: InteractionData): string {
-  return [
-    "本文档由 Outline Desktop 客户端自动维护，存放论文库的点赞与评分数据。",
-    "**请勿手动编辑**（手动改动可能被覆盖或导致数据丢失）。",
-    "",
-    "```json",
-    JSON.stringify(data, null, 2),
-    "```",
-    "",
-  ].join("\n");
-}
-
-const META_CACHE_KEY = "papers.metaCache.v2";
+const META_CACHE_KEY = "papers.metaCache.v3";
 
 interface MetaCache {
   savedAt: string;
   metas: Record<string, PaperMeta>;
-  registryDocId: string | null;
-  registry: InteractionData | null;
 }
 
 function readMetaCache(): MetaCache | null {
@@ -319,8 +296,6 @@ function readMetaCache(): MetaCache | null {
  */
 export interface PapersMetaResult {
   metas: Record<string, PaperMeta>;
-  registryDocId: string | null;
-  registry: InteractionData | null;
 }
 
 export function papersMetaQueryKey(
@@ -332,8 +307,6 @@ export function papersMetaQueryKey(
 
 export function usePaperMetas(root: PapersRoot | null): {
   metas: Map<string, PaperMeta>;
-  registryDocId: string | null;
-  registry: InteractionData;
 } {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
@@ -342,8 +315,6 @@ export function usePaperMetas(root: PapersRoot | null): {
     queryKey: papersMetaQueryKey(activeProfileId, root?.collectionId),
     queryFn: async (): Promise<PapersMetaResult> => {
       const metas: Record<string, PaperMeta> = {};
-      let registryDocId: string | null = null;
-      let registry: InteractionData | null = null;
       for (let offset = 0; offset < 1000; offset += 100) {
         const page = await unwrapIpc<{ data: OutlineDocument[] }>(
           api.call(activeProfileId!, "documents.list", {
@@ -354,28 +325,24 @@ export function usePaperMetas(root: PapersRoot | null): {
         );
         const docs = page.data ?? [];
         for (const d of docs) {
-          if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) {
-            // the shared likes/ratings registry rides along in the same sweep
-            registryDocId = d.id;
-            if (typeof d.text === "string") registry = parseRegistry(d.text);
-            continue;
-          }
+          // skip any leftover legacy interaction registry doc
+          if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) continue;
           if (typeof d.text === "string") metas[d.id] = parsePaperMeta(d.text);
         }
         if (docs.length < 100) break;
       }
-      const cache: MetaCache = {
-        savedAt: new Date().toISOString(),
-        metas,
-        registryDocId,
-        registry,
-      };
       try {
-        localStorage.setItem(META_CACHE_KEY, JSON.stringify(cache));
+        localStorage.setItem(
+          META_CACHE_KEY,
+          JSON.stringify({
+            savedAt: new Date().toISOString(),
+            metas,
+          } satisfies MetaCache),
+        );
       } catch {
         // cache write is best-effort (quota etc.)
       }
-      return { metas, registryDocId, registry };
+      return { metas };
     },
     enabled: !!activeProfileId && !!root,
     staleTime: 10 * 60_000,
@@ -383,13 +350,7 @@ export function usePaperMetas(root: PapersRoot | null): {
     // refresh still happens
     initialData: () => {
       const cache = readMetaCache();
-      return cache
-        ? {
-            metas: cache.metas,
-            registryDocId: cache.registryDocId ?? null,
-            registry: cache.registry ?? null,
-          }
-        : undefined;
+      return cache ? { metas: cache.metas } : undefined;
     },
     initialDataUpdatedAt: () => {
       const cache = readMetaCache();
@@ -399,8 +360,6 @@ export function usePaperMetas(root: PapersRoot | null): {
 
   return {
     metas: new Map(Object.entries(data?.metas ?? {})),
-    registryDocId: data?.registryDocId ?? null,
-    registry: data?.registry ?? EMPTY_INTERACTIONS,
   };
 }
 
@@ -446,12 +405,48 @@ export function summarizeInteractions(
 }
 
 /**
- * Toggle-like / set-score against the shared registry document.
- * Writes are read-modify-write on the latest server text, merging ONLY the
+ * Shared likes / star ratings, stored on WebDAV (坚果云) so the whole team sees
+ * the same numbers — no longer an Outline document. The file lives at
+ * 论文库/interactions.json under the app-data root.
+ *
+ * Writes are read-modify-write on the latest server copy, merging ONLY the
  * current user's entry (lab-scale traffic; last-writer-wins acceptable).
- * Consecutive clicks are chained so they can't clobber each other locally.
+ * Consecutive clicks are chained so they can't clobber each other locally;
+ * localStorage mirrors the file for instant paint + offline reads.
  */
-export function usePaperInteractions(root: PapersRoot | null): {
+const PAPER_IX_FILE = "论文库/interactions.json";
+const PAPER_IX_CACHE = "papers.interactions.cache.v1";
+
+type IpcResult<T> = { ok: boolean; data?: T; error?: { message: string } };
+type DavGet = { found: boolean; content: string | null };
+
+function readPaperIxCache(): InteractionData {
+  try {
+    const raw = localStorage.getItem(PAPER_IX_CACHE);
+    const d = raw ? (JSON.parse(raw) as InteractionData) : null;
+    return d && typeof d.papers === "object" ? d : EMPTY_INTERACTIONS;
+  } catch {
+    return EMPTY_INTERACTIONS;
+  }
+}
+function writePaperIxCache(v: InteractionData): void {
+  try {
+    localStorage.setItem(PAPER_IX_CACHE, JSON.stringify(v));
+  } catch {
+    /* best-effort */
+  }
+}
+function parseInteractions(content: string | null | undefined): InteractionData {
+  if (!content) return EMPTY_INTERACTIONS;
+  try {
+    const d = JSON.parse(content) as InteractionData;
+    return d && typeof d.papers === "object" ? d : EMPTY_INTERACTIONS;
+  } catch {
+    return EMPTY_INTERACTIONS;
+  }
+}
+
+export function usePaperInteractions(_root: PapersRoot | null): {
   registry: InteractionData;
   summaryFor: (paperId: string) => PaperInteractionSummary;
   toggleLike: (paperId: string) => void;
@@ -459,60 +454,43 @@ export function usePaperInteractions(root: PapersRoot | null): {
   canInteract: boolean;
 } {
   const api = useElectronAPI();
-  const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { user } = useUserInfo();
-  const queryClient = useQueryClient();
-  const { registry, registryDocId } = usePaperMetas(root);
+  const [registry, setRegistry] = useState<InteractionData>(() =>
+    readPaperIxCache(),
+  );
   const chainRef = useRef<Promise<void>>(Promise.resolve());
-  // survives across renders within the session so a just-created registry doc
-  // is reused by follow-up writes even before the next meta refresh
-  const docIdRef = useRef<string | null>(null);
-  if (registryDocId) docIdRef.current = registryDocId;
+  const loaded = useRef(false);
 
-  const apply = (patch: { like?: boolean; score?: number | null }, paperId: string) => {
-    if (!activeProfileId || !user || !root) return;
-    const metaKey = papersMetaQueryKey(activeProfileId, root.collectionId);
+  useEffect(() => {
+    if (loaded.current) return;
+    loaded.current = true;
+    void (async () => {
+      const res = (await api.webdav.get(PAPER_IX_FILE)) as IpcResult<DavGet>;
+      if (res.ok && res.data?.found) {
+        const remote = parseInteractions(res.data.content);
+        setRegistry(remote);
+        writePaperIxCache(remote);
+      }
+    })();
+  }, [api]);
 
-    // optimistic local update
-    queryClient.setQueryData<PapersMetaResult>(metaKey, (old) => {
-      if (!old) return old;
-      const base = old.registry ?? EMPTY_INTERACTIONS;
-      const next = mergeEntry(base, paperId, user.id, user.name ?? "", patch);
-      return { ...old, registry: next };
+  // optimistic local mutation + read-modify-write to WebDAV
+  const commit = (mutate: (cur: InteractionData) => InteractionData) => {
+    setRegistry((prev) => {
+      const next = mutate(prev);
+      writePaperIxCache(next);
+      return next;
     });
-
     chainRef.current = chainRef.current.then(async () => {
       try {
-        let docId = docIdRef.current;
-        let latest: InteractionData = EMPTY_INTERACTIONS;
-        if (docId) {
-          const info = await unwrapIpc<{ data: OutlineDocument }>(
-            api.documents.info(activeProfileId, docId),
-          );
-          latest = parseRegistry(info.data.text ?? "") ?? EMPTY_INTERACTIONS;
-        }
-        const next = mergeEntry(latest, paperId, user.id, user.name ?? "", patch);
-        const text = serializeRegistry(next);
-        if (docId) {
-          await unwrapIpc(
-            api.call(activeProfileId, "documents.update", { id: docId, text }),
-          );
-        } else {
-          const created = await unwrapIpc<{ data: OutlineDocument }>(
-            api.call(activeProfileId, "documents.create", {
-              title: REGISTRY_TITLE,
-              text,
-              collectionId: root.collectionId,
-              publish: true,
-            }),
-          );
-          docId = created.data.id;
-          docIdRef.current = docId;
-        }
-        // reconcile the cache with what the server now holds
-        queryClient.setQueryData<PapersMetaResult>(metaKey, (old) =>
-          old ? { ...old, registry: next, registryDocId: docId } : old,
-        );
+        const res = (await api.webdav.get(PAPER_IX_FILE)) as IpcResult<DavGet>;
+        const latest = res.ok && res.data?.found
+          ? parseInteractions(res.data.content)
+          : EMPTY_INTERACTIONS;
+        const merged = mutate(latest);
+        await api.webdav.put(PAPER_IX_FILE, JSON.stringify(merged, null, 2));
+        setRegistry(merged);
+        writePaperIxCache(merged);
       } catch (err) {
         console.error("[papers] interaction write failed:", err);
       }
@@ -526,11 +504,19 @@ export function usePaperInteractions(root: PapersRoot | null): {
     registry,
     summaryFor,
     toggleLike: (paperId) => {
+      if (!user) return;
       const mine = summaryFor(paperId).myLike;
-      apply({ like: !mine }, paperId);
+      commit((cur) =>
+        mergeEntry(cur, paperId, user.id, user.name ?? "", { like: !mine }),
+      );
     },
-    setScore: (paperId, score) => apply({ score }, paperId),
-    canInteract: !!user && !!activeProfileId && !!root,
+    setScore: (paperId, score) => {
+      if (!user) return;
+      commit((cur) =>
+        mergeEntry(cur, paperId, user.id, user.name ?? "", { score }),
+      );
+    },
+    canInteract: !!user,
   };
 }
 

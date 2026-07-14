@@ -31,7 +31,7 @@ export type Interactions = Record<string, CardEntry>;
 type IpcResult<T> = { ok: boolean; data?: T; error?: { message: string } };
 type DavGet = { found: boolean; content: string | null };
 
-const FILE = "interactions.json";
+const FILE = "自测题库/interactions.json";
 const CACHE = "quiz.interactions.cache.v1";
 
 function readCache(): Interactions {

@@ -2,7 +2,13 @@ import { ipcMain, net } from "electron";
 import { z } from "zod";
 
 /**
- * WebDAV storage for the self-test quiz (坚果云 / Jianguoyun).
+ * WebDAV storage for client-maintained app data (坚果云 / Jianguoyun).
+ *
+ * All data the desktop client keeps outside Outline's own document model lives
+ * here under one app-data root, one subfolder per feature:
+ *   5-共享/Outline桌面端/自测题库/  → quiz bank + per-user progress + interactions
+ *   5-共享/Outline桌面端/论文库/    → paper likes/ratings (interactions.json)
+ * Callers pass a path relative to the root, e.g. "论文库/interactions.json".
  *
  * Routed through the main process because the renderer can't do WebDAV
  * (custom methods + Basic auth + external host) without hitting CORS.
@@ -14,7 +20,7 @@ import { z } from "zod";
 const DAV_BASE = "https://dav.jianguoyun.com/dav";
 const DAV_USER = "1728094659@qq.com";
 const DAV_PASS = "aybxiymcadgqqe9s";
-const DAV_DIR = "5-共享/outline自测题库";
+const DAV_ROOT = "5-共享/Outline桌面端";
 
 const AUTH_HEADER =
   "Basic " + Buffer.from(`${DAV_USER}:${DAV_PASS}`).toString("base64");
@@ -26,13 +32,41 @@ function fail(code: string, message: string) {
   return { ok: false as const, error: { code, message } };
 }
 
-/** Build the full URL for a file under the quiz dir, per-segment encoded. */
-function davUrl(relPath: string): string {
-  const segments = `${DAV_DIR}/${relPath}`
+/** Build a full URL from a path relative to DAV_BASE, per-segment encoded. */
+function urlFor(rel: string): string {
+  return `${DAV_BASE}/${rel
     .split("/")
     .filter(Boolean)
-    .map(encodeURIComponent);
-  return `${DAV_BASE}/${segments.join("/")}`;
+    .map(encodeURIComponent)
+    .join("/")}`;
+}
+
+/** A caller path is confined to the app root and may not escape it. */
+function rootPath(path: string): string {
+  return `${DAV_ROOT}/${path}`;
+}
+function isSafe(path: string): boolean {
+  return !path.split("/").some((seg) => seg === ".." || seg === ".");
+}
+
+/** MKCOL each ancestor collection of a file so PUT never 409s on a missing
+ * parent. Idempotent: 405/301 mean the collection already exists. */
+async function ensureParents(fileRel: string): Promise<void> {
+  const parts = fileRel.split("/").filter(Boolean);
+  parts.pop(); // drop the filename
+  let acc = "";
+  for (const seg of parts) {
+    acc = acc ? `${acc}/${seg}` : seg;
+    try {
+      await net.fetch(urlFor(acc) + "/", {
+        method: "MKCOL",
+        headers: { Authorization: AUTH_HEADER },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      // best-effort; the PUT below surfaces any real failure
+    }
+  }
 }
 
 const GetSchema = z.object({ path: z.string().min(1) });
@@ -42,9 +76,10 @@ export function registerWebdavHandlers(): void {
   // Fetch a file's text; { found: false } on 404 (not an error).
   ipcMain.handle("webdav:get", async (_event, payload: unknown) => {
     const parsed = GetSchema.safeParse(payload);
-    if (!parsed.success) return fail("VALIDATION", "path required");
+    if (!parsed.success || !isSafe(parsed.data.path))
+      return fail("VALIDATION", "invalid path");
     try {
-      const res = await net.fetch(davUrl(parsed.data.path), {
+      const res = await net.fetch(urlFor(rootPath(parsed.data.path)), {
         headers: { Authorization: AUTH_HEADER },
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),
@@ -60,9 +95,12 @@ export function registerWebdavHandlers(): void {
   // Upsert a file. Jianguoyun returns 201 (created) or 204 (overwritten).
   ipcMain.handle("webdav:put", async (_event, payload: unknown) => {
     const parsed = PutSchema.safeParse(payload);
-    if (!parsed.success) return fail("VALIDATION", "path and content required");
+    if (!parsed.success || !isSafe(parsed.data.path))
+      return fail("VALIDATION", "invalid path");
+    const rel = rootPath(parsed.data.path);
     try {
-      const res = await net.fetch(davUrl(parsed.data.path), {
+      await ensureParents(rel);
+      const res = await net.fetch(urlFor(rel), {
         method: "PUT",
         headers: {
           Authorization: AUTH_HEADER,

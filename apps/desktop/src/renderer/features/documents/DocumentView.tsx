@@ -312,6 +312,19 @@ function commentText(c: Comment): string {
   return "";
 }
 
+/**
+ * Text to highlight in the document for a comment.
+ * Web-anchored comments carry a server `anchorText`. Desktop comments can't
+ * persist an anchor mark through the markdown save path, so they quote the
+ * selection into the body as a 「…」 line — we recover that as the anchor so
+ * the commented spot still gets a highlight (best-effort; first exact match).
+ */
+function deriveAnchorText(c: Comment): string | null {
+  if (c.anchorText && c.anchorText.trim()) return c.anchorText.trim();
+  const m = /「([^」]+)」/.exec(commentText(c));
+  return m ? m[1].trim() : null;
+}
+
 function extractProseText(node: unknown): string {
   // Accept either a node ({ type, text?, content? }) or a raw content array,
   // so passing the whole doc node walks its children correctly.
@@ -802,8 +815,9 @@ function EditableDocument({
     () =>
       JSON.stringify(
         comments
-          .filter((c) => !c.parentCommentId && c.anchorText)
-          .map((c) => ({ id: c.id, anchorText: c.anchorText })),
+          .filter((c) => !c.parentCommentId)
+          .map((c) => ({ id: c.id, anchorText: deriveAnchorText(c) }))
+          .filter((a) => a.anchorText),
       ),
     [comments],
   );
