@@ -96,6 +96,11 @@ function PaperRow({
           {paper.emoji && <span>{paper.emoji} </span>}
           {paper.title.replace(/^📖\s*/, "")}
         </div>
+        {meta?.enTitle && (
+          <div className="paper-en-title" title={meta.enTitle}>
+            {meta.enTitle}
+          </div>
+        )}
         <div className="paper-meta-line">
           {paper.year && (
             <span className="paper-when">
@@ -266,7 +271,7 @@ export default function PapersView(): React.ReactElement {
     const meta = metas.get(p.id);
     if (tag !== null && !(meta?.tags ?? []).includes(tag)) return false;
     if (q.trim()) {
-      const hay = `${p.title} ${meta?.venue ?? ""} ${meta?.authors ?? ""} ${meta?.org ?? ""} ${(meta?.tags ?? []).join(" ")}`.toLowerCase();
+      const hay = `${p.title} ${meta?.enTitle ?? ""} ${meta?.venue ?? ""} ${meta?.authors ?? ""} ${meta?.org ?? ""} ${meta?.link ?? ""} ${(meta?.tags ?? []).join(" ")}`.toLowerCase();
       if (!hay.includes(q.trim().toLowerCase())) return false;
     }
     return true;

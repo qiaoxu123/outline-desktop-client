@@ -294,7 +294,20 @@ export interface PaperMeta {
   link: string | null;
   authors: string | null;
   org: string | null;
+  /** English paper title (from the 论文标题 row) — titles in the library are
+   * Chinese translations, so this is what makes English-title search work. */
+  enTitle: string | null;
   parsed: boolean;
+}
+
+/** Clean an English-title cell: unwrap `[text](url)`, strip markdown emphasis
+ * and surrounding quotes. Returns null for empty/placeholder values. */
+function normalizeEnTitle(raw: string | null): string | null {
+  if (!raw) return null;
+  let s = raw.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"); // [Title](url) → Title
+  s = s.replace(/[*_`]/g, "").replace(/^["'“”‘’\s]+|["'“”‘’\s]+$/g, "").trim();
+  if (!s || /^(无|n\/?a|none|-|—)$/i.test(s)) return null;
+  return s;
 }
 
 export function parsePaperMeta(text: string): PaperMeta {
@@ -325,6 +338,9 @@ export function parsePaperMeta(text: string): PaperMeta {
     link: linkMatch?.[1] ?? (rawLink && /^https?:/.test(rawLink) ? rawLink : null),
     authors: pick("作者"),
     org: pick("机构"),
+    enTitle: normalizeEnTitle(
+      pick("论文标题", "英文标题", "原文标题", "原标题", "英文题目", "标题", "Title"),
+    ),
     parsed: fields.size > 0,
   };
 }
@@ -352,7 +368,8 @@ export interface InteractionData {
 
 const EMPTY_INTERACTIONS: InteractionData = { version: 1, papers: {} };
 
-const META_CACHE_KEY = "papers.metaCache.v3";
+// v4: added enTitle (English title) so search can match untranslated titles.
+const META_CACHE_KEY = "papers.metaCache.v4";
 
 interface MetaCache {
   savedAt: string;
