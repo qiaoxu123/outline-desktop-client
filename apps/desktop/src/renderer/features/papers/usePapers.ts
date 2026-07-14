@@ -103,6 +103,10 @@ export interface PaperEntry {
 const YEAR_RE = /(\d{4})\s*年/;
 const MONTH_RE = /^(\d{1,2})\s*月/;
 const FEATURED_TITLE = "精选论文";
+/** 精选专题 was split out of 扩展学习 into its own top-level collection; its
+ * tree is topic folders (专题) containing 📖 papers — same shape as the old
+ * 精选论文 subtree, so collectFeatured handles it. */
+const FEATURED_COLLECTION_TITLE = "精选专题";
 
 /** Walk the 推荐阅读 subtree: 年/月 folders are containers, everything else
  * is a paper entry (its own children, if any, are appendices — not papers). */
@@ -240,23 +244,35 @@ export function usePaperEntries(root: PapersRoot | null): {
     },
   });
 
-  // 组内工作 collection — resolve by name, then pull its 📖 解读 docs so they
-  // appear in the library alongside 推荐阅读 / 精选论文.
-  const { data: iwData } = useQuery({
-    queryKey: ["profile", activeProfileId, "internal-work-docs"],
+  // Paper collections that live OUTSIDE 扩展学习 — resolved by name in one pass:
+  //  • 组内工作: its 📖 解读 docs
+  //  • 精选专题: topic-organised 📖 papers (split out of the old 精选论文 subtree)
+  const { data: extraData } = useQuery({
+    queryKey: ["profile", activeProfileId, "extra-paper-collections"],
     queryFn: async () => {
-      const cols = (
-        await unwrapIpc<{ data: OutlineCollection[] }>(
-          api.collections.list(activeProfileId!),
-        )
-      ).data;
-      const iw = (cols ?? []).find(
-        (c) => (c.name ?? "").trim() === INTERNAL_WORK_TITLE,
+      const cols =
+        (
+          await unwrapIpc<{ data: OutlineCollection[] }>(
+            api.collections.list(activeProfileId!),
+          )
+        ).data ?? [];
+      const load = async (id?: string): Promise<OutlineCollectionDocument[]> =>
+        id
+          ? (
+              await unwrapIpc<{ data: OutlineCollectionDocument[] }>(
+                api.collections.documents(activeProfileId!, id),
+              )
+            ).data ?? []
+          : [];
+      const iw = cols.find((c) => (c.name ?? "").trim() === INTERNAL_WORK_TITLE);
+      const featured = cols.find(
+        (c) => (c.name ?? "").trim() === FEATURED_COLLECTION_TITLE,
       );
-      if (!iw) return { data: [] as OutlineCollectionDocument[] };
-      return unwrapIpc<{ data: OutlineCollectionDocument[] }>(
-        api.collections.documents(activeProfileId!, iw.id),
-      );
+      const [iwTree, featuredTree] = await Promise.all([
+        load(iw?.id),
+        load(featured?.id),
+      ]);
+      return { iwTree, featuredTree };
     },
     enabled: !!activeProfileId,
     staleTime: 10 * 60_000,
@@ -278,7 +294,9 @@ export function usePaperEntries(root: PapersRoot | null): {
       stack.push(...(node.children ?? []));
     }
   }
-  if (iwData?.data?.length) collectInternalWork(iwData.data, papers);
+  if (extraData?.iwTree?.length) collectInternalWork(extraData.iwTree, papers);
+  if (extraData?.featuredTree?.length)
+    collectFeatured(extraData.featuredTree, null, papers);
   // Newest recommendation first; undated (精选/组内工作) papers sort last.
   papers.sort(
     (a, b) => (b.year ?? 0) - (a.year ?? 0) || (b.month ?? 0) - (a.month ?? 0),
@@ -424,7 +442,14 @@ export function usePaperMetas(root: PapersRoot | null): {
       const iw = (cols ?? []).find(
         (c) => (c.name ?? "").trim() === INTERNAL_WORK_TITLE,
       );
-      const scanIds = [root!.collectionId, ...(iw ? [iw.id] : [])];
+      const featured = (cols ?? []).find(
+        (c) => (c.name ?? "").trim() === FEATURED_COLLECTION_TITLE,
+      );
+      const scanIds = [
+        root!.collectionId,
+        ...(iw ? [iw.id] : []),
+        ...(featured ? [featured.id] : []),
+      ];
       for (const cid of scanIds) {
         for (let offset = 0; offset < 1000; offset += 100) {
           const page = await unwrapIpc<{ data: OutlineDocument[] }>(
