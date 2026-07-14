@@ -96,10 +96,13 @@ export interface PaperEntry {
   /** From the ancestor folder titles, e.g. 2026 / 7. */
   year: number | null;
   month: number | null;
+  /** For 精选论文 papers: the top-level专题 they live under. */
+  topic?: string | null;
 }
 
 const YEAR_RE = /(\d{4})\s*年/;
 const MONTH_RE = /^(\d{1,2})\s*月/;
+const FEATURED_TITLE = "精选论文";
 
 /** Walk the 推荐阅读 subtree: 年/月 folders are containers, everything else
  * is a paper entry (its own children, if any, are appendices — not papers). */
@@ -120,6 +123,34 @@ function collectPapers(
     } else {
       out.push({ id: n.id, title, emoji: n.emoji ?? null, year, month });
     }
+  }
+}
+
+/**
+ * Walk the 精选论文 subtree: topic folders are containers, only 📖-prefixed
+ * docs are papers (topic overview pages are not). Without this, papers filed
+ * under 精选论文 were invisible to the library (only findable via global
+ * search). `topic` = the first-level 专题 title.
+ */
+function collectFeatured(
+  nodes: OutlineCollectionDocument[],
+  topic: string | null,
+  out: PaperEntry[],
+): void {
+  for (const n of nodes) {
+    const title = (n.title ?? "").trim();
+    if (title.startsWith("📖")) {
+      out.push({
+        id: n.id,
+        title,
+        emoji: n.emoji ?? null,
+        year: null,
+        month: null,
+        topic,
+      });
+      continue; // a paper's children are appendices, not papers
+    }
+    collectFeatured(n.children ?? [], topic ?? title, out);
   }
 }
 
@@ -192,12 +223,16 @@ export function usePaperEntries(root: PapersRoot | null): {
       const node = stack.pop()!;
       if (node.id === root.docId) {
         collectPapers(node.children ?? [], null, null, papers);
-        break;
+        continue; // don't descend again
+      }
+      if ((node.title ?? "").trim() === FEATURED_TITLE) {
+        collectFeatured(node.children ?? [], null, papers);
+        continue;
       }
       stack.push(...(node.children ?? []));
     }
   }
-  // Newest recommendation first.
+  // Newest recommendation first; undated (精选论文) papers sort last.
   papers.sort(
     (a, b) => (b.year ?? 0) - (a.year ?? 0) || (b.month ?? 0) - (a.month ?? 0),
   );

@@ -102,6 +102,9 @@ function PaperRow({
               推荐于 {paper.year}·{paper.month ?? "?"}月
             </span>
           )}
+          {!paper.year && paper.topic && (
+            <span className="paper-when">精选 · {paper.topic}</span>
+          )}
           {meta?.venue && <span className="paper-venue">{meta.venue}</span>}
           {meta?.tags.slice(0, 5).map((t) => (
             <button
