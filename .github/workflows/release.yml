@@ -2,12 +2,24 @@ name: Release
 
 # Build installers for all three desktop platforms and publish them to a
 # GitHub Release whenever a v* tag is pushed (e.g. `git push origin v1.0.0`).
-# Can also be run manually from the Actions tab against any branch/tag.
+#
+# The three platform builds run in parallel and each uploads its output as a
+# workflow *artifact*; a single final `release` job then collects everything
+# and does ONE upload to the GitHub Release. This avoids the earlier race where
+# three jobs wrote to the same release concurrently and dropped assets
+# (missing .deb / partial sets).
+#
+# Manual re-run: Actions tab → Release → Run workflow, and pass the tag
+# (e.g. v1.11.1) to rebuild & re-publish that version.
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build & publish (e.g. v1.11.1)"
+        required: true
 
 permissions:
   contents: write # required to create the Release and upload assets
@@ -20,16 +32,22 @@ jobs:
         include:
           - os: macos-latest
             platform: mac
+            args: "--mac --arm64"
           - os: windows-latest
             platform: win
+            args: "--win --x64 --arm64"
           - os: ubuntu-latest
             platform: linux
+            args: "--linux --x64 --arm64"
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # push → the tag ref; workflow_dispatch → the tag passed as input
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,58 +57,54 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        # GitHub-hosted runners reach the default Electron CDN fine; the repo's
-        # .npmrc mirror still resolves, so no override is needed.
 
       - name: Type check
         run: npm run typecheck
 
-      - name: Build installers (${{ matrix.platform }})
-        run: npm run dist:${{ matrix.platform }}
+      - name: Build renderer + main
+        run: npm run build -w apps/desktop
+
+      - name: Package installers (${{ matrix.platform }})
+        working-directory: apps/desktop
+        run: npx --no-install electron-builder ${{ matrix.args }} --publish never
         env:
-          # electron-builder reads this to attach assets to the release.
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Skip code signing — no certs in CI. macOS/Windows produce unsigned
-          # artifacts (users may need to bypass Gatekeeper / SmartScreen).
+          # No signing certs in CI — macOS/Windows produce unsigned artifacts
+          # (users bypass Gatekeeper / SmartScreen on first launch).
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            apps/desktop/dist/*.dmg
-            apps/desktop/dist/*.zip
-            apps/desktop/dist/*.exe
-            apps/desktop/dist/*.AppImage
-            apps/desktop/dist/*.deb
-            apps/desktop/dist/latest*.yml
-            dist/*.dmg
-            dist/*.zip
-            dist/*.exe
-            dist/*.AppImage
-            dist/*.deb
-            dist/latest*.yml
-          fail_on_unmatched_files: false
-          draft: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload build artifacts (fallback / manual runs)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: outline-desktop-${{ matrix.platform }}
+          name: dist-${{ matrix.platform }}
+          retention-days: 3
+          if-no-files-found: warn
           path: |
             apps/desktop/dist/*.dmg
             apps/desktop/dist/*.zip
             apps/desktop/dist/*.exe
             apps/desktop/dist/*.AppImage
             apps/desktop/dist/*.deb
-            dist/*.dmg
-            dist/*.zip
-            dist/*.exe
-            dist/*.AppImage
-            dist/*.deb
-          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List collected files
+        run: ls -la artifacts
+
+      - name: Publish to GitHub Release (single upload)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: artifacts/*
+          fail_on_unmatched_files: false
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
