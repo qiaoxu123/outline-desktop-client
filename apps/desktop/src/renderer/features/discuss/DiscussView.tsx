@@ -6,6 +6,7 @@ import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { absoluteUrl, useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
 import { useDocContextMenu } from "../../hooks/useDocContextMenu";
+import { OIcon } from "../../components/outlineIcons";
 import {
   useDiscussCollection,
   useTopicsWithActivity,
@@ -79,8 +80,12 @@ function TopicRow({
           {topic.createdBy?.name} · 最后活动 {timeAgo(lastActivity)}
         </span>
       </span>
-      <span className={`topic-replies ${replyCount > 0 ? "" : "empty"}`}>
-        {replyCount > 0 ? `${replyCount} 回复` : "暂无回复"}
+      <span
+        className={`topic-replies ${replyCount > 0 ? "" : "empty"}`}
+        title={replyCount > 0 ? `${replyCount} 回复` : "暂无回复"}
+      >
+        <OIcon name="comment" size={15} />
+        {replyCount > 0 && <span className="topic-replies-count">{replyCount}</span>}
       </span>
       {own && (
         <button

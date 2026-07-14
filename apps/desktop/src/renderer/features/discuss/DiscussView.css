@@ -137,8 +137,17 @@
 
 .topic-replies {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+  min-width: 2.2em;
+  justify-content: flex-end;
+}
+
+.topic-replies-count {
+  font-variant-numeric: tabular-nums;
 }
 
 .topic-replies.empty {

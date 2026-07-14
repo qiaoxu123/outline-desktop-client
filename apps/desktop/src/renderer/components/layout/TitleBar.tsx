@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "../../state/uiStore";
 import { OIcon } from "../outlineIcons";
 import TabBar from "./TabBar";
@@ -6,11 +8,23 @@ import "./TitleBar.css";
 
 export default function TitleBar(): React.ReactElement {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const showToc = useUIStore((s) => s.showToc);
   const toggleToc = useUIStore((s) => s.toggleToc);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Reload server data (collections, document trees, papers, comments…) —
+  // invalidates every cache under the active profile so moves/edits made
+  // elsewhere show up without restarting the app.
+  const refresh = () => {
+    setRefreshing(true);
+    void queryClient.invalidateQueries({ queryKey: ["profile", activeProfileId] });
+    window.setTimeout(() => setRefreshing(false), 700);
+  };
   // Effective dark state (resolving "system" against the OS preference) so the
   // one-click toggle flips to the opposite of what's actually on screen.
   const isDark =
@@ -52,6 +66,21 @@ export default function TitleBar(): React.ReactElement {
         <TabBar />
       </div>
       <div className="titlebar-right">
+        <button
+          className="titlebar-button"
+          onClick={refresh}
+          title="刷新(重新拉取服务器数据)"
+        >
+          <OIcon
+            name="refresh"
+            size={18}
+            style={
+              refreshing
+                ? { animation: "tb-spin 0.7s linear" }
+                : undefined
+            }
+          />
+        </button>
         <button
           className={`titlebar-button ${showToc ? "active" : ""}`}
           onClick={toggleToc}

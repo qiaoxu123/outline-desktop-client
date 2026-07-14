@@ -123,3 +123,9 @@
   color: var(--color-primary);
   background: var(--color-bg-secondary);
 }
+
+/* refresh button spin (plays once per click) */
+@keyframes tb-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
