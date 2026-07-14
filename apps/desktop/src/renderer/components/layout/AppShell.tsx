@@ -4,6 +4,7 @@ import Sidebar from "../sidebar/Sidebar";
 import TitleBar from "./TitleBar";
 import Breadcrumb from "./Breadcrumb";
 import { useUIStore } from "../../state/uiStore";
+import { OIcon } from "../outlineIcons";
 import "./AppShell.css";
 
 const SIDEBAR_MIN = 200;
@@ -95,9 +96,7 @@ export default function AppShell(): React.ReactElement {
                   }
                   title="回到顶部"
                 >
-                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 3.5l5 5-1.06 1.06L8 5.62 4.06 9.56 3 8.5l5-5z" />
-                  </svg>
+                  <OIcon name="caretUp" size={20} />
                 </button>
               )}
             </main>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
+import { OIcon } from "../../components/outlineIcons";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { unwrapIpc } from "../../lib/ipc";
 import "./SearchView.css";
@@ -82,15 +83,7 @@ export default function SearchView(): React.ReactElement {
     <div className="search-view">
       <div className="search-header">
         <div className="search-input-wrapper">
-          <svg
-            className="search-icon"
-            width="18"
-            height="18"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-          >
-            <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.975 1.975 0 00-.017.016zm-5.242.156a5 5 0 110-10 5 5 0 010 10z" />
-          </svg>
+          <span className="search-icon"><OIcon name="search" size={20} /></span>
           <input
             type="text"
             className="search-input"

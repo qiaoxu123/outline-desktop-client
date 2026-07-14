@@ -37,7 +37,10 @@ function DocList({
         <p className="home-empty">{emptyText}</p>
       ) : (
         <div className="home-doc-list">
-          {docs.map((doc) => (
+          {docs
+            // hide client-maintained data docs (legacy ⚙️ registry) from lists
+            .filter((doc) => !(doc.title ?? "").startsWith("⚙️"))
+            .map((doc) => (
             <a
               key={doc.id}
               href={`#/document/${doc.id}`}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocContextMenu } from "../../hooks/useDocContextMenu";
+import { OIcon } from "../../components/outlineIcons";
 import { sortDocsByTitle } from "../../lib/naturalSort";
 import {
   usePapersRoot,
@@ -132,9 +133,7 @@ function PaperRow({
           onToggleLike();
         }}
       >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8.86 1.5a1 1 0 00-.95.68L6.6 6H3a1 1 0 00-1 1v6a1 1 0 001 1h8.53a2 2 0 001.97-1.67l.83-5A2 2 0 0012.36 5H9.9l.42-2.06A1.2 1.2 0 009.14 1.5h-.28zM5 7.2V13H3.5V7.2H5z" />
-        </svg>
+        <OIcon name="thumbsUp" size={15} />
         {likes > 0 && <span>{likes}</span>}
       </button>
 
@@ -178,9 +177,7 @@ function PaperRow({
             window.open(meta.link!);
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M6 3H3.5A1.5 1.5 0 002 4.5v8A1.5 1.5 0 003.5 14h8a1.5 1.5 0 001.5-1.5V10h-1.5v2.5h-8v-8H6V3zm3 0v1.5h2.44L6.5 9.44l1.06 1.06 4.94-4.94V8H14V3H9z" />
-          </svg>
+          <OIcon name="open" size={16} />
         </button>
       )}
       <button

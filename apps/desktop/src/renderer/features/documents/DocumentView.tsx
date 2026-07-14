@@ -20,6 +20,7 @@ import {
   MarkdownEditorContent,
 } from "./Editor";
 import { commentHighlightsKey } from "./extensions/commentHighlights";
+import { OIcon } from "../../components/outlineIcons";
 import { discussCollectionId } from "../discuss/useDiscuss";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
@@ -701,9 +702,7 @@ function NestedDocuments({
           >
             <span className="nested-doc-icon">
               {child.emoji ?? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" opacity="0.6">
-                  <path d="M7 3a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8.41a2 2 0 00-.59-1.41l-3.41-3.41A2 2 0 0013.59 3H7zm0 2h6v3a1 1 0 001 1h3v10H7V5z" />
-                </svg>
+                <OIcon name="document" size={18} style={{ opacity: 0.6 }} />
               )}
             </span>
             <span className="nested-doc-title">{child.title || "Untitled"}</span>
@@ -727,22 +726,11 @@ function TopRightActions({
 }
 
 function CommentIcon(): React.ReactElement {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 3v-3H3a1 1 0 01-1-1V3z" />
-    </svg>
-  );
+  return <OIcon name="comment" size={18} />;
 }
 
 function HistoryIcon(): React.ReactElement {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-      stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
-    >
-      <path d="M8 2.5a5.5 5.5 0 11-5.3 4M2.5 3v3.5H6" />
-      <path d="M8 5.5V8l2 1.5" />
-    </svg>
-  );
+  return <OIcon name="history" size={18} />;
 }
 
 /* ---------- always-on editor (editors): open == editable, autosaves ---------- */
@@ -972,13 +960,11 @@ function EditableDocument({
             disabled={starPending}
             title={star ? "取消星标" : "加星标"}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16"
-              fill={star ? "var(--color-star)" : "none"}
-              stroke={star ? "var(--color-star)" : "currentColor"}
-              strokeWidth="1.4"
-            >
-              <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
-            </svg>
+            <OIcon
+              name={star ? "starred" : "unstarred"}
+              size={18}
+              color={star ? "var(--color-star)" : "currentColor"}
+            />
           </button>
           <button
             className={`document-icon-button ${panel === "comments" ? "active" : ""}`}
@@ -1095,13 +1081,11 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
             disabled={starPending}
             title={star ? "取消星标" : "加星标"}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16"
-              fill={star ? "var(--color-star)" : "none"}
-              stroke={star ? "var(--color-star)" : "currentColor"}
-              strokeWidth="1.4"
-            >
-              <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
-            </svg>
+            <OIcon
+              name={star ? "starred" : "unstarred"}
+              size={18}
+              color={star ? "var(--color-star)" : "currentColor"}
+            />
           </button>
           <button
             className={`document-icon-button ${commentsOpen ? "active" : ""}`}

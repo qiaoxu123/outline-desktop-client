@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
+import { OIcon } from "../outlineIcons";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import {
   useUserInfo,
@@ -78,33 +79,27 @@ function CollectionIcon({
     return <span className="sb-emoji">{icon}</span>;
   }
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill={color || "var(--color-primary)"}
+    <OIcon
+      name="collection"
+      size={16}
+      color={color || "var(--color-primary)"}
       style={{ flexShrink: 0 }}
-    >
-      <path d="M3 6a2 2 0 012-2h4.172a2 2 0 011.414.586L12 6h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
-    </svg>
+    />
   );
 }
 
 function Chevron({ open }: { open: boolean }): React.ReactElement {
+  // Outline web's disclosure chevron (CollapsedIcon points down = open).
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="currentColor"
+    <OIcon
+      name="collapsed"
+      size={16}
       style={{
-        transform: open ? "rotate(90deg)" : "none",
+        transform: open ? "none" : "rotate(-90deg)",
         transition: "transform 0.12s",
         flexShrink: 0,
       }}
-    >
-      <path d="M6 3.5l5 4.5-5 4.5V3.5z" />
-    </svg>
+    />
   );
 }
 
@@ -414,9 +409,7 @@ function StarNode({
           {emoji ? (
             <span className="sb-emoji">{emoji}</span>
           ) : (
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="var(--color-star)" style={{ flexShrink: 0 }}>
-              <path d="M8 1.5l1.94 3.93 4.34.63-3.14 3.06.74 4.32L8 11.4l-3.88 2.04.74-4.32L1.72 6.06l4.34-.63L8 1.5z" />
-            </svg>
+            <OIcon name="starred" size={14} color="var(--color-star)" style={{ flexShrink: 0 }} />
           )}
           <span className="sb-title">{title}</span>
         </a>
@@ -625,9 +618,7 @@ function PersonalNotesSection(): React.ReactElement {
               }}
               title="打开个人笔记目录"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-star)" style={{ flexShrink: 0 }}>
-                <path d="M3 6a2 2 0 012-2h4.172a2 2 0 011.414.586L12 6h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
-              </svg>
+              <OIcon name="collection" size={16} color="var(--color-star)" style={{ flexShrink: 0 }} />
               <span className="sb-title">我的笔记</span>
             </a>
           </div>
@@ -738,63 +729,38 @@ export default function Sidebar(): React.ReactElement {
       </div>
 
       <nav className="sb-quick-nav">
-        {navItem(
-          "/search",
-          "搜索",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.975 1.975 0 00-.017.016zm-5.242.156a5 5 0 110-10 5 5 0 010 10z" />
-          </svg>,
-          true,
-        )}
-        {navItem(
-          "/",
-          "主页",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 1.5L1.5 7v7a1 1 0 001 1H6v-4.5h4V15h3.5a1 1 0 001-1V7L8 1.5z" />
-          </svg>,
-          true,
-        )}
+        {navItem("/search", "搜索", <OIcon name="search" size={18} />, true)}
+        {navItem("/", "主页", <OIcon name="home" size={18} />, true)}
         {navItem(
           "/settings",
           "设置",
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
-          </svg>,
+          <OIcon name="settings" size={18} />,
           true,
         )}
         <span className="sb-nav-divider" aria-hidden="true">｜</span>
         {navItem(
           "/discuss",
           "讨论区",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M1.5 3A1.5 1.5 0 013 1.5h7A1.5 1.5 0 0111.5 3v5A1.5 1.5 0 0110 9.5H5l-2.5 2.5v-2.5H3A1.5 1.5 0 011.5 8V3zm11.5 2h.5A1.5 1.5 0 0115 6.5v5a1.5 1.5 0 01-1.5 1.5h-.5v2.5L10.5 13H6.8l1.5-1.5H13V5z" />
-          </svg>,
+          <OIcon name="comment" size={18} />,
           true,
           discussNew,
         )}
         {navItem(
           "/papers",
           "论文库",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M3 1.5h7.5L14 5v8.5A1.5 1.5 0 0112.5 15h-9A1.5 1.5 0 012 13.5v-10A1.5 1.5 0 013 1.5H3zm7 1.5H3.5v10.5h9V6H10V3zm-5 5h6v1.2H5V8zm0 2.6h6v1.2H5v-1.2z" />
-          </svg>,
+          <OIcon name="academicCap" size={18} />,
           true,
         )}
         {navItem(
           "/quiz",
           "自测题库",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M3 1.5h10A1.5 1.5 0 0114.5 3v8A1.5 1.5 0 0113 12.5H8.4l-3 2.6a.6.6 0 01-1-.46V12.5H3A1.5 1.5 0 011.5 11V3A1.5 1.5 0 013 1.5zm5 2.1a2 2 0 00-1.98 1.71l1.28.2A.72.72 0 118 7.2a.64.64 0 00-.64.64v.86h1.28v-.42A2 2 0 008 3.6zm-.64 5.3v1.28h1.28V8.9H7.36z" />
-          </svg>,
+          <OIcon name="checkbox" size={18} />,
           true,
         )}
         {navItem(
           "/shares",
           "共享链接",
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M4.715 6.542L3.343 7.914a3 3 0 104.243 4.243l1.828-1.829A3 3 0 008.586 5.5L8 6.086a1 1 0 00-.154.199 2 2 0 01.861 3.337L6.88 11.45a2 2 0 11-2.83-2.83l.793-.792a4 4 0 01-.128-1.287z" />
-            <path d="M6.586 4.672A3 3 0 007.414 9.5l.775-.776a2 2 0 01-.896-3.346L9.12 3.55a2 2 0 113.03 2.61l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 10-4.243-4.243L6.586 4.672z" />
-          </svg>,
+          <OIcon name="globe" size={18} />,
           true,
         )}
       </nav>

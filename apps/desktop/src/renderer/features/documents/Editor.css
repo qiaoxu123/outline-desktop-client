@@ -96,7 +96,7 @@
   justify-content: center;
   min-width: 28px;
   height: 28px;
-  padding: 0 4px;
+  padding: 0 2px;
   border: none;
   background: transparent;
   color: var(--color-text);
@@ -123,18 +123,6 @@
 
 .bubble-btn.active svg {
   opacity: 1;
-}
-
-.bubble-hl {
-  background: #fef3a8;
-  color: #5a4a00;
-  border-radius: 3px;
-  padding: 0 3px;
-  font-weight: 700;
-}
-
-.bubble-btn.active .bubble-hl {
-  background: rgba(255, 255, 255, 0.85);
 }
 
 /* highlight color picker popover */

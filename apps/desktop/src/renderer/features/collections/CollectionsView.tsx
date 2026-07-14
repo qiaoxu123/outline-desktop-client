@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
+import { OIcon } from "../../components/outlineIcons";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { unwrapIpc } from "../../lib/ipc";
 import type { OutlineCollectionDocument } from "@outline/shared-types";
@@ -117,15 +118,7 @@ function DocumentTree({
               {doc.emoji ? (
                 <span className="document-tree-emoji">{doc.emoji}</span>
               ) : (
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 18 18"
-                  fill="currentColor"
-                  className="document-tree-doc-icon"
-                >
-                  <path d="M4 2h7l4 4v10H4V2zm1 1v12h8V6.5H9V3H5z" />
-                </svg>
+                <OIcon name="document" size={18} style={{ opacity: 0.7 }} />
               )}
             </span>
             <span className="document-tree-title">
