@@ -154,6 +154,30 @@ function collectFeatured(
   }
 }
 
+/** 组内工作 collection (separate from 扩展学习): collect every 📖-prefixed
+ * doc anywhere in its tree as a paper, tagged with a fixed 组内工作 topic. */
+const INTERNAL_WORK_TITLE = "组内工作";
+function collectInternalWork(
+  nodes: OutlineCollectionDocument[],
+  out: PaperEntry[],
+): void {
+  for (const n of nodes) {
+    const title = (n.title ?? "").trim();
+    if (title.startsWith("📖")) {
+      out.push({
+        id: n.id,
+        title,
+        emoji: n.emoji ?? null,
+        year: null,
+        month: null,
+        topic: "组内工作",
+      });
+      continue;
+    }
+    collectInternalWork(n.children ?? [], out);
+  }
+}
+
 const TREE_CACHE_KEY = "papers.treeCache.v1";
 
 interface TreeCache {
@@ -216,6 +240,28 @@ export function usePaperEntries(root: PapersRoot | null): {
     },
   });
 
+  // 组内工作 collection — resolve by name, then pull its 📖 解读 docs so they
+  // appear in the library alongside 推荐阅读 / 精选论文.
+  const { data: iwData } = useQuery({
+    queryKey: ["profile", activeProfileId, "internal-work-docs"],
+    queryFn: async () => {
+      const cols = (
+        await unwrapIpc<{ data: OutlineCollection[] }>(
+          api.collections.list(activeProfileId!),
+        )
+      ).data;
+      const iw = (cols ?? []).find(
+        (c) => (c.name ?? "").trim() === INTERNAL_WORK_TITLE,
+      );
+      if (!iw) return { data: [] as OutlineCollectionDocument[] };
+      return unwrapIpc<{ data: OutlineCollectionDocument[] }>(
+        api.collections.documents(activeProfileId!, iw.id),
+      );
+    },
+    enabled: !!activeProfileId,
+    staleTime: 10 * 60_000,
+  });
+
   const papers: PaperEntry[] = [];
   if (root && data?.data) {
     const stack = [...data.data];
@@ -232,7 +278,8 @@ export function usePaperEntries(root: PapersRoot | null): {
       stack.push(...(node.children ?? []));
     }
   }
-  // Newest recommendation first; undated (精选论文) papers sort last.
+  if (iwData?.data?.length) collectInternalWork(iwData.data, papers);
+  // Newest recommendation first; undated (精选/组内工作) papers sort last.
   papers.sort(
     (a, b) => (b.year ?? 0) - (a.year ?? 0) || (b.month ?? 0) - (a.month ?? 0),
   );
@@ -350,21 +397,34 @@ export function usePaperMetas(root: PapersRoot | null): {
     queryKey: papersMetaQueryKey(activeProfileId, root?.collectionId),
     queryFn: async (): Promise<PapersMetaResult> => {
       const metas: Record<string, PaperMeta> = {};
-      for (let offset = 0; offset < 1000; offset += 100) {
-        const page = await unwrapIpc<{ data: OutlineDocument[] }>(
-          api.call(activeProfileId!, "documents.list", {
-            collectionId: root!.collectionId,
-            limit: 100,
-            offset,
-          }),
-        );
-        const docs = page.data ?? [];
-        for (const d of docs) {
-          // skip any leftover legacy interaction registry doc
-          if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) continue;
-          if (typeof d.text === "string") metas[d.id] = parsePaperMeta(d.text);
+      // scan the papers collection (扩展学习) + 组内工作 so both sets get
+      // parsed metadata (tags / venue / link)
+      const cols = (
+        await unwrapIpc<{ data: OutlineCollection[] }>(
+          api.collections.list(activeProfileId!),
+        )
+      ).data;
+      const iw = (cols ?? []).find(
+        (c) => (c.name ?? "").trim() === INTERNAL_WORK_TITLE,
+      );
+      const scanIds = [root!.collectionId, ...(iw ? [iw.id] : [])];
+      for (const cid of scanIds) {
+        for (let offset = 0; offset < 1000; offset += 100) {
+          const page = await unwrapIpc<{ data: OutlineDocument[] }>(
+            api.call(activeProfileId!, "documents.list", {
+              collectionId: cid,
+              limit: 100,
+              offset,
+            }),
+          );
+          const docs = page.data ?? [];
+          for (const d of docs) {
+            // skip any leftover legacy interaction registry doc
+            if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) continue;
+            if (typeof d.text === "string") metas[d.id] = parsePaperMeta(d.text);
+          }
+          if (docs.length < 100) break;
         }
-        if (docs.length < 100) break;
       }
       try {
         localStorage.setItem(

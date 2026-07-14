@@ -103,7 +103,9 @@ function PaperRow({
             </span>
           )}
           {!paper.year && paper.topic && (
-            <span className="paper-when">精选 · {paper.topic}</span>
+            <span className="paper-when">
+              {paper.topic === "组内工作" ? "组内工作" : `精选 · ${paper.topic}`}
+            </span>
           )}
           {meta?.venue && <span className="paper-venue">{meta.venue}</span>}
           {meta?.tags.slice(0, 5).map((t) => (
