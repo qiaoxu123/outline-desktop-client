@@ -232,18 +232,20 @@ body.sidebar-resizing {
   overflow-y: auto;
   background: var(--color-bg);
   position: relative;
-  /* reading column width, adjustable in Settings (level 1 narrowest → 5 full) */
-  --reading-col: 920px;
+  /* reading column width, adjustable in Settings (level 1 narrowest → 5 full).
+     Values are kept genuinely narrow so lower levels actually bite on normal
+     windows (a wide cap does nothing when the window itself is narrower). */
+  --reading-col: 760px; /* level 1 最窄 */
 }
 
 .app-content[data-content-width="2"] {
-  --reading-col: 1100px;
+  --reading-col: 920px;
 }
 .app-content[data-content-width="3"] {
-  --reading-col: 1280px;
+  --reading-col: 1100px; /* 适中 — comfortable default */
 }
 .app-content[data-content-width="4"] {
-  --reading-col: 1460px;
+  --reading-col: 1320px;
 }
 /* level 5 → .full-width class (handled below) stretches to fill */
 

@@ -34,15 +34,13 @@ export const useUIStore = create<UIState>((set) => ({
     (localStorage.getItem("ui.theme") as "light" | "dark" | "system" | null) ??
     "system",
   contentWidth: ((): 1 | 2 | 3 | 4 | 5 => {
-    // Default is 适中 (1280px) so documents match the pinned 论坛/论文库/主页
-    // width. One-time migration: the old default was 最窄 (1); stored 1s from
-    // that era are moved to 适中 unless re-chosen afterwards.
-    if (!localStorage.getItem("ui.contentWidth.defaultMigrated")) {
-      localStorage.setItem("ui.contentWidth.defaultMigrated", "1");
-      const old = Number(localStorage.getItem("ui.contentWidth"));
-      if (!(old >= 2 && old <= 5)) {
-        localStorage.setItem("ui.contentWidth", "3");
-      }
+    // Default is 适中 = level 3 (now ~1100px, a comfortable reading width).
+    // The px scale was rebalanced narrower (760/920/1100/1320/full) so lower
+    // levels actually take effect. One-time v2 migration resets everyone to
+    // 适中 once, because the previous stored levels mapped to different widths.
+    if (!localStorage.getItem("ui.contentWidth.scaleV2")) {
+      localStorage.setItem("ui.contentWidth.scaleV2", "1");
+      localStorage.setItem("ui.contentWidth", "3");
     }
     const v = Number(localStorage.getItem("ui.contentWidth"));
     return v >= 1 && v <= 5 ? (v as 1 | 2 | 3 | 4 | 5) : 3;
