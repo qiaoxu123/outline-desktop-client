@@ -489,28 +489,29 @@
   font-family: var(--font-mono);
 }
 
-/* tables: full document width like Outline web, compact cell padding */
+/* tables: full document width like Outline web, compact cell padding.
+   Cells inherit the body font (family AND size) so table text matches the
+   surrounding prose instead of looking like a smaller, separate font. */
 .document-body table {
   width: 100%;
   border-collapse: collapse;
   margin: 0.8em 0;
-  font-size: 14px;
+  font-size: inherit;
 }
 
 .document-body th,
 .document-body td {
-  padding: 4px 10px;
+  padding: 5px 10px;
   border: 1px solid var(--color-border);
   text-align: left;
   vertical-align: top;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .document-body th {
   background: var(--color-bg-secondary);
   font-weight: 600;
-  font-size: 13px;
-  color: var(--color-text-secondary);
+  color: var(--color-text);
 }
 
 /* paragraphs inside cells shouldn't add vertical gaps */
