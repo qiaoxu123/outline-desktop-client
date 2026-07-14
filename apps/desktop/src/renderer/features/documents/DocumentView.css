@@ -354,7 +354,8 @@
 }
 
 .document-article {
-  line-height: 1.75;
+  /* match Outline web: --line-height-body is 1.5 (16px body) */
+  line-height: var(--leading-normal);
 }
 
 /* Sticky header keeps the title + edit/save/star/comment controls visible
