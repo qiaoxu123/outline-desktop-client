@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../sidebar/Sidebar";
 import TitleBar from "./TitleBar";
 import Breadcrumb from "./Breadcrumb";
@@ -56,6 +56,23 @@ export default function AppShell(): React.ReactElement {
     el.addEventListener("scroll", onScroll);
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Per-route scroll memory. All routes share this one scroll container, so
+  // without this, leaving a long document and returning to a list view kept
+  // the document's scroll offset (list appeared scrolled mid-way). Each
+  // route's offset is saved on leave and restored (or reset to top) on entry.
+  const location = useLocation();
+  const scrollMemory = useRef(new Map<string, number>());
+  const prevPathRef = useRef(location.pathname);
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    const path = location.pathname;
+    const prev = prevPathRef.current;
+    if (!el || prev === path) return;
+    scrollMemory.current.set(prev, el.scrollTop);
+    prevPathRef.current = path;
+    el.scrollTop = scrollMemory.current.get(path) ?? 0;
+  }, [location.pathname]);
 
   return (
     <div className="app-shell">

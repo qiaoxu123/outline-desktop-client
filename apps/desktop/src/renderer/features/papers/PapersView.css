@@ -39,13 +39,13 @@
 
 .papers-search {
   flex: 1;
-  min-width: 200px;
-  padding: 7px 12px;
+  min-width: 280px;
+  padding: 11px 16px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-bg);
   color: var(--color-text);
-  font-size: var(--text-sm);
+  font-size: 15px;
   outline: none;
 }
 

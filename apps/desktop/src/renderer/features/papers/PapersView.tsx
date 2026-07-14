@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocContextMenu } from "../../hooks/useDocContextMenu";
 import { OIcon } from "../../components/outlineIcons";
@@ -214,6 +214,18 @@ export default function PapersView(): React.ReactElement {
   const [tag, setTag] = useState<string | null>(null);
   const [readFilter, setReadFilter] = useState<ReadState | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
+
+  // Changing search/filter/sort re-composes the list from the top, so jump
+  // the shared scroll container back up — otherwise a previously scrolled
+  // position leaves the user staring at the middle of the new result set.
+  const filtersDirty = useRef(false);
+  useEffect(() => {
+    if (!filtersDirty.current) {
+      filtersDirty.current = true; // skip initial mount (scroll restore owns it)
+      return;
+    }
+    document.querySelector(".app-content")?.scrollTo({ top: 0 });
+  }, [q, year, month, tag, readFilter, sortKey]);
 
   const years = useMemo(
     () =>
