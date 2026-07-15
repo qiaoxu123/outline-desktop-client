@@ -324,4 +324,19 @@ export const SEED_CARDS: SeedCard[] = [
       "**一点部署直觉**：以 Llama-3-8B 为例，单 token 的 KV 约 128KB，8K 上下文大约要 1GB 显存；模型再大就得配合多卡张量并行（TP）。\n\n" +
       "> 📎 参考:小红书笔记《PagedAttention 与 KV Cache 全机制拆解》 https://www.xiaohongshu.com/explore/6a376b150000000022014557",
   },
+
+  // 补充：Q/K/V 直觉版（简单口述，与 q2 的详细版互补）
+  {
+    id: "q39",
+    category: "核心模型结构",
+    question: "简单介绍一下 Transformer 中的 Q、K、V 是什么？",
+    answer:
+      "Q、K、V 是自注意力里每个 token 都会算出来的三个向量，都是**同一个输入向量分别乘三个不同的权重矩阵**得到的（Q=XW_Q、K=XW_K、V=XW_V）。\n\n" +
+      "用「图书馆检索」打个比方就很好懂：\n\n" +
+      "- **Q（Query，查询）**：当前 token「我现在想找什么」——它发出的提问；\n" +
+      "- **K（Key，键）**：每个 token 对外挂的「标签/索引」，用来被别人匹配——「我能提供什么」；\n" +
+      "- **V（Value，值）**：每个 token 真正携带、要被取走的信息内容。\n\n" +
+      "**自注意力的过程**：拿我的 Q 去和所有 token 的 K 做点积算相似度（打分），除以 √d_k 缩放后用 softmax 归一化成一组权重，再用这组权重去**加权求和所有 token 的 V**，得到当前 token 融合了全局信息的新表示。\n\n" +
+      "**一句话记忆**：Q 是「我在找什么」，K 是「我能被什么找到」，V 是「找到之后取走的内容」。",
+  },
 ];

@@ -72,6 +72,13 @@
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* antialiased smoothing renders text light on macOS — medium weight keeps
+     tab titles legible; the active tab goes a touch heavier for hierarchy. */
+  font-weight: 500;
+}
+
+.tab.active .tab-title {
+  font-weight: 600;
 }
 
 .tab-close {
