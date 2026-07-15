@@ -87,6 +87,8 @@ export interface TabsState {
   /** Close a tab; returns the neighbour to navigate to (or null). */
   closeTab: (documentId: string) => string | null;
   togglePin: (documentId: string) => void;
+  /** Drag-reorder: move the dragged tab to the dropped-on tab's slot. */
+  moveTab: (fromId: string, toId: string) => void;
   /** Close every unpinned tab except the given one. */
   closeOthers: (documentId: string) => void;
   /** Close every unpinned tab. */
@@ -148,6 +150,18 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         ),
       ),
     })),
+  moveTab: (fromId, toId) =>
+    set((s) => {
+      if (fromId === toId) return s;
+      const arr = [...s.tabs];
+      const from = arr.findIndex((t) => t.documentId === fromId);
+      const to = arr.findIndex((t) => t.documentId === toId);
+      if (from === -1 || to === -1) return s;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      // Keep the pinned-first invariant; reordering is free within each group.
+      return { tabs: persistTabs(sortTabs(arr)) };
+    }),
   closeOthers: (documentId) =>
     set((s) => ({
       tabs: persistTabs(

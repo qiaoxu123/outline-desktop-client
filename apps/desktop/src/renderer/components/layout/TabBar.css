@@ -50,6 +50,15 @@
   padding-right: 10px;
 }
 
+/* drag-to-reorder feedback */
+.tab.dragging {
+  opacity: 0.45;
+}
+
+.tab.drop-target {
+  box-shadow: inset 2px 0 0 0 var(--color-primary);
+}
+
 .tab-pin {
   flex-shrink: 0;
   opacity: 0.65;

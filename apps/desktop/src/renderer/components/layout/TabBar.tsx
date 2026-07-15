@@ -19,8 +19,11 @@ export default function TabBar(): React.ReactElement | null {
   const togglePin = useTabsStore((s) => s.togglePin);
   const closeOthers = useTabsStore((s) => s.closeOthers);
   const closeAll = useTabsStore((s) => s.closeAll);
+  const moveTab = useTabsStore((s) => s.moveTab);
   const [menu, setMenu] = useState<TabMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!menu) return;
@@ -80,7 +83,29 @@ export default function TabBar(): React.ReactElement | null {
       {tabs.map((tab) => (
         <div
           key={tab.documentId}
-          className={`tab ${tab.documentId === activeId ? "active" : ""} ${tab.pinned ? "pinned" : ""}`}
+          className={`tab ${tab.documentId === activeId ? "active" : ""} ${tab.pinned ? "pinned" : ""} ${tab.documentId === dragId ? "dragging" : ""} ${tab.documentId === overId && dragId && dragId !== tab.documentId ? "drop-target" : ""}`}
+          draggable
+          onDragStart={(e) => {
+            setDragId(tab.documentId);
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", tab.documentId);
+          }}
+          onDragOver={(e) => {
+            if (!dragId || dragId === tab.documentId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (overId !== tab.documentId) setOverId(tab.documentId);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragId && dragId !== tab.documentId) moveTab(dragId, tab.documentId);
+            setDragId(null);
+            setOverId(null);
+          }}
+          onDragEnd={() => {
+            setDragId(null);
+            setOverId(null);
+          }}
           onClick={() => navigate(`/document/${tab.documentId}`)}
           onAuxClick={(e) => e.button === 1 && onClose(e, tab.documentId)}
           onContextMenu={(e) => {
