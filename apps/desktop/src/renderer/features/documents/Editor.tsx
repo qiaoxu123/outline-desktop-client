@@ -15,6 +15,7 @@ import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import Placeholder from "@tiptap/extension-placeholder";
 import Highlight from "@tiptap/extension-highlight";
+import Underline from "@tiptap/extension-underline";
 import { Markdown } from "tiptap-markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type MarkdownIt from "markdown-it";
@@ -137,15 +138,45 @@ function patchTableSerializer(editor: TiptapEditor): void {
   if (parserMd && !parserMd.__brPatched) {
     parserMd.inline.ruler.before("text", "html_br", (state, silent): boolean => {
       if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
-      const m = /^<br\s*\/?>/i.exec(state.src.slice(state.pos));
-      if (!m) return false;
-      if (!silent) state.push("hardbreak", "br", 0);
-      state.pos += m[0].length;
-      return true;
+      const rest = state.src.slice(state.pos);
+      const br = /^<br\s*\/?>/i.exec(rest);
+      if (br) {
+        if (!silent) state.push("hardbreak", "br", 0);
+        state.pos += br[0].length;
+        return true;
+      }
+      // <u> / </u> → emit as raw html so DOMParser maps it to the underline mark
+      const u = /^<\/?u>/i.exec(rest);
+      if (u) {
+        if (!silent) {
+          const t = state.push("html_inline", "", 0);
+          t.content = u[0].toLowerCase();
+        }
+        state.pos += u[0].length;
+        return true;
+      }
+      return false;
     });
     parserMd.__brPatched = true;
   }
 }
+
+/**
+ * Underline round-trips as <u>…</u> (no standard markdown syntax; Outline
+ * stores it verbatim). The read renderer + editor parser get matching <u>
+ * inline rules so it renders and re-parses correctly. Cmd/Ctrl+U comes free
+ * from the base Underline extension.
+ */
+const MarkdownUnderline = Underline.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { open: "<u>", close: "</u>", mixable: true },
+        parse: {},
+      },
+    };
+  },
+});
 
 /**
  * With Table resizable:false prosemirror-tables renders a bare <table>; wide
@@ -216,6 +247,7 @@ export function useMarkdownEditor(
         TableCell,
         TableHeader,
         Placeholder.configure({ placeholder: "开始编写…" }),
+        MarkdownUnderline,
         MarkdownHighlight,
         MathInline,
         MathBlock,
@@ -232,11 +264,18 @@ export function useMarkdownEditor(
     [],
   );
 
-  // Override the fragile built-in table serializer once the editor (and its
-  // markdown serializer) exists — prevents tables being saved as "[table]".
+  // Override the fragile built-in table serializer + add <br>/<u> parser rules
+  // once the editor (and its markdown serializer/parser) exist.
   useEffect(() => {
-    if (editor) patchTableSerializer(editor);
-  }, [editor]);
+    if (!editor) return;
+    patchTableSerializer(editor);
+    // The initial content was parsed before the <u> rule was installed, so any
+    // <u>…</u> got escaped instead of becoming an underline mark. Re-parse once
+    // with the patched parser (emitUpdate=false so it doesn't trigger a save).
+    if (/<u>/i.test(initialMarkdown)) {
+      editor.commands.setContent(initialMarkdown, false);
+    }
+  }, [editor, initialMarkdown]);
 
   return editor;
 }
@@ -392,6 +431,13 @@ function SelectionToolbar({
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <OIcon name="italic" />
+      </ToolbarButton>
+      <ToolbarButton
+        title="下划线 (⌘U)"
+        active={editor.isActive("underline")}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      >
+        <OIcon name="underline" />
       </ToolbarButton>
       <ToolbarButton
         title="删除线"

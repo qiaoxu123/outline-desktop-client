@@ -1,6 +1,6 @@
 {
   "name": "outline-desktop",
-  "version": "1.11.14",
+  "version": "1.11.15",
   "private": true,
   "description": "Outline Desktop - cross-platform client (macOS / Windows / Linux)",
   "author": "xu <george.x.qiao@gmail.com>",
@@ -34,6 +34,7 @@
     "@tiptap/extension-table-row": "^2.27.2",
     "@tiptap/extension-task-item": "^2.27.2",
     "@tiptap/extension-task-list": "^2.27.2",
+    "@tiptap/extension-underline": "^2.27.2",
     "@tiptap/pm": "^2.27.2",
     "@tiptap/react": "^2.27.2",
     "@tiptap/starter-kit": "^2.27.2",

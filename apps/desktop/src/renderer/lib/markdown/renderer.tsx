@@ -62,11 +62,25 @@ function createMd(breaks: boolean): MarkdownIt {
   // no HTML-injection surface (unlike enabling html:true wholesale).
   inst.inline.ruler.before("text", "html_br", (state, silent): boolean => {
     if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
-    const m = /^<br\s*\/?>/i.exec(state.src.slice(state.pos));
-    if (!m) return false;
-    if (!silent) state.push("hardbreak", "br", 0);
-    state.pos += m[0].length;
-    return true;
+    const rest = state.src.slice(state.pos);
+    const br = /^<br\s*\/?>/i.exec(rest);
+    if (br) {
+      if (!silent) state.push("hardbreak", "br", 0);
+      state.pos += br[0].length;
+      return true;
+    }
+    // Underline: Outline stores it as <u>…</u> (no markdown syntax). Emit the
+    // exact tag (no attributes → no injection surface) so it renders underlined.
+    const u = /^<\/?u>/i.exec(rest);
+    if (u) {
+      if (!silent) {
+        const t = state.push("html_inline", "", 0);
+        t.content = u[0].toLowerCase();
+      }
+      state.pos += u[0].length;
+      return true;
+    }
+    return false;
   });
 
   // Wide tables scroll inside their own container instead of overflowing the
