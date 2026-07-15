@@ -296,16 +296,8 @@ body.sidebar-resizing {
   max-width: none;
 }
 
-/* forum topics stay at the board's fixed width regardless of the Settings
-   reading width — posts and the 论坛/论文库 lists share one narrow column */
-.app-content .document-layout.discuss-topic {
-  grid-template-columns: 1fr minmax(0, 1280px) 1fr;
-}
-
-.app-content .document-layout.discuss-topic .document-article {
-  grid-column: 2;
-  max-width: 1280px;
-}
+/* Forum topics follow the same Settings reading width as normal documents
+   (they open via /document/:id → DocumentView); no fixed-width override. */
 
 .app-content.full-width .document-layout > .history-panel,
 .app-content.full-width .document-layout > .comments-panel {
