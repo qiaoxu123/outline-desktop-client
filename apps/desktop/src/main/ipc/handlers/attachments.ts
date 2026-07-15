@@ -84,6 +84,13 @@ export function registerAttachmentHandlers(): void {
         data: {
           id: attachment.id,
           url: attachment.url,
+          // Absolute URL: a relative /api/attachments.redirect link gets turned
+          // into a file-node by Outline (which mangles CJK labels and strips
+          // sibling text); an absolute URL stays a normal link, so the filename
+          // and a download link can live on one line.
+          absoluteUrl: attachment.url.startsWith("http")
+            ? attachment.url
+            : base + attachment.url,
           name: attachment.name || name,
           contentType,
           isImage: contentType.startsWith("image/"),

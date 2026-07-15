@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   useEditor,
   EditorContent,
@@ -16,6 +16,8 @@ import TableHeader from "@tiptap/extension-table-header";
 import Placeholder from "@tiptap/extension-placeholder";
 import Highlight from "@tiptap/extension-highlight";
 import { Markdown } from "tiptap-markdown";
+import type { Node as PMNode } from "@tiptap/pm/model";
+import type MarkdownIt from "markdown-it";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
 import { AttachmentImage } from "./extensions/image";
@@ -41,6 +43,109 @@ const MarkdownHighlight = Highlight.extend({
     };
   },
 }).configure({ multicolor: true });
+
+/**
+ * Robust GFM table serializer. tiptap-markdown's built-in one bails to an HTML
+ * fallback (which, with html:false, writes the literal string "[table]" and
+ * DESTROYS the table on save) whenever a cell has more than one block child
+ * (e.g. multi-line author cells). This one handles every cell: it renders each
+ * block child inline, joining multiple blocks / in-cell line breaks with <br>
+ * (the read view turns <br> back into line breaks). Data is never lost.
+ */
+interface TableSerState {
+  inTable?: boolean;
+  out: string;
+  write: (s: string) => void;
+  ensureNewLine: () => void;
+  closeBlock: (n: PMNode) => void;
+  renderInline: (n: PMNode) => void;
+  text: (s: string, escape?: boolean) => void;
+  flushClose?: (size?: number) => void;
+}
+
+function serializeTable(state: TableSerState, node: PMNode): void {
+  state.inTable = true;
+  // Emit the pending block separator (e.g. after a preceding heading) BEFORE we
+  // start capturing cell output, otherwise the first cell swallows it.
+  state.flushClose?.(2);
+  node.forEach((row, _rp, rowIdx) => {
+    const cells: string[] = [];
+    row.forEach((cell) => {
+      // Capture each cell's inline markdown so we can post-process it: join
+      // multiple block children / hard breaks with <br>, undo the parser's
+      // HTML-escaping of literal <br> (&lt;br&gt;), and escape pipes.
+      const start = state.out.length;
+      cell.forEach((block, _bp, blockIdx) => {
+        if (blockIdx) state.write("<br>");
+        if (block.isTextblock) state.renderInline(block);
+        else state.text(block.textContent);
+      });
+      let md = state.out.slice(start);
+      state.out = state.out.slice(0, start); // rewind — we re-emit below
+      md = md
+        .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
+        .replace(/\r?\n+/g, "<br>")
+        .replace(/\|/g, "\\|")
+        .trim();
+      cells.push(md || " ");
+    });
+    state.write("| " + cells.join(" | ") + " |");
+    state.ensureNewLine();
+    if (rowIdx === 0) {
+      state.write("| " + cells.map(() => "---").join(" | ") + " |");
+      state.ensureNewLine();
+    }
+  });
+  state.closeBlock(node);
+  state.inTable = false;
+}
+
+/**
+ * Inject serializeTable into the live markdown serializer, overriding
+ * tiptap-markdown's fragile built-in (see serializeTable). Done post-create
+ * because the serializer instance only exists after the editor is built.
+ */
+function patchTableSerializer(editor: TiptapEditor): void {
+  const md = (
+    editor.storage as {
+      markdown?: {
+        serializer?: Record<string, unknown>;
+        parser?: { md?: MarkdownIt & { __brPatched?: boolean } };
+      };
+    }
+  ).markdown;
+
+  // Serialize: robust table serializer (see serializeTable).
+  const ser = md?.serializer;
+  if (ser) {
+    const proto = Object.getPrototypeOf(ser);
+    const desc = Object.getOwnPropertyDescriptor(proto, "nodes");
+    if (desc?.get) {
+      Object.defineProperty(ser, "nodes", {
+        configurable: true,
+        get() {
+          return { ...desc.get!.call(this), table: serializeTable };
+        },
+      });
+    }
+  }
+
+  // Parse: turn bare <br> into hard breaks (matches the read renderer). Without
+  // this the editor parses <br> as literal text and multi-line table cells come
+  // back as escaped "&lt;br&gt;", losing the in-cell line breaks on edit.
+  const parserMd = md?.parser?.md;
+  if (parserMd && !parserMd.__brPatched) {
+    parserMd.inline.ruler.before("text", "html_br", (state, silent): boolean => {
+      if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
+      const m = /^<br\s*\/?>/i.exec(state.src.slice(state.pos));
+      if (!m) return false;
+      if (!silent) state.push("hardbreak", "br", 0);
+      state.pos += m[0].length;
+      return true;
+    });
+    parserMd.__brPatched = true;
+  }
+}
 
 /**
  * With Table resizable:false prosemirror-tables renders a bare <table>; wide
@@ -74,7 +179,7 @@ export function useMarkdownEditor(
   filesRef.current = onFiles;
   // Created once per component mount (callers remount via key per document) —
   // recreating on every content/prop change would reset the cursor mid-typing.
-  return useEditor(
+  const editor = useEditor(
     {
       editable,
       editorProps: {
@@ -126,6 +231,14 @@ export function useMarkdownEditor(
     },
     [],
   );
+
+  // Override the fragile built-in table serializer once the editor (and its
+  // markdown serializer) exists — prevents tables being saved as "[table]".
+  useEffect(() => {
+    if (editor) patchTableSerializer(editor);
+  }, [editor]);
+
+  return editor;
 }
 
 export function getMarkdown(editor: TiptapEditor): string {

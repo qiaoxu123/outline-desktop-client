@@ -969,3 +969,37 @@
     margin-top: 16px;
   }
 }
+
+/* Drag/paste upload progress toast (fixed, bottom-center) */
+.upload-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 70vw;
+  padding: 10px 16px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: var(--text-sm);
+  z-index: 50;
+}
+.upload-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: upload-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

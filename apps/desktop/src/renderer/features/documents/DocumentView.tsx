@@ -797,16 +797,19 @@ function EditableDocument({
   // Drag/paste-to-upload: read from a ref so the (stable) editorProps handlers
   // always see the live editor instance created just below.
   const editorRef = useRef<ReturnType<typeof useMarkdownEditor>>(null);
+  const [uploads, setUploads] = useState<string[]>([]);
   const onFiles = useCallback(
     async (files: File[], pos: number) => {
       const ed = editorRef.current;
       if (!ed || !activeProfileId) return;
       let at = pos;
       for (const file of files) {
+        setUploads((u) => [...u, file.name]);
         try {
           const dataBase64 = await fileToBase64(file);
           const res = await unwrapIpc<{
             url: string;
+            absoluteUrl: string;
             name: string;
             isImage: boolean;
           }>(
@@ -827,36 +830,43 @@ function EditableDocument({
               })
               .run();
           } else {
-            // Non-image files: Outline (a) mangles CJK labels on attachment
-            // links and (b) strips any text sharing the link's line. So emit
-            // TWO paragraphs — the filename as bold text on its own line, then
-            // an ASCII "Download" link that survives the markdown round-trip.
+            // Non-image files: filename (bold) + a 下载 link on ONE line. Uses
+            // the ABSOLUTE url so Outline keeps it as a normal link (a relative
+            // attachment link would be block-converted, mangling the CJK label
+            // and stripping the filename).
             ed
               .chain()
               .focus()
-              .insertContentAt(at, [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: `📎 ${res.name}` },
-                  ],
-                },
-                {
-                  type: "paragraph",
-                  content: [
-                    {
-                      type: "text",
-                      marks: [{ type: "link", attrs: { href: res.url } }],
-                      text: "Download",
-                    },
-                  ],
-                },
-              ])
+              .insertContentAt(at, {
+                type: "paragraph",
+                content: [
+                  { type: "text", marks: [{ type: "bold" }], text: `📎 ${res.name}  ` },
+                  {
+                    type: "text",
+                    marks: [{ type: "link", attrs: { href: res.absoluteUrl } }],
+                    text: "下载",
+                  },
+                ],
+              })
               .run();
           }
           at = ed.state.selection.to;
         } catch (err) {
           console.error("[upload] failed:", err);
+          ed
+            .chain()
+            .focus()
+            .insertContentAt(at, {
+              type: "paragraph",
+              content: [{ type: "text", text: `⚠️ 上传失败：${file.name}` }],
+            })
+            .run();
+          at = ed.state.selection.to;
+        } finally {
+          setUploads((u) => {
+            const i = u.indexOf(file.name);
+            return i === -1 ? u : [...u.slice(0, i), ...u.slice(i + 1)];
+          });
         }
       }
     },
@@ -1098,6 +1108,12 @@ function EditableDocument({
         <div className="document-body">
           <MarkdownEditorContent editor={editor} onComment={onComment} />
         </div>
+        {uploads.length > 0 && (
+          <div className="upload-toast">
+            <span className="upload-spinner" />
+            正在上传 {uploads.length} 个文件…（{uploads.join("、")}）
+          </div>
+        )}
         {isDiscussTopic && (
           <div ref={inlineCommentsRef}>
             <CommentsPanel
