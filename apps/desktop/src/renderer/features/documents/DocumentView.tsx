@@ -733,6 +733,16 @@ function HistoryIcon(): React.ReactElement {
   return <OIcon name="history" size={18} />;
 }
 
+/** Read a dropped/pasted File as base64 (strips the data: URL prefix). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 /* ---------- always-on editor (editors): open == editable, autosaves ---------- */
 
 function EditableDocument({
@@ -784,7 +794,77 @@ function EditableDocument({
     [isDiscussTopic, scrollToInlineComments],
   );
 
-  const editor = useMarkdownEditor(doc.text, true, onCommentClick);
+  // Drag/paste-to-upload: read from a ref so the (stable) editorProps handlers
+  // always see the live editor instance created just below.
+  const editorRef = useRef<ReturnType<typeof useMarkdownEditor>>(null);
+  const onFiles = useCallback(
+    async (files: File[], pos: number) => {
+      const ed = editorRef.current;
+      if (!ed || !activeProfileId) return;
+      let at = pos;
+      for (const file of files) {
+        try {
+          const dataBase64 = await fileToBase64(file);
+          const res = await unwrapIpc<{
+            url: string;
+            name: string;
+            isImage: boolean;
+          }>(
+            api.attachments.upload(activeProfileId, {
+              documentId: doc.id,
+              name: file.name,
+              contentType: file.type || "application/octet-stream",
+              dataBase64,
+            }),
+          );
+          if (res.isImage) {
+            ed
+              .chain()
+              .focus()
+              .insertContentAt(at, {
+                type: "image",
+                attrs: { src: res.url, alt: res.name },
+              })
+              .run();
+          } else {
+            // Non-image files: Outline (a) mangles CJK labels on attachment
+            // links and (b) strips any text sharing the link's line. So emit
+            // TWO paragraphs — the filename as bold text on its own line, then
+            // an ASCII "Download" link that survives the markdown round-trip.
+            ed
+              .chain()
+              .focus()
+              .insertContentAt(at, [
+                {
+                  type: "paragraph",
+                  content: [
+                    { type: "text", marks: [{ type: "bold" }], text: `📎 ${res.name}` },
+                  ],
+                },
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      marks: [{ type: "link", attrs: { href: res.url } }],
+                      text: "Download",
+                    },
+                  ],
+                },
+              ])
+              .run();
+          }
+          at = ed.state.selection.to;
+        } catch (err) {
+          console.error("[upload] failed:", err);
+        }
+      }
+    },
+    [api, activeProfileId, doc.id],
+  );
+
+  const editor = useMarkdownEditor(doc.text, true, onCommentClick, onFiles);
+  editorRef.current = editor;
 
   // Dev-only handle for round-trip debugging (compare
   // __editor.storage.markdown.getMarkdown() against __docText in devtools).

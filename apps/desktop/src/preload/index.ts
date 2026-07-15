@@ -35,6 +35,18 @@ export interface ElectronAPI {
     get: (path: string) => Promise<unknown>;
     put: (path: string, content: string) => Promise<unknown>;
   };
+  /** Upload a file to Outline (drag/paste into the editor). Bytes are base64. */
+  attachments: {
+    upload: (
+      profileId: string,
+      payload: {
+        documentId?: string;
+        name: string;
+        contentType: string;
+        dataBase64: string;
+      },
+    ) => Promise<unknown>;
+  };
   /** Whitelisted pass-through to the Outline API (see main api.ts). */
   call: (
     profileId: string,
@@ -90,6 +102,10 @@ const api: ElectronAPI = {
   webdav: {
     get: (path) => ipcRenderer.invoke("webdav:get", { path }),
     put: (path, content) => ipcRenderer.invoke("webdav:put", { path, content }),
+  },
+  attachments: {
+    upload: (profileId, payload) =>
+      ipcRenderer.invoke("attachments:upload", { profileId, ...payload }),
   },
   call: (profileId, method, params) =>
     ipcRenderer.invoke("api:call", { profileId, method, params }),

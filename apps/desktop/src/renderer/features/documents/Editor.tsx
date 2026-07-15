@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   useEditor,
   EditorContent,
@@ -66,12 +66,37 @@ export function useMarkdownEditor(
   initialMarkdown: string,
   editable: boolean,
   onCommentClick?: (commentId: string) => void,
+  onFiles?: (files: File[], pos: number) => void,
 ): TiptapEditor | null {
+  // onFiles is read through a ref so the (once-created) editorProps handlers
+  // below always call the latest callback (which closes over the live editor).
+  const filesRef = useRef(onFiles);
+  filesRef.current = onFiles;
   // Created once per component mount (callers remount via key per document) —
   // recreating on every content/prop change would reset the cursor mid-typing.
   return useEditor(
     {
       editable,
+      editorProps: {
+        handlePaste: (view, event) => {
+          const files = Array.from(event.clipboardData?.files ?? []);
+          if (!files.length || !filesRef.current) return false;
+          event.preventDefault();
+          filesRef.current(files, view.state.selection.from);
+          return true;
+        },
+        handleDrop: (view, event) => {
+          const files = Array.from(event.dataTransfer?.files ?? []);
+          if (!files.length || !filesRef.current) return false;
+          event.preventDefault();
+          const at = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+          });
+          filesRef.current(files, at?.pos ?? view.state.selection.from);
+          return true;
+        },
+      },
       extensions: [
         StarterKit,
         // openOnClick so links (OneDrive/外部链接等) actually navigate on click

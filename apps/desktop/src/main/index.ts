@@ -10,6 +10,7 @@ import { registerAuthHandlers } from "./ipc/handlers/auth";
 import { registerApiHandlers } from "./ipc/handlers/api";
 import { registerPersonalNotesHandlers } from "./ipc/handlers/personalNotes";
 import { registerWebdavHandlers } from "./ipc/handlers/webdav";
+import { registerAttachmentHandlers } from "./ipc/handlers/attachments";
 
 // The Outline server (notes.jlu-mcns.site) is a domestic host reachable
 // directly — it must NOT be routed through a general-purpose proxy. We only
@@ -32,6 +33,7 @@ function registerAllIpcHandlers(): void {
   registerApiHandlers();
   registerPersonalNotesHandlers();
   registerWebdavHandlers();
+  registerAttachmentHandlers();
 
   // Attachment download: Chromium's downloader gets the Authorization header
   // from the webRequest hook above, so a plain downloadURL just works and

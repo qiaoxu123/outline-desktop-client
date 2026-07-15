@@ -1,3 +1,8 @@
+## [1.11.11] - 2026-07-15
+
+### Features
+- **编辑器支持拖拽 / 粘贴上传附件。** 把图片或文件拖进(或粘贴到)文档正文即自动上传到 Outline:上传走主进程(`attachments.create` → `files.create`,用 Electron `net.fetch`,API key 不进渲染进程)。图片插入为图片节点;其它文件插入为"文件名(粗体)+ 一行 Download 链接"两段式,规避 Outline 对含 CJK 的附件链接标签的损坏(会把中文标签变成 nullx0 并吞掉同行文字)。
+
 ## [1.11.10] - 2026-07-15
 
 ### Fixes
