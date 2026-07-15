@@ -55,6 +55,20 @@ function createMd(breaks: boolean): MarkdownIt {
       (markPlugin as unknown as MdPlugin),
   );
 
+  // Render bare <br> tags as real line breaks even though html:false. Outline
+  // serialises in-cell line breaks (and some hard breaks) as literal <br>, so
+  // without this every multi-line table cell shows literal "<br>" text. Only
+  // the exact <br>/<br/>/<br /> token is matched — no attributes, so it carries
+  // no HTML-injection surface (unlike enabling html:true wholesale).
+  inst.inline.ruler.before("text", "html_br", (state, silent): boolean => {
+    if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
+    const m = /^<br\s*\/?>/i.exec(state.src.slice(state.pos));
+    if (!m) return false;
+    if (!silent) state.push("hardbreak", "br", 0);
+    state.pos += m[0].length;
+    return true;
+  });
+
   // Wide tables scroll inside their own container instead of overflowing the
   // reading column (same .tableWrapper the editor emits).
   inst.renderer.rules.table_open = () => '<div class="tableWrapper"><table>';
