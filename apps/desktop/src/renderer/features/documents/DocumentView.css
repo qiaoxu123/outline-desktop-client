@@ -427,6 +427,62 @@
   font-weight: 600;
 }
 
+.document-body h5 {
+  font-size: 0.95em;
+  margin: 0.7em 0 0.3em;
+  font-weight: 600;
+}
+
+.document-body h6 {
+  font-size: 0.9em;
+  margin: 0.7em 0 0.3em;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Heading-level marker: a small gray H1/H2/… tag pinned in the left gutter so
+   you can tell a heading's level at a glance without it disturbing the text
+   flow. Fixed rem size keeps the tag identical across all heading sizes. */
+.document-body :is(h1, h2, h3, h4, h5, h6) {
+  position: relative;
+}
+
+.document-body :is(h1, h2, h3, h4, h5, h6)::before {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.5em;
+  top: 0.3em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  background: var(--color-bg-secondary, rgba(127, 127, 127, 0.12));
+  border-radius: 4px;
+  padding: 0 0.4em;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.document-body h1::before {
+  content: "H1";
+}
+.document-body h2::before {
+  content: "H2";
+}
+.document-body h3::before {
+  content: "H3";
+}
+.document-body h4::before {
+  content: "H4";
+}
+.document-body h5::before {
+  content: "H5";
+}
+.document-body h6::before {
+  content: "H6";
+}
+
 .document-body p {
   margin: 0.6em 0;
 }
