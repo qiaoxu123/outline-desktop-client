@@ -257,4 +257,34 @@ export const SEED_CARDS: SeedCard[] = [
     answer:
       "**全量微调（Full Fine-Tuning）**：更新模型全部参数——效果上限高，但显存/算力/存储开销大，每个任务都要存一份完整权重，易过拟合小数据。**高效微调（PEFT）**：冻结大部分参数、只训极少量新增/选中参数，如 **LoRA**（低秩增量矩阵，最主流）、Adapter、Prefix/Prompt Tuning、QLoRA（量化+LoRA）。区别：PEFT 用极小代价（<1% 参数）逼近全量效果，省显存、可多任务共享底座、便于部署，是资源受限下的首选。",
   },
+
+  // 补充：多模态表示学习（CLIP / SigLIP，归入「核心理论概念」）
+  {
+    id: "q33",
+    category: "核心理论概念",
+    question: "CLIP 的全称是什么？",
+    answer:
+      "**CLIP = Contrastive Language–Image Pre-training**（对比式语言-图像预训练），OpenAI 2021 年提出的图文多模态模型。它用一个**图像编码器**（ViT/ResNet）和一个**文本编码器**（Transformer）把图片和文本映射到**同一个向量空间**，从而能直接比较图文相似度。",
+  },
+  {
+    id: "q34",
+    category: "核心理论概念",
+    question: "CLIP 是如何训练的？",
+    answer:
+      "用约 **4 亿网络图文对**做**对比学习**：图、文各自编码后，一个 batch 内 N 张图 × N 段文构成 N×N 相似度矩阵，**对角线上匹配的图文对拉近、其余 N²−N 个不匹配的推远**（带温度系数的对称交叉熵，即 InfoNCE）。训练后即可把类别名写成「a photo of a {类别}」当分类器，做**零样本分类**。",
+  },
+  {
+    id: "q35",
+    category: "核心理论概念",
+    question: "SigLIP 的全称是什么？",
+    answer:
+      "**SigLIP = Sigmoid Loss for Language Image Pre-training**（用 Sigmoid 损失的语言-图像预训练），Google 2023 年提出，是 CLIP 的改进版，整体沿用「双编码器 + 图文对齐」的框架。",
+  },
+  {
+    id: "q36",
+    category: "核心理论概念",
+    question: "SigLIP 和 CLIP 的主要区别是什么？",
+    answer:
+      "**核心区别只在损失函数**。CLIP 用 softmax 对比损失，要在整个 batch 内做**全局归一化**（得凑齐所有样本算分母，依赖超大 batch）；SigLIP 改成**逐对独立的 sigmoid 二分类损失**——每个图文对单独判「匹配/不匹配」，**不需要全局归一化**。好处：更省显存、**小 batch 也能训得好**、更易分布式扩展。",
+  },
 ];

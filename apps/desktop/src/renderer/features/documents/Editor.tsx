@@ -74,7 +74,10 @@ export function useMarkdownEditor(
       editable,
       extensions: [
         StarterKit,
-        Link.configure({ openOnClick: false }),
+        // openOnClick so links (OneDrive/外部链接等) actually navigate on click
+        // in the always-on editor; window.open → main's setWindowOpenHandler →
+        // shell.openExternal opens them in the system browser.
+        Link.configure({ openOnClick: true }),
         AttachmentImage,
         TaskList,
         TaskItem.configure({ nested: true }),
