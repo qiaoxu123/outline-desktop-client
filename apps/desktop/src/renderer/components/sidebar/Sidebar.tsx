@@ -763,13 +763,13 @@ export default function Sidebar(): React.ReactElement {
         {navItem(
           "/discuss",
           "讨论区",
-          <OIcon name="comment" size={22} />,
+          <OIcon name="comment" size={18} />,
           true,
           discussNew,
         )}
-        {navItem("/papers", "论文库", <OIcon name="academicCap" size={22} />, true)}
-        {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={22} />, true)}
-        {navItem("/shares", "共享链接", <OIcon name="globe" size={22} />, true)}
+        {navItem("/papers", "论文库", <OIcon name="academicCap" size={18} />, true)}
+        {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={18} />, true)}
+        {navItem("/shares", "共享链接", <OIcon name="globe" size={18} />, true)}
       </nav>
 
       <div className="sb-scroll">

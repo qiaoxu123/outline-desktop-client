@@ -51,12 +51,12 @@
 .sb-nav-item.icon-only {
   position: relative;
   justify-content: center;
-  padding: 8px;
+  padding: 6px;
   gap: 0;
 }
 
 .sb-nav-item.icon-only svg {
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 /* divider between the content-space icons and 设置 */
