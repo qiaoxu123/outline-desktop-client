@@ -720,21 +720,19 @@ export default function Sidebar(): React.ReactElement {
     icon: React.ReactElement,
     iconOnly = false,
     badge = 0,
-    stacked = false,
   ): React.ReactElement => (
     <a
       href={`#${path}`}
       aria-label={iconOnly ? label : undefined}
-      className={`sb-nav-item ${iconOnly ? "icon-only" : ""} ${stacked ? "stacked" : ""} ${location.pathname === path ? "active" : ""}`}
+      title={iconOnly ? label : undefined}
+      className={`sb-nav-item ${iconOnly ? "icon-only" : ""} ${location.pathname === path ? "active" : ""}`}
       onClick={(e) => {
         e.preventDefault();
         navigate(path);
       }}
     >
       {icon}
-      {(!iconOnly || stacked) && (
-        <span className={stacked ? "sb-nav-label" : undefined}>{label}</span>
-      )}
+      {!iconOnly && <span>{label}</span>}
       {badge > 0 && (
         <span className="sb-badge" title={`${badge} 条新动态`}>
           {badge > 99 ? "99+" : badge}
@@ -761,41 +759,17 @@ export default function Sidebar(): React.ReactElement {
           <OIcon name="settings" size={18} />,
           true,
         )}
-      </nav>
-
-      <nav className="sb-content-nav">
+        <span className="sb-nav-divider" aria-hidden="true">｜</span>
         {navItem(
           "/discuss",
           "讨论区",
-          <OIcon name="comment" size={20} />,
-          false,
+          <OIcon name="comment" size={22} />,
+          true,
           discussNew,
-          true,
         )}
-        {navItem(
-          "/papers",
-          "论文库",
-          <OIcon name="academicCap" size={20} />,
-          false,
-          0,
-          true,
-        )}
-        {navItem(
-          "/quiz",
-          "自测题库",
-          <OIcon name="checkbox" size={20} />,
-          false,
-          0,
-          true,
-        )}
-        {navItem(
-          "/shares",
-          "共享链接",
-          <OIcon name="globe" size={20} />,
-          false,
-          0,
-          true,
-        )}
+        {navItem("/papers", "论文库", <OIcon name="academicCap" size={22} />, true)}
+        {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={22} />, true)}
+        {navItem("/shares", "共享链接", <OIcon name="globe" size={22} />, true)}
       </nav>
 
       <div className="sb-scroll">
