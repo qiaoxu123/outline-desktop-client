@@ -33,6 +33,31 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "title", label: "标题 A→Z" },
 ];
 
+/**
+ * Session-scoped memory of the last search / filter / sort. Opening a paper
+ * navigates to /document/:id, which unmounts this view; going back remounts it
+ * and would otherwise reset every control to its default (the full library,
+ * scrolled to top — feels like landing on a fresh page). Seeding the initial
+ * state from here restores the user's previous result list. Cleared on app
+ * restart, mirroring AppShell's per-route scroll memory.
+ */
+type PapersUiState = {
+  q: string;
+  year: number | null;
+  month: number | null;
+  tag: string | null;
+  readFilter: ReadState | null;
+  sortKey: SortKey;
+};
+let savedUi: PapersUiState = {
+  q: "",
+  year: null,
+  month: null,
+  tag: null,
+  readFilter: null,
+  sortKey: "recommended",
+};
+
 function StarPicker({
   myScore,
   onPick,
@@ -104,7 +129,7 @@ function PaperRow({
         <div className="paper-meta-line">
           {paper.year && (
             <span className="paper-when">
-              推荐于 {paper.year}·{paper.month ?? "?"}月
+              推荐阅读 · {paper.year} · {paper.month ?? "?"}月
             </span>
           )}
           {!paper.year && paper.topic && (
@@ -215,12 +240,18 @@ export default function PapersView(): React.ReactElement {
   const { stateFor, cycle } = useReadStates();
   const { menu: contextMenu, onContextMenu } = useDocContextMenu();
 
-  const [q, setQ] = useState("");
-  const [year, setYear] = useState<number | null>(null);
-  const [month, setMonth] = useState<number | null>(null);
-  const [tag, setTag] = useState<string | null>(null);
-  const [readFilter, setReadFilter] = useState<ReadState | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("recommended");
+  const [q, setQ] = useState(savedUi.q);
+  const [year, setYear] = useState<number | null>(savedUi.year);
+  const [month, setMonth] = useState<number | null>(savedUi.month);
+  const [tag, setTag] = useState<string | null>(savedUi.tag);
+  const [readFilter, setReadFilter] = useState<ReadState | null>(savedUi.readFilter);
+  const [sortKey, setSortKey] = useState<SortKey>(savedUi.sortKey);
+
+  // Persist search / filter / sort so back-navigation restores this exact list
+  // (paired with AppShell's per-route scroll restore for /papers).
+  useEffect(() => {
+    savedUi = { q, year, month, tag, readFilter, sortKey };
+  }, [q, year, month, tag, readFilter, sortKey]);
 
   // Changing search/filter/sort re-composes the list from the top, so jump
   // the shared scroll container back up — otherwise a previously scrolled

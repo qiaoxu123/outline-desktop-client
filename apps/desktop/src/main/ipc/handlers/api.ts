@@ -24,6 +24,10 @@ const ALLOWED_METHODS = new Set([
   "stars.delete",
   // shares
   "shares.list",
+  "shares.info",
+  "shares.create",
+  "shares.update",
+  "shares.revoke",
   // documents
   "documents.viewed",
   "documents.list",
