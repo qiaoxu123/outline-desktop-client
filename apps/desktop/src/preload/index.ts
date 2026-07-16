@@ -55,6 +55,8 @@ export interface ElectronAPI {
   ) => Promise<unknown>;
   /** Download a server attachment via Chromium (auth header injected in main). */
   downloadUrl: (url: string) => Promise<unknown>;
+  /** Windows only: recolor the native window-controls overlay for the theme. */
+  setTitleBarOverlay: (color: string, symbolColor: string) => void;
   /** Pointer to the user's personal-notes folder on the server. */
   personalNotes: {
     getRoot: (profileId: string) => Promise<unknown>;
@@ -110,6 +112,8 @@ const api: ElectronAPI = {
   call: (profileId, method, params) =>
     ipcRenderer.invoke("api:call", { profileId, method, params }),
   downloadUrl: (url) => ipcRenderer.invoke("attachments:download", { url }),
+  setTitleBarOverlay: (color, symbolColor) =>
+    ipcRenderer.send("win:setTitleBarOverlay", { color, symbolColor }),
   personalNotes: {
     getRoot: (profileId) =>
       ipcRenderer.invoke("personalNotes:getRoot", profileId),

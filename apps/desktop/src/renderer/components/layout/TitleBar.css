@@ -10,6 +10,16 @@
   user-select: none;
 }
 
+/* Windows frameless: keep the right-side icons clear of the native window-
+   controls overlay (min/max/close). titlebar-area-width is the draggable width
+   (window minus overlay); the difference is exactly the overlay's width, which
+   adapts to DPI scaling. Falls back to 138px if the env var is unavailable. */
+:root[data-os="win"] .titlebar {
+  padding-right: calc(
+    100vw - env(titlebar-area-width, calc(100vw - 138px))
+  );
+}
+
 /* Containers stay draggable — only the interactive controls opt out,
    otherwise the full-width left container makes the whole bar undraggable. */
 .titlebar-left,

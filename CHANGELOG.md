@@ -1,3 +1,8 @@
+## [1.11.17] - 2026-07-16
+
+### Features (Windows)
+- **Windows 顶部改为无边框单行,对齐 macOS。** 去掉原生深色标题栏,窗口用 `titleBarStyle: hidden` + 原生"窗口控件覆盖层"(min/max/close 显示在右上角,颜色随主题联动);应用自绘的工具栏成为唯一顶栏,右侧图标用 `env(titlebar-area-width)` 自动避让覆盖层(适配 DPI 缩放)。整个顶部从"原生标题栏 + 菜单 + 工具栏"三行压缩为一行。
+
 ## [1.11.16] - 2026-07-16
 
 ### Fixes (Windows)

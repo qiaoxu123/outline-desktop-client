@@ -1,4 +1,12 @@
-import { app, BrowserWindow, ipcMain, net, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeTheme,
+  net,
+  session,
+  shell,
+} from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { setFetchImplementation } from "@outline/api-client";
@@ -35,6 +43,25 @@ function registerAllIpcHandlers(): void {
   registerWebdavHandlers();
   registerAttachmentHandlers();
 
+  // Windows: recolor the native window-controls overlay when the app theme
+  // changes so min/max/close blend with the (custom) titlebar background.
+  ipcMain.on(
+    "win:setTitleBarOverlay",
+    (e, overlay: { color: string; symbolColor: string }) => {
+      if (process.platform !== "win32") return;
+      const win = BrowserWindow.fromWebContents(e.sender);
+      try {
+        win?.setTitleBarOverlay?.({
+          color: overlay.color,
+          symbolColor: overlay.symbolColor,
+          height: 48,
+        });
+      } catch {
+        // overlay only exists when the window was created with titleBarOverlay
+      }
+    },
+  );
+
   // Attachment download: Chromium's downloader gets the Authorization header
   // from the webRequest hook above, so a plain downloadURL just works and
   // shows the native save dialog.
@@ -60,14 +87,27 @@ function createMainWindow(): BrowserWindow {
     // redundant with the app's own toolbar and looks cluttered. Alt still
     // reveals it, and its accelerators (Ctrl+C/V etc.) keep working.
     autoHideMenuBar: true,
-    // hiddenInset/trafficLightPosition are macOS-only; Windows/Linux keep the
-    // native frame so window controls (minimize/maximize/close) work normally.
+    // macOS: inset traffic lights. Windows: frameless with a native window-
+    // controls overlay (min/max/close top-right, themed) so the top matches the
+    // macOS single-row look instead of a native title bar + menu. Linux keeps
+    // the native frame.
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hiddenInset" as const,
           trafficLightPosition: { x: 16, y: 16 },
         }
-      : {}),
+      : process.platform === "win32"
+        ? {
+            titleBarStyle: "hidden" as const,
+            titleBarOverlay: {
+              color: nativeTheme.shouldUseDarkColors ? "#111319" : "#ffffff",
+              symbolColor: nativeTheme.shouldUseDarkColors
+                ? "#e6e6e6"
+                : "#111319",
+              height: 48,
+            },
+          }
+        : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: true,

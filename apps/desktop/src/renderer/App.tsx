@@ -176,6 +176,13 @@ function useApplyTheme(): void {
     const apply = () => {
       const dark = theme === "dark" || (theme === "system" && mq.matches);
       root.setAttribute("data-theme", dark ? "dark" : "light");
+      // Windows: match the native window-controls overlay to the titlebar bg.
+      if (window.electronAPI?.platform === "win32") {
+        const cs = getComputedStyle(root);
+        const bg = cs.getPropertyValue("--color-bg").trim() || (dark ? "#111319" : "#ffffff");
+        const fg = cs.getPropertyValue("--color-text").trim() || (dark ? "#e6e6e6" : "#111319");
+        window.electronAPI.setTitleBarOverlay(bg, fg);
+      }
     };
 
     apply();
