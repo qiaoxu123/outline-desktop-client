@@ -24,6 +24,7 @@ export default function TabBar(): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!menu) return;
@@ -41,11 +42,19 @@ export default function TabBar(): React.ReactElement | null {
     };
   }, [menu]);
 
-  if (tabs.length === 0) return null;
-
   const activeId = location.pathname.startsWith("/document/")
     ? location.pathname.slice("/document/".length)
     : null;
+
+  // Keep the active tab visible — a newly opened doc's tab is appended off the
+  // right edge; scroll it into view (VSCode/Chrome behaviour).
+  useEffect(() => {
+    stripRef.current
+      ?.querySelector<HTMLElement>(".tab.active")
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [activeId, tabs.length]);
+
+  if (tabs.length === 0) return null;
 
   /** After bulk-closing, land somewhere sensible if the active tab is gone. */
   const ensureActiveVisible = () => {
@@ -79,7 +88,18 @@ export default function TabBar(): React.ReactElement | null {
   );
 
   return (
-    <div className="tabbar">
+    <div
+      className="tabbar"
+      ref={stripRef}
+      onWheel={(e) => {
+        // Mouse wheel is vertical; translate it to horizontal tab scrolling so
+        // overflowed tabs are reachable (trackpad horizontal swipe already works).
+        const el = stripRef.current;
+        if (el && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          el.scrollLeft += e.deltaY;
+        }
+      }}
+    >
       {tabs.map((tab) => (
         <div
           key={tab.documentId}
