@@ -1,3 +1,9 @@
+## [1.11.16] - 2026-07-16
+
+### Fixes (Windows)
+- **隐藏 Windows 原生菜单栏。** 窗口加 `autoHideMenuBar`,去掉与应用自身工具栏重复、显得杂乱的 File/Edit/View/Window 菜单条(按 Alt 仍可临时唤出,快捷键照常)。
+- **侧边栏在 Windows 上更紧凑。** Windows 字体渲染比 macOS 重、Segoe UI 也略大,同一套 CSS 在 Windows 上显得"粗"。新增 `data-os` 根标记 + 仅 Windows 生效的样式:侧边栏字号 14→13、行高与行内边距收紧,视觉密度对齐 macOS。
+
 ## [1.11.15] - 2026-07-16
 
 ### Features

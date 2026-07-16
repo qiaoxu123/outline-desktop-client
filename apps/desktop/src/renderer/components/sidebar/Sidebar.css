@@ -575,3 +575,34 @@
 .sb-modal-doc:hover {
   background: var(--color-hover, rgba(0, 0, 0, 0.06));
 }
+
+/* ---- Windows: match the macOS build's visual density ----
+   Windows renders text heavier than macOS's antialiasing (no -webkit-font-
+   smoothing equivalent) and Segoe UI is slightly larger than SF, so the same
+   CSS looks noticeably bulkier. Tighten font-size / line-height / row padding
+   only on Windows so the sidebar reads as compact as on macOS. */
+:root[data-os="win"] .sidebar {
+  font-size: 13px;
+}
+:root[data-os="win"] .sb-link,
+:root[data-os="win"] .sb-nav-item {
+  font-size: 13px;
+  line-height: 1.3;
+}
+:root[data-os="win"] .sb-link {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+:root[data-os="win"] .sb-nav-item {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+:root[data-os="win"] .sb-item {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+:root[data-os="win"] .sb-section-header {
+  font-size: 11px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}

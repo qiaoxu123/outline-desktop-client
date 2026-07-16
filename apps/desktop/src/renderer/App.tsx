@@ -99,6 +99,16 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
   const [loading, setLoading] = useState(true);
   const [loginNotice, setLoginNotice] = useState("");
 
+  // Tag the root with the OS so platform-specific CSS can adjust (e.g. Windows
+  // renders text heavier than macOS antialiasing — the sidebar tightens there).
+  useEffect(() => {
+    const p = api.platform;
+    document.documentElement.setAttribute(
+      "data-os",
+      p === "darwin" ? "mac" : p === "win32" ? "win" : "linux",
+    );
+  }, [api]);
+
   useEffect(() => {
     const init = async () => {
       const r = (await api.profiles.list()) as {

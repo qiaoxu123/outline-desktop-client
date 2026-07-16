@@ -56,6 +56,10 @@ function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    // Hide the native File/Edit/View/Window menu bar (Windows/Linux) — it's
+    // redundant with the app's own toolbar and looks cluttered. Alt still
+    // reveals it, and its accelerators (Ctrl+C/V etc.) keep working.
+    autoHideMenuBar: true,
     // hiddenInset/trafficLightPosition are macOS-only; Windows/Linux keep the
     // native frame so window controls (minimize/maximize/close) work normally.
     ...(process.platform === "darwin"
