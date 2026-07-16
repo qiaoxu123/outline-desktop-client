@@ -508,6 +508,34 @@
   cursor: default;
 }
 
+/* "暂时跳过" inside the setup prompt, and the collapsed re-open link */
+.sb-personal-skip {
+  width: 100%;
+  padding: 4px 10px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.sb-personal-skip:hover {
+  color: var(--color-text-secondary);
+}
+
+.sb-personal-skip-link {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 8px 6px;
+  text-align: left;
+}
+.sb-personal-skip-link:hover {
+  color: var(--color-primary);
+}
+
 /* ---------- personal-root picker modal ---------- */
 .sb-modal-backdrop {
   position: fixed;

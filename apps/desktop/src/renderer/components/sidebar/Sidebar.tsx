@@ -542,6 +542,18 @@ function PersonalNotesSection(): React.ReactElement {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [notice, setNotice] = useState("");
+  // Let users skip the "point me at your folder" prompt and self-select later.
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem("ui.personalNotesSkip") === "1",
+  );
+  const skip = () => {
+    localStorage.setItem("ui.personalNotesSkip", "1");
+    setDismissed(true);
+  };
+  const unskip = () => {
+    localStorage.removeItem("ui.personalNotesSkip");
+    setDismissed(false);
+  };
 
   const handleSetup = async (): Promise<void> => {
     setDetecting(true);
@@ -583,7 +595,7 @@ function PersonalNotesSection(): React.ReactElement {
         )}
       </div>
 
-      {!root && (
+      {!root && !dismissed && (
         <div className="sb-personal-setup">
           <p className="sb-note">把这里指向你在服务器上的个人目录。</p>
           <button
@@ -599,8 +611,17 @@ function PersonalNotesSection(): React.ReactElement {
           >
             手动选择…
           </button>
+          <button className="sb-personal-skip" onClick={skip}>
+            暂时跳过，稍后再选
+          </button>
           {notice && <p className="sb-note error">{notice}</p>}
         </div>
+      )}
+
+      {!root && dismissed && (
+        <button className="sb-personal-skip-link" onClick={unskip}>
+          设置个人笔记…
+        </button>
       )}
 
       {root && (
