@@ -1090,7 +1090,7 @@ function EditableDocument({
         </div>
       </TopRightActions>
       {shareOpen && (
-        <ShareDialog documentId={doc.id} onClose={() => setShareOpen(false)} />
+        <ShareDialog url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""} onClose={() => setShareOpen(false)} />
       )}
       <article className="document-article">
         <header className="document-header">
@@ -1182,7 +1182,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
   return (
     <div className={`document-layout ${isDiscussTopic ? "discuss-topic" : ""}`}>
       {shareOpen && (
-        <ShareDialog documentId={doc.id} onClose={() => setShareOpen(false)} />
+        <ShareDialog url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""} onClose={() => setShareOpen(false)} />
       )}
       <TopRightActions>
         <div className="document-actions">
