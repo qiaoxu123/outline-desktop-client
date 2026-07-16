@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
@@ -14,6 +14,7 @@ import {
   markDiscussVisited,
   type TopicWithActivity,
 } from "./useDiscuss";
+import { useDiscussLikes, useDiscussViews } from "./useDiscussStats";
 import "./DiscussView.css";
 
 const UNCATEGORIZED = "__none__";
@@ -38,6 +39,11 @@ function TopicRow({
   deleting,
   isUnread,
   onContextMenu,
+  likeCount,
+  liked,
+  canInteract,
+  onToggleLike,
+  viewCount,
 }: {
   row: TopicWithActivity;
   ownUserId?: string;
@@ -46,6 +52,11 @@ function TopicRow({
   deleting: boolean;
   isUnread: (id: string, lastActivity: string) => boolean;
   onContextMenu: (e: React.MouseEvent) => void;
+  likeCount: number;
+  liked: boolean;
+  canInteract: boolean;
+  onToggleLike: () => void;
+  viewCount: number | undefined;
 }): React.ReactElement {
   const { topic, replyCount, lastActivity } = row;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -80,6 +91,11 @@ function TopicRow({
           {topic.createdBy?.name} · 最后活动 {timeAgo(lastActivity)}
         </span>
       </span>
+      {(viewCount ?? 0) > 0 && (
+        <span className="topic-views" title={`${viewCount} 次阅读`}>
+          {viewCount} 阅读
+        </span>
+      )}
       <span
         className={`topic-replies ${replyCount > 0 ? "" : "empty"}`}
         title={replyCount > 0 ? `${replyCount} 回复` : "暂无回复"}
@@ -87,6 +103,18 @@ function TopicRow({
         <OIcon name="comment" size={15} />
         {replyCount > 0 && <span className="topic-replies-count">{replyCount}</span>}
       </span>
+      <button
+        className={`topic-like ${liked ? "liked" : ""}`}
+        disabled={!canInteract}
+        title={liked ? "取消点赞" : "点赞"}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleLike();
+        }}
+      >
+        <OIcon name="thumbsUp" size={14} />
+        {likeCount > 0 && <span className="topic-like-count">{likeCount}</span>}
+      </button>
       {own && (
         <button
           className={`topic-delete ${confirmDelete ? "danger" : ""}`}
@@ -117,6 +145,9 @@ export default function DiscussView(): React.ReactElement {
     useTopicsWithActivity(collectionId);
   const { isUnread, markSeen } = useTopicSeen();
   const { menu: contextMenu, onContextMenu } = useDocContextMenu();
+  const { likeInfo, toggleLike, canInteract } = useDiscussLikes();
+  const topicIds = useMemo(() => rows.map((r) => r.topic.id), [rows]);
+  const views = useDiscussViews(topicIds);
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState("");
   const [composeCategory, setComposeCategory] = useState<string>(UNCATEGORIZED);
@@ -293,6 +324,11 @@ export default function DiscussView(): React.ReactElement {
                 title: row.topic.title || "无标题",
               })
             }
+            likeCount={likeInfo(row.topic.id).count}
+            liked={likeInfo(row.topic.id).mine}
+            canInteract={canInteract}
+            onToggleLike={() => toggleLike(row.topic.id)}
+            viewCount={views.get(row.topic.id)}
           />
         ))}
       </div>

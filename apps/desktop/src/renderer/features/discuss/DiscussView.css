@@ -215,3 +215,41 @@
   color: var(--color-danger);
   font-weight: 600;
 }
+
+/* topic like + view count (right side of each row, like the paper library) */
+.topic-views {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.topic-like {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.topic-like:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+.topic-like.liked {
+  color: var(--color-primary);
+}
+.topic-like:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.topic-like-count {
+  font-variant-numeric: tabular-nums;
+}
