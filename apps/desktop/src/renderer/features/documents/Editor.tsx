@@ -203,11 +203,15 @@ export function useMarkdownEditor(
   editable: boolean,
   onCommentClick?: (commentId: string) => void,
   onFiles?: (files: File[], pos: number) => void,
+  onLinkClick?: (href: string) => void,
 ): TiptapEditor | null {
-  // onFiles is read through a ref so the (once-created) editorProps handlers
-  // below always call the latest callback (which closes over the live editor).
+  // onFiles/onLinkClick are read through refs so the (once-created) editorProps
+  // handlers below always call the latest callback (which closes over the live
+  // editor / router).
   const filesRef = useRef(onFiles);
   filesRef.current = onFiles;
+  const linkRef = useRef(onLinkClick);
+  linkRef.current = onLinkClick;
   // Created once per component mount (callers remount via key per document) —
   // recreating on every content/prop change would reset the cursor mid-typing.
   const editor = useEditor(
@@ -232,13 +236,24 @@ export function useMarkdownEditor(
           filesRef.current(files, at?.pos ?? view.state.selection.from);
           return true;
         },
+        handleClick: (_view, _pos, event) => {
+          // Route link clicks through onLinkClick: internal doc links open as an
+          // in-app tab, external links open in the system browser.
+          const a = (event.target as HTMLElement).closest("a");
+          const href = a?.getAttribute("href");
+          if (a && href && linkRef.current) {
+            event.preventDefault();
+            linkRef.current(href);
+            return true;
+          }
+          return false;
+        },
       },
       extensions: [
         StarterKit,
-        // openOnClick so links (OneDrive/外部链接等) actually navigate on click
-        // in the always-on editor; window.open → main's setWindowOpenHandler →
-        // shell.openExternal opens them in the system browser.
-        Link.configure({ openOnClick: true }),
+        // openOnClick off — handleClick above routes internal links to an in-app
+        // tab and external links to the system browser.
+        Link.configure({ openOnClick: false }),
         AttachmentImage,
         TaskList,
         TaskItem.configure({ nested: true }),

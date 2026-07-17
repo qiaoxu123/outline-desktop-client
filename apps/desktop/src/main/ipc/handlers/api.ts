@@ -29,6 +29,7 @@ const ALLOWED_METHODS = new Set([
   "shares.update",
   "shares.revoke",
   // documents
+  "documents.info",
   "documents.viewed",
   "documents.list",
   "documents.recently_viewed",

@@ -3,7 +3,7 @@ import { useUIStore } from "../state/uiStore";
 import { useElectronAPI } from "./useElectronAPI";
 import { unwrapIpc } from "../lib/ipc";
 
-const SERVER_URL = "https://notes.jlu-mcns.site";
+export const SERVER_URL = "https://notes.jlu-mcns.site";
 
 /* ---------- auth.info: current user + team ---------- */
 

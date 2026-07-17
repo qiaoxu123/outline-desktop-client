@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import katexPlugin from "@vscode/markdown-it-katex";
@@ -6,6 +7,9 @@ import markPlugin from "markdown-it-mark";
 import hljs from "highlight.js";
 import { absoluteAttachmentUrl } from "../server";
 import { parseImageTitle } from "./imageTitle";
+import { openOutlineLink } from "../outlineLinks";
+import { useElectronAPI } from "../../hooks/useElectronAPI";
+import { useUIStore } from "../../state/uiStore";
 import "katex/dist/katex.min.css";
 import "./highlight-theme.css";
 
@@ -142,14 +146,28 @@ export function MarkdownRenderer({
   content,
   breaks = false,
 }: MarkdownRendererProps): React.ReactElement {
+  const navigate = useNavigate();
+  const api = useElectronAPI();
+  const profileId = useUIStore((s) => s.activeProfileId);
   const html = useMemo(
     () => (breaks ? mdBreaks : md).render(content),
     [content, breaks],
   );
 
+  const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const a = (e.target as HTMLElement).closest("a");
+    if (!a) return;
+    const href = a.getAttribute("href");
+    if (!href || href.startsWith("#")) return; // in-page anchors, footnotes, etc.
+    // Internal doc/share links open as an in-app tab; external → system browser.
+    e.preventDefault();
+    void openOutlineLink(href, { navigate, api, profileId });
+  };
+
   return (
     <div
       className="markdown-body"
+      onClick={onClick}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

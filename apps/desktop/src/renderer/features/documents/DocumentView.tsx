@@ -21,6 +21,7 @@ import {
 } from "./Editor";
 import { commentHighlightsKey } from "./extensions/commentHighlights";
 import { ShareDialog } from "./ShareDialog";
+import { openOutlineLink } from "../../lib/outlineLinks";
 import { OIcon } from "../../components/outlineIcons";
 import { discussCollectionId } from "../discuss/useDiscuss";
 import type { OutlineDocument } from "@outline/shared-types";
@@ -754,6 +755,7 @@ function EditableDocument({
   onRestored: () => void;
 }): React.ReactElement {
   const api = useElectronAPI();
+  const navigate = useNavigate();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const showToc = useUIStore((s) => s.showToc);
   const queryClient = useQueryClient();
@@ -875,7 +877,20 @@ function EditableDocument({
     [api, activeProfileId, doc.id],
   );
 
-  const editor = useMarkdownEditor(doc.text, true, onCommentClick, onFiles);
+  const onLinkClick = useCallback(
+    (href: string) => {
+      void openOutlineLink(href, { navigate, api, profileId: activeProfileId });
+    },
+    [navigate, api, activeProfileId],
+  );
+
+  const editor = useMarkdownEditor(
+    doc.text,
+    true,
+    onCommentClick,
+    onFiles,
+    onLinkClick,
+  );
   editorRef.current = editor;
 
   // Dev-only handle for round-trip debugging (compare
