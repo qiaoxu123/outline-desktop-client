@@ -455,3 +455,25 @@ body.image-resizing {
 .doc-editor .ProseMirror th > p {
   margin: 0;
 }
+
+/* table editing menu (text buttons) */
+.table-menu {
+  gap: 1px;
+}
+.table-btn {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: background 0.08s, color 0.08s;
+}
+.table-btn:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+}

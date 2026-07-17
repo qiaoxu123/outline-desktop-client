@@ -519,6 +519,19 @@ function SelectionToolbar({
       >
         <OIcon name="orderedList" />
       </ToolbarButton>
+      <ToolbarButton
+        title="插入表格 (3×3)"
+        active={editor.isActive("table")}
+        onClick={() =>
+          editor
+            .chain()
+            .focus()
+            .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+            .run()
+        }
+      >
+        <OIcon name="table" />
+      </ToolbarButton>
 
       <span className="bubble-divider" />
 
@@ -544,6 +557,46 @@ function SelectionToolbar({
   );
 }
 
+/* ---------- table editing menu (shown when the cursor is in a table) ---------- */
+
+function TableMenu({ editor }: { editor: TiptapEditor }): React.ReactElement {
+  const chain = () => editor.chain().focus();
+  const btn = (label: string, title: string, run: () => void) => (
+    <button
+      type="button"
+      className="table-btn"
+      title={title}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        run();
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <BubbleMenu
+      editor={editor}
+      pluginKey="tableMenu"
+      shouldShow={({ editor: ed }) => ed.isActive("table")}
+      tippyOptions={{ duration: 100, placement: "bottom", maxWidth: "none" }}
+      className="bubble-menu table-menu"
+    >
+      {btn("＋行↑", "上方插入行", () => chain().addRowBefore().run())}
+      {btn("＋行↓", "下方插入行", () => chain().addRowAfter().run())}
+      {btn("✕行", "删除当前行", () => chain().deleteRow().run())}
+      <span className="bubble-divider" />
+      {btn("＋列←", "左侧插入列", () => chain().addColumnBefore().run())}
+      {btn("＋列→", "右侧插入列", () => chain().addColumnAfter().run())}
+      {btn("✕列", "删除当前列", () => chain().deleteColumn().run())}
+      <span className="bubble-divider" />
+      {btn("合并/拆分", "合并或拆分单元格", () => chain().mergeOrSplit().run())}
+      {btn("表头", "切换表头行", () => chain().toggleHeaderRow().run())}
+      {btn("删除表格", "删除整个表格", () => chain().deleteTable().run())}
+    </BubbleMenu>
+  );
+}
+
 export function MarkdownEditorContent({
   editor,
   onComment,
@@ -554,6 +607,7 @@ export function MarkdownEditorContent({
   return (
     <>
       {editor && <SelectionToolbar editor={editor} onComment={onComment} />}
+      {editor && <TableMenu editor={editor} />}
       <EditorContent editor={editor} className="doc-editor" />
     </>
   );
