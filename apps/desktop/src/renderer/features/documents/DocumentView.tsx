@@ -263,62 +263,48 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
   );
 }
 
-/* ---------- paper interactions (likes + star ratings, shared with 论文库) ---------- */
+/* ---------- paper byline (view count + like, shown under the title) ---------- */
 
-function PaperInteractionBar({
+function PaperByline({
   documentId,
 }: {
   documentId: string;
 }): React.ReactElement {
-  const { summaryFor, toggleLike, setScore, canInteract } =
-    usePaperInteractions(null);
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { summaryFor, toggleLike, canInteract } = usePaperInteractions(null);
   const s = summaryFor(documentId);
 
+  // Same query key as <Viewers>, so this shares its cached views.list result.
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "views", documentId],
+    queryFn: () =>
+      unwrapIpc<{ data: Viewer[] }>(
+        api.call(activeProfileId!, "views.list", { documentId }),
+      ),
+    enabled: !!activeProfileId,
+    refetchInterval: 30_000,
+  });
+  const totalViews = (data?.data ?? []).reduce(
+    (sum, v) => sum + (v.count ?? 1),
+    0,
+  );
+
   return (
-    <div className="paper-ix-bar">
+    <div className="paper-byline">
+      <span className="paper-byline-views">{totalViews} 次浏览</span>
+      <span className="paper-byline-sep" aria-hidden="true">
+        ·
+      </span>
       <button
-        className={`paper-ix-like ${s.myLike ? "liked" : ""}`}
+        className={`paper-byline-like ${s.myLike ? "liked" : ""}`}
         onClick={() => toggleLike(documentId)}
         disabled={!canInteract}
-        title={
-          !canInteract ? "登录后可点赞" : s.myLike ? "取消点赞" : "点赞"
-        }
+        title={!canInteract ? "登录后可点赞" : s.myLike ? "取消点赞" : "点赞"}
       >
         <OIcon name="thumbsUp" size={14} />
-        <span className="paper-ix-like-count">{s.likes}</span>
+        <span>{s.likes}</span>
       </button>
-      <div
-        className={`paper-ix-stars ${s.myScore !== null ? "mine" : ""}`}
-        title={
-          !canInteract
-            ? "登录后可评分"
-            : s.myScore !== null
-              ? `我的评分：${s.myScore} 星（再点同一颗可清除）`
-              : "点星评分"
-        }
-      >
-        {[1, 2, 3, 4, 5].map((k) => {
-          const filled =
-            s.scoreAvg !== null && k <= Math.round(s.scoreAvg);
-          return (
-            <button
-              key={k}
-              className={`paper-ix-star ${filled ? "filled" : ""}`}
-              onClick={() =>
-                setScore(documentId, s.myScore === k ? null : k)
-              }
-              disabled={!canInteract}
-            >
-              <OIcon name={filled ? "starred" : "unstarred"} size={14} />
-            </button>
-          );
-        })}
-        {s.scoreAvg !== null && (
-          <span className="paper-ix-score">
-            {s.scoreAvg.toFixed(1)}（{s.scoreCount}）
-          </span>
-        )}
-      </div>
     </div>
   );
 }
@@ -1218,10 +1204,7 @@ function EditableDocument({
               {saveLabel}
             </span>
           )}
-          <Viewers documentId={doc.id} />
-          {doc.title.startsWith("📖") && (
-            <PaperInteractionBar documentId={doc.id} />
-          )}
+          {!doc.title.startsWith("📖") && <Viewers documentId={doc.id} />}
           <button
             className={`document-icon-button ${star ? "starred" : ""}`}
             onClick={() => toggleStar(doc.id, star)}
@@ -1291,6 +1274,7 @@ function EditableDocument({
               placeholder="无标题"
             />
           </div>
+          {doc.title.startsWith("📖") && <PaperByline documentId={doc.id} />}
         </header>
 
         <div className="document-body">
@@ -1362,10 +1346,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
       )}
       <TopRightActions>
         <div className="document-actions">
-          <Viewers documentId={doc.id} />
-          {doc.title.startsWith("📖") && (
-            <PaperInteractionBar documentId={doc.id} />
-          )}
+          {!doc.title.startsWith("📖") && <Viewers documentId={doc.id} />}
           <button
             className={`document-icon-button ${star ? "starred" : ""}`}
             onClick={() => toggleStar(doc.id, star)}
@@ -1414,6 +1395,7 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
               {doc.title || "Untitled"}
             </h1>
           </div>
+          {doc.title.startsWith("📖") && <PaperByline documentId={doc.id} />}
           <div className="document-meta">
             <span>更新于 {new Date(doc.updatedAt).toLocaleDateString()}</span>
             {doc.updatedBy && <span>by {doc.updatedBy.name}</span>}

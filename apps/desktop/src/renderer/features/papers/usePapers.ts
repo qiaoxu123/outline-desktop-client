@@ -476,7 +476,10 @@ export function usePaperMetas(root: PapersRoot | null): {
         ...(featured ? [featured.id] : []),
       ];
       for (const cid of scanIds) {
-        for (let offset = 0; offset < 1000; offset += 100) {
+        // 扩展学习 alone holds >1000 docs; the old 1000 cap left ~34 papers with
+        // no metadata → un-dated → mis-sorted. Page far enough to cover the whole
+        // collection (the inner loop still breaks early once a page is short).
+        for (let offset = 0; offset < 5000; offset += 100) {
           const page = await unwrapIpc<{ data: OutlineDocument[] }>(
             api.call(activeProfileId!, "documents.list", {
               collectionId: cid,
@@ -513,7 +516,12 @@ export function usePaperMetas(root: PapersRoot | null): {
       return { metas };
     },
     enabled: !!activeProfileId && !!root,
-    staleTime: 10 * 60_000,
+    // Short window so newly interpreted papers pick up their metadata (updatedAt
+    // for sorting, enTitle/tags for search) within ~30s of opening the view —
+    // 10 min was long enough that fresh papers sat un-dated at the bottom. The
+    // persisted cache still paints instantly; this only governs the background
+    // refresh cadence.
+    staleTime: 30_000,
     // instant paint from the persisted cache; marked stale so a background
     // refresh still happens
     initialData: () => {

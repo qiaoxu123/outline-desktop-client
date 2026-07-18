@@ -285,6 +285,11 @@ export default function PapersView(): React.ReactElement {
     if (sortKey === "updated") {
       // One ordering key for the whole library: the document's last-updated
       // time (newest first), regardless of 年/月 folder or 精选专题 origin.
+      // Papers whose metadata isn't loaded yet (a handful of 精选论文 docs the
+      // paged documents.list can't reach past its server-side limit) sort last,
+      // NOT to the top — otherwise those un-dated papers would outrank genuinely
+      // recent ones. Freshly interpreted papers DO get metadata via the short
+      // staleTime refresh, so they still surface at the top by their real time.
       const ts = (p: PaperEntry): number => {
         const updated = metas.get(p.id)?.updatedAt;
         const d = updated ? new Date(updated) : null;
