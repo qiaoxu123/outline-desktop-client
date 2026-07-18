@@ -817,6 +817,39 @@ export function usePaperViews(papers: PaperEntry[]): Map<string, number> {
   return useMemo(() => new Map(Object.entries(views)), [views]);
 }
 
+/* ---------- browsing history (my recently-viewed papers) ---------- */
+
+/**
+ * The current user's own viewed documents, newest first, as a docId → rank map
+ * (0 = most recent). Backed by Outline's `documents.viewed` (server-tracked; the
+ * desktop records a view via `views.create` on every open). Callers intersect
+ * this with the library set to get "最近浏览的论文".
+ */
+export function useRecentlyViewedRank(): {
+  rank: Map<string, number>;
+  isLoading: boolean;
+} {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { data, isLoading } = useQuery({
+    queryKey: ["profile", activeProfileId, "documents-viewed"],
+    queryFn: async () => {
+      const res = await unwrapIpc<{ data: { id: string }[] }>(
+        api.call(activeProfileId!, "documents.viewed", { limit: 100 }),
+      );
+      return res.data ?? [];
+    },
+    enabled: !!activeProfileId,
+    staleTime: 30_000,
+  });
+  const rank = useMemo(() => {
+    const m = new Map<string, number>();
+    (data ?? []).forEach((d, i) => m.set(d.id, i));
+    return m;
+  }, [data]);
+  return { rank, isLoading };
+}
+
 /* ---------- personal read state ---------- */
 
 export type ReadState = "unread" | "reading" | "read";

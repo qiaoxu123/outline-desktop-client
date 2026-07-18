@@ -9,6 +9,7 @@ import {
   usePaperMetas,
   usePaperInteractions,
   usePaperViews,
+  useRecentlyViewedRank,
   useReadStates,
   type PaperEntry,
   type PaperMeta,
@@ -24,6 +25,15 @@ const READ_LABEL: Record<ReadState, string> = {
 };
 
 type SortKey = "updated" | "views" | "likes" | "score" | "title";
+
+/** Which slice of the library to show. */
+type Scope = "all" | "liked" | "history";
+
+const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
+  { value: "all", label: "全部" },
+  { value: "liked", label: "我赞过" },
+  { value: "history", label: "最近浏览" },
+];
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "updated", label: "更新时间 新→旧" },
@@ -46,12 +56,14 @@ type PapersUiState = {
   tag: string | null;
   readFilter: ReadState | null;
   sortKey: SortKey;
+  scope: Scope;
 };
 let savedUi: PapersUiState = {
   q: "",
   tag: null,
   readFilter: null,
   sortKey: "updated",
+  scope: "all",
 };
 
 function StarPicker({
@@ -233,6 +245,7 @@ export default function PapersView(): React.ReactElement {
   const { summaryFor, toggleLike, setScore, canInteract } =
     usePaperInteractions(root);
   const views = usePaperViews(papers);
+  const { rank: historyRank } = useRecentlyViewedRank();
   const { stateFor, cycle } = useReadStates();
   const { menu: contextMenu, onContextMenu } = useDocContextMenu();
 
@@ -240,12 +253,13 @@ export default function PapersView(): React.ReactElement {
   const [tag, setTag] = useState<string | null>(savedUi.tag);
   const [readFilter, setReadFilter] = useState<ReadState | null>(savedUi.readFilter);
   const [sortKey, setSortKey] = useState<SortKey>(savedUi.sortKey);
+  const [scope, setScope] = useState<Scope>(savedUi.scope);
 
   // Persist search / filter / sort so back-navigation restores this exact list
   // (paired with AppShell's per-route scroll restore for /papers).
   useEffect(() => {
-    savedUi = { q, tag, readFilter, sortKey };
-  }, [q, tag, readFilter, sortKey]);
+    savedUi = { q, tag, readFilter, sortKey, scope };
+  }, [q, tag, readFilter, sortKey, scope]);
 
   // Changing search/filter/sort re-composes the list from the top, so jump
   // the shared scroll container back up — otherwise a previously scrolled
@@ -257,7 +271,7 @@ export default function PapersView(): React.ReactElement {
       return;
     }
     document.querySelector(".app-content")?.scrollTo({ top: 0 });
-  }, [q, tag, readFilter, sortKey]);
+  }, [q, tag, readFilter, sortKey, scope]);
 
   const allTags = useMemo(() => {
     const counts = new Map<string, number>();
@@ -270,7 +284,17 @@ export default function PapersView(): React.ReactElement {
       .map(([t]) => t);
   }, [metas]);
 
-  const filtered = papers.filter((p) => {
+  // 全部 / 我赞过 / 最近浏览 pick which papers are eligible before filtering.
+  const base = useMemo(() => {
+    if (scope === "liked") return papers.filter((p) => summaryFor(p.id).myLike);
+    if (scope === "history")
+      return papers.filter((p) => historyRank.has(p.id));
+    return papers;
+    // summaryFor closes over the interactions registry; re-run when it changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [papers, scope, historyRank, summaryFor]);
+
+  const filtered = base.filter((p) => {
     if (readFilter !== null && stateFor(p.id) !== readFilter) return false;
     const meta = metas.get(p.id);
     if (tag !== null && !(meta?.tags ?? []).includes(tag)) return false;
@@ -282,6 +306,11 @@ export default function PapersView(): React.ReactElement {
   });
 
   const sorted = useMemo(() => {
+    // 最近浏览 is inherently ordered by when I last opened each paper.
+    if (scope === "history") {
+      const r = (p: PaperEntry): number => historyRank.get(p.id) ?? Infinity;
+      return [...filtered].sort((a, b) => r(a) - r(b));
+    }
     if (sortKey === "updated") {
       // One ordering key for the whole library: the document's last-updated
       // time (newest first), regardless of 年/月 folder or 精选专题 origin.
@@ -313,9 +342,19 @@ export default function PapersView(): React.ReactElement {
     const key = cmp[sortKey];
     return [...filtered].sort((a, b) => key(b) - key(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, sortKey, views, summaryFor, metas]);
+  }, [filtered, sortKey, views, summaryFor, metas, scope, historyRank]);
 
   const readCount = papers.filter((p) => stateFor(p.id) === "read").length;
+  // Chip counts (cheap over ~800 papers; summaryFor/historyRank change rarely).
+  const likedCount = useMemo(
+    () => papers.filter((p) => summaryFor(p.id).myLike).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [papers, summaryFor],
+  );
+  const historyCount = useMemo(
+    () => papers.filter((p) => historyRank.has(p.id)).length,
+    [papers, historyRank],
+  );
 
   return (
     <div className="papers-view">
@@ -327,9 +366,32 @@ export default function PapersView(): React.ReactElement {
           </p>
         </div>
         <span className="papers-stats">
-          共 {papers.length} 篇 · 已读 {readCount} 篇
+          {scope === "all"
+            ? `共 ${papers.length} 篇 · 已读 ${readCount} 篇`
+            : `${SCOPE_OPTIONS.find((s) => s.value === scope)?.label} ${base.length} 篇`}
         </span>
       </header>
+
+      <div className="papers-scope">
+        {SCOPE_OPTIONS.map((o) => {
+          const n =
+            o.value === "liked"
+              ? likedCount
+              : o.value === "history"
+                ? historyCount
+                : papers.length;
+          return (
+            <button
+              key={o.value}
+              className={`papers-scope-btn ${scope === o.value ? "active" : ""}`}
+              onClick={() => setScope(o.value)}
+            >
+              {o.label}
+              <span className="papers-scope-count">{n}</span>
+            </button>
+          );
+        })}
+      </div>
 
       <div className="papers-filters">
         <input
@@ -350,15 +412,20 @@ export default function PapersView(): React.ReactElement {
         </select>
         <select
           className="papers-select"
-          value={sortKey}
+          value={scope === "history" ? "" : sortKey}
           onChange={(e) => setSortKey(e.target.value as SortKey)}
-          title="排序"
+          title={scope === "history" ? "最近浏览按浏览时间排序" : "排序"}
+          disabled={scope === "history"}
         >
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
+          {scope === "history" ? (
+            <option value="">浏览时间 新→旧</option>
+          ) : (
+            SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))
+          )}
         </select>
       </div>
 
@@ -384,7 +451,13 @@ export default function PapersView(): React.ReactElement {
       )}
       {isLoading && <p className="papers-note">加载论文列表…</p>}
       {status === "ready" && !isLoading && sorted.length === 0 && (
-        <p className="papers-note">没有匹配的论文。</p>
+        <p className="papers-note">
+          {scope === "liked"
+            ? "还没有赞过的论文 — 在论文行或阅读页点 👍 即可收藏到这里。"
+            : scope === "history"
+              ? "暂无浏览记录 — 打开任意论文后会自动记录在这里。"
+              : "没有匹配的论文。"}
+        </p>
       )}
 
       <div className="papers-list">
