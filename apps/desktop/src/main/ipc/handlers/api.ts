@@ -46,6 +46,7 @@ const ALLOWED_METHODS = new Set([
   // comments
   "comments.list",
   "comments.create",
+  "comments.update",
   "comments.delete",
   "comments.resolve",
   "comments.unresolve",

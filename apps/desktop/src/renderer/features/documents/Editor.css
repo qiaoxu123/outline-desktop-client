@@ -422,6 +422,13 @@ body.image-resizing {
   margin: 0.8em 0;
 }
 
+/* Editing surface leaves room on the top/left for the grip bars + ⊕ buttons
+   (which sit at negative offsets); without the padding overflow-x would clip
+   them. Read view (.markdown-body) has no grips, so no padding there. */
+.doc-editor .tableWrapper {
+  padding: 18px 2px 2px 18px;
+}
+
 .doc-editor .tableWrapper table,
 .markdown-body .tableWrapper table {
   margin: 0;
@@ -476,4 +483,178 @@ body.image-resizing {
 .table-btn:hover {
   background: var(--color-bg-secondary);
   color: var(--color-primary);
+}
+
+/* ---- web-style grip bars + ⊕ insert buttons (ported from Outline) ----
+   Grips/buttons are widget <a> decorations placed at the start of each cell;
+   each cell is position:relative so they anchor to it. Only rendered in the
+   editor (the extension guards on editable). */
+.doc-editor .ProseMirror th,
+.doc-editor .ProseMirror td {
+  position: relative;
+}
+
+.doc-editor .table-add-row,
+.doc-editor .table-add-column {
+  display: block;
+  position: absolute;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+.doc-editor .table-add-row:hover::after,
+.doc-editor .table-add-column:hover::after {
+  width: 16px;
+  height: 16px;
+  z-index: 20;
+  background-color: var(--color-primary);
+  background-size: 16px 16px;
+  background-position: 50% 50%;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTEyIDVDMTEuNDQ3NyA1IDExIDUuNDQ3NzIgMTEgNlYxMUg2QzUuNDQ3NzIgMTEgNSAxMS40NDc3IDUgMTJDNSAxMi41NTIzIDUuNDQ3NzIgMTMgNiAxM0gxMVYxOEMxMSAxOC41NTIzIDExLjQ0NzcgMTkgMTIgMTlDMTIuNTUyMyAxOSAxMyAxOC41NTIzIDEzIDE4VjEzSDE4QzE4LjU1MjMgMTMgMTkgMTIuNTUyMyAxOSAxMkMxOSAxMS40NDc3IDE4LjU1MjMgMTEgMTggMTFIMTNWNkMxMyA1LjQ0NzcyIDEyLjU1MjMgNSAxMiA1WiIgZmlsbD0id2hpdGUiLz48L3N2Zz4=");
+}
+.doc-editor .table-add-row::before,
+.doc-editor .table-add-column::before {
+  content: "";
+  display: block;
+  cursor: pointer;
+  position: absolute;
+  width: 24px;
+  height: 24px;
+}
+
+.doc-editor .table-add-row {
+  bottom: -1px;
+  left: -16px;
+  width: 0;
+  height: 2px;
+  z-index: 1;
+}
+.doc-editor .table-add-row::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: -10px;
+  width: 4px;
+  height: 4px;
+  border-radius: 100%;
+  background-color: var(--color-border);
+}
+.doc-editor .table-add-row:hover::after {
+  bottom: -7.5px;
+  left: -16px;
+}
+.doc-editor .table-add-row::before {
+  bottom: -12px;
+  left: -18px;
+}
+.doc-editor .table-add-row.first {
+  bottom: auto;
+  top: -1px;
+}
+.doc-editor .table-add-row.first::before {
+  bottom: auto;
+  top: -12px;
+}
+
+.doc-editor .table-add-column {
+  top: -16px;
+  right: -1px;
+  width: 2px;
+  height: 0;
+  z-index: 1;
+}
+.doc-editor .table-add-column::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  right: -1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 100%;
+  background-color: var(--color-border);
+}
+.doc-editor .table-add-column:hover::after {
+  top: -16px;
+  right: -7px;
+}
+.doc-editor .table-add-column::before {
+  top: -16px;
+  right: -12px;
+}
+.doc-editor .table-add-column.first {
+  right: auto;
+  left: -1px;
+}
+.doc-editor .table-add-column.first::before {
+  right: auto;
+  left: -12px;
+}
+
+.doc-editor .table-grip-column::after {
+  content: "";
+  cursor: grab;
+  position: absolute;
+  top: -16px;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  background: var(--color-border);
+}
+.doc-editor .table-grip-column:hover::after {
+  background: var(--color-text);
+}
+.doc-editor .table-grip-column.first::after {
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.doc-editor .table-grip-column.last::after {
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+.doc-editor .table-grip-column.selected::after {
+  background: var(--color-primary);
+}
+
+.doc-editor .table-grip-row::after {
+  content: "";
+  cursor: grab;
+  position: absolute;
+  left: -16px;
+  top: 0;
+  height: 100%;
+  width: 12px;
+  background: var(--color-border);
+}
+.doc-editor .table-grip-row:hover::after {
+  background: var(--color-text);
+}
+.doc-editor .table-grip-row.first::after {
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.doc-editor .table-grip-row.last::after {
+  border-bottom-left-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+.doc-editor .table-grip-row.selected::after {
+  background: var(--color-primary);
+}
+
+.doc-editor .table-grip::after {
+  content: "";
+  cursor: pointer;
+  background: var(--color-border);
+  width: 13px;
+  height: 13px;
+  border-radius: 13px;
+  border: 2px solid var(--color-bg);
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  z-index: 10;
+}
+.doc-editor .table-grip:hover::after {
+  background: var(--color-text);
+}
+.doc-editor .table-grip.selected::after {
+  background: var(--color-primary);
 }

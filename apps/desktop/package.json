@@ -1,6 +1,6 @@
 {
   "name": "outline-desktop",
-  "version": "1.11.27",
+  "version": "1.11.28",
   "private": true,
   "description": "Outline Desktop - cross-platform client (macOS / Windows / Linux)",
   "author": "xu <george.x.qiao@gmail.com>",
@@ -38,7 +38,9 @@
     "@tiptap/pm": "^2.27.2",
     "@tiptap/react": "^2.27.2",
     "@tiptap/starter-kit": "^2.27.2",
+    "@types/d3-force": "^3.0.10",
     "@vscode/markdown-it-katex": "^1.1.2",
+    "d3-force": "^3.0.0",
     "highlight.js": "^11.11.0",
     "katex": "^0.16.47",
     "markdown-it": "^14.1.0",

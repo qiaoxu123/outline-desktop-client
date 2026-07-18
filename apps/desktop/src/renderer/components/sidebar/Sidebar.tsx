@@ -768,6 +768,7 @@ export default function Sidebar(): React.ReactElement {
           discussNew,
         )}
         {navItem("/papers", "论文库", <OIcon name="academicCap" size={18} />, true)}
+        {navItem("/papers/graph", "关系图", <OIcon name="graph" size={18} />, true)}
         {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={18} />, true)}
         {navItem("/shares", "共享链接", <OIcon name="globe" size={18} />, true)}
       </nav>

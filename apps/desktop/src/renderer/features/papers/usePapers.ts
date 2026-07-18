@@ -315,6 +315,14 @@ export interface PaperMeta {
   /** English paper title (from the 论文标题 row) — titles in the library are
    * Chinese translations, so this is what makes English-title search work. */
   enTitle: string | null;
+  /** Document last-updated time — the single ordering key for the whole
+   * library (年/月 folders are no longer used to sort or filter). */
+  updatedAt: string | null;
+  /** This document's own urlId (from documents.list). */
+  urlId: string | null;
+  /** urlIds of other documents referenced in this paper's body (dedup'd) —
+   * feeds the 论文关系图 (backlink graph). */
+  outLinks: string[];
   parsed: boolean;
 }
 
@@ -359,8 +367,23 @@ export function parsePaperMeta(text: string): PaperMeta {
     enTitle: normalizeEnTitle(
       pick("论文标题", "英文标题", "原文标题", "原标题", "英文题目", "标题", "Title"),
     ),
+    updatedAt: null, // filled by usePaperMetas from the documents.list payload
+    urlId: null, // filled by usePaperMetas from the documents.list payload
+    outLinks: [], // filled by usePaperMetas from the documents.list payload
     parsed: fields.size > 0,
   };
+}
+
+/** Extract the urlIds of all in-app doc links (`/doc/<slug>`) in a body;
+ * the urlId is the last `-`-separated segment of the slug. */
+export function extractOutLinks(text: string): string[] {
+  const out = new Set<string>();
+  for (const m of text.matchAll(/\/doc\/([A-Za-z0-9一-鿿-]+)/g)) {
+    const slug = m[1];
+    const urlId = slug.slice(slug.lastIndexOf("-") + 1);
+    if (urlId) out.add(urlId);
+  }
+  return [...out];
 }
 
 /* ---------- shared likes / star ratings ---------- */
@@ -387,7 +410,9 @@ export interface InteractionData {
 const EMPTY_INTERACTIONS: InteractionData = { version: 1, papers: {} };
 
 // v4: added enTitle (English title) so search can match untranslated titles.
-const META_CACHE_KEY = "papers.metaCache.v4";
+// v6: added updatedAt — the single sort key for the whole library.
+// v7: added urlId + outLinks — feeds the 论文关系图.
+const META_CACHE_KEY = "papers.metaCache.v7";
 
 interface MetaCache {
   savedAt: string;
@@ -463,7 +488,13 @@ export function usePaperMetas(root: PapersRoot | null): {
           for (const d of docs) {
             // skip any leftover legacy interaction registry doc
             if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) continue;
-            if (typeof d.text === "string") metas[d.id] = parsePaperMeta(d.text);
+            if (typeof d.text === "string")
+              metas[d.id] = {
+                ...parsePaperMeta(d.text),
+                updatedAt: d.updatedAt ?? null,
+                urlId: d.urlId ?? null,
+                outLinks: extractOutLinks(d.text),
+              };
           }
           if (docs.length < 100) break;
         }

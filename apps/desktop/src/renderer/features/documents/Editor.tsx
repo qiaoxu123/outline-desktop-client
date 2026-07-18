@@ -22,6 +22,7 @@ import type MarkdownIt from "markdown-it";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
 import { AttachmentImage } from "./extensions/image";
+import { TableControls } from "./extensions/tableControls";
 import { OIcon } from "../../components/outlineIcons";
 import "katex/dist/katex.min.css";
 import "./Editor.css";
@@ -261,6 +262,7 @@ export function useMarkdownEditor(
         TableRow,
         TableCell,
         TableHeader,
+        TableControls,
         Placeholder.configure({ placeholder: "开始编写…" }),
         MarkdownUnderline,
         MarkdownHighlight,

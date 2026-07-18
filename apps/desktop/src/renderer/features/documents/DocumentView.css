@@ -637,6 +637,94 @@
   white-space: nowrap;
 }
 
+/* paper interaction bar (likes + star ratings, shared with 论文库) */
+.paper-ix-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 2px;
+}
+
+.paper-ix-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.paper-ix-like:hover:not(:disabled) {
+  background: var(--color-hover, var(--color-bg-secondary));
+  color: var(--color-text);
+}
+
+.paper-ix-like.liked {
+  color: var(--color-primary);
+}
+
+.paper-ix-like:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.paper-ix-like-count {
+  font-weight: 600;
+  line-height: 1;
+}
+
+.paper-ix-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.paper-ix-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.1s, transform 0.1s;
+}
+
+.paper-ix-star.filled {
+  color: var(--color-star, #f5b400);
+}
+
+/* my own rating reads as "primary" so 已评 is visually distinct */
+.paper-ix-stars.mine .paper-ix-star.filled {
+  color: var(--color-primary);
+}
+
+.paper-ix-star:hover:not(:disabled) {
+  color: var(--color-star, #f5b400);
+  transform: scale(1.15);
+}
+
+.paper-ix-star:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.paper-ix-score {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 /* comments panel */
 .comments-panel {
   position: sticky;
@@ -823,6 +911,18 @@
   font-size: 11px;
   color: var(--color-success);
   font-weight: 600;
+}
+
+.comment-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.comment-edit-ops {
+  display: flex;
+  gap: 6px;
 }
 
 .comment-reply-composer {

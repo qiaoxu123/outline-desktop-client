@@ -24,6 +24,7 @@ import { ShareDialog } from "./ShareDialog";
 import { openOutlineLink } from "../../lib/outlineLinks";
 import { OIcon } from "../../components/outlineIcons";
 import { discussCollectionId } from "../discuss/useDiscuss";
+import { usePaperInteractions } from "../papers/usePapers";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
 
@@ -262,6 +263,66 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
   );
 }
 
+/* ---------- paper interactions (likes + star ratings, shared with 论文库) ---------- */
+
+function PaperInteractionBar({
+  documentId,
+}: {
+  documentId: string;
+}): React.ReactElement {
+  const { summaryFor, toggleLike, setScore, canInteract } =
+    usePaperInteractions(null);
+  const s = summaryFor(documentId);
+
+  return (
+    <div className="paper-ix-bar">
+      <button
+        className={`paper-ix-like ${s.myLike ? "liked" : ""}`}
+        onClick={() => toggleLike(documentId)}
+        disabled={!canInteract}
+        title={
+          !canInteract ? "登录后可点赞" : s.myLike ? "取消点赞" : "点赞"
+        }
+      >
+        <OIcon name="thumbsUp" size={14} />
+        <span className="paper-ix-like-count">{s.likes}</span>
+      </button>
+      <div
+        className={`paper-ix-stars ${s.myScore !== null ? "mine" : ""}`}
+        title={
+          !canInteract
+            ? "登录后可评分"
+            : s.myScore !== null
+              ? `我的评分：${s.myScore} 星（再点同一颗可清除）`
+              : "点星评分"
+        }
+      >
+        {[1, 2, 3, 4, 5].map((k) => {
+          const filled =
+            s.scoreAvg !== null && k <= Math.round(s.scoreAvg);
+          return (
+            <button
+              key={k}
+              className={`paper-ix-star ${filled ? "filled" : ""}`}
+              onClick={() =>
+                setScore(documentId, s.myScore === k ? null : k)
+              }
+              disabled={!canInteract}
+            >
+              <OIcon name={filled ? "starred" : "unstarred"} size={14} />
+            </button>
+          );
+        })}
+        {s.scoreAvg !== null && (
+          <span className="paper-ix-score">
+            {s.scoreAvg.toFixed(1)}（{s.scoreCount}）
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- comments (threaded, aligned with Outline web) ---------- */
 
 interface Comment {
@@ -342,20 +403,59 @@ function extractProseText(node: unknown): string {
   return n.type === "paragraph" || n.type === "heading" ? `${inner}\n` : inner;
 }
 
+/** Rebuild a ProseMirror comment doc from edited plain text: each line is a
+ * paragraph, and a line that is entirely a 「…」 quote keeps its italic mark
+ * (matching how new comments render the anchored selection). */
+function buildCommentDoc(fullText: string): { type: "doc"; content: unknown[] } {
+  const content: unknown[] = [];
+  for (const raw of fullText.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const isQuote = /^「.*」$/.test(line);
+    content.push({
+      type: "paragraph",
+      content: [
+        isQuote
+          ? { type: "text", marks: [{ type: "em" }], text: line }
+          : { type: "text", text: line },
+      ],
+    });
+  }
+  if (content.length === 0) content.push({ type: "paragraph", content: [] });
+  return { type: "doc", content };
+}
+
 function CommentItem({
   comment,
   ownUserId,
   onDelete,
   deleting,
+  onEdit,
+  saving,
 }: {
   comment: Comment;
   ownUserId?: string;
   onDelete: (id: string) => void;
   deleting: boolean;
+  onEdit: (id: string, text: string) => void;
+  saving: boolean;
 }): React.ReactElement {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
   const url = absoluteUrl(comment.createdBy?.avatarUrl);
   const own = !!ownUserId && comment.createdBy?.id === ownUserId;
+
+  const startEdit = (): void => {
+    setEditDraft(commentText(comment).replace(/\n+$/, ""));
+    setConfirmDelete(false);
+    setEditing(true);
+  };
+  const saveEdit = (): void => {
+    const next = editDraft.trim();
+    if (next) onEdit(comment.id, next);
+    setEditing(false);
+  };
 
   return (
     <div className="comment-item">
@@ -374,19 +474,56 @@ function CommentItem({
           <span className="comment-time">
             {new Date(comment.createdAt).toLocaleString()}
           </span>
-          {own && (
-            <button
-              className={`comment-op ${confirmDelete ? "danger" : ""}`}
-              disabled={deleting}
-              onClick={() =>
-                confirmDelete ? onDelete(comment.id) : setConfirmDelete(true)
-              }
-            >
-              {confirmDelete ? "确认删除？" : "删除"}
-            </button>
+          {own && !editing && (
+            <>
+              <button
+                className="comment-op"
+                disabled={saving || deleting}
+                onClick={startEdit}
+              >
+                编辑
+              </button>
+              <button
+                className={`comment-op ${confirmDelete ? "danger" : ""}`}
+                disabled={deleting}
+                onClick={() =>
+                  confirmDelete ? onDelete(comment.id) : setConfirmDelete(true)
+                }
+              >
+                {confirmDelete ? "确认删除？" : "删除"}
+              </button>
+            </>
           )}
         </div>
-        <div className="comment-text">{commentText(comment)}</div>
+        {editing ? (
+          <div className="comment-edit">
+            <textarea
+              className="comments-input"
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={3}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveEdit();
+                if (e.key === "Escape") setEditing(false);
+              }}
+            />
+            <div className="comment-edit-ops">
+              <button
+                className="comment-op"
+                disabled={saving || !editDraft.trim()}
+                onClick={saveEdit}
+              >
+                {saving ? "保存中…" : "保存"}
+              </button>
+              <button className="comment-op" onClick={() => setEditing(false)}>
+                取消
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="comment-text">{commentText(comment)}</div>
+        )}
       </div>
     </div>
   );
@@ -496,6 +633,20 @@ function CommentsPanel({
     onSuccess: invalidate,
   });
 
+  const editMutation = useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) =>
+      unwrapIpc(
+        api.call(activeProfileId!, "comments.update", {
+          id,
+          data: buildCommentDoc(text),
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+  const editingId = editMutation.isPending
+    ? (editMutation.variables?.id ?? null)
+    : null;
+
   // Scroll the focused thread (clicked anchor in the document) into view.
   useEffect(() => {
     if (!focusedCommentId) return;
@@ -509,7 +660,10 @@ function CommentsPanel({
   const repliesFor = (id: string) =>
     comments.filter((c) => c.parentCommentId === id);
   const mutationFailed =
-    createMutation.isError || resolveMutation.isError || deleteMutation.isError;
+    createMutation.isError ||
+    resolveMutation.isError ||
+    deleteMutation.isError ||
+    editMutation.isError;
 
   return (
     <div className={`comments-panel ${inline ? "comments-inline" : ""}`}>
@@ -557,6 +711,8 @@ function CommentsPanel({
                 ownUserId={user?.id}
                 onDelete={(id) => deleteMutation.mutate(id)}
                 deleting={deleteMutation.isPending}
+                onEdit={(id, text) => editMutation.mutate({ id, text })}
+                saving={editingId === c.id}
               />
               {replies.map((r) => (
                 <div key={r.id} className="comment-reply">
@@ -565,6 +721,8 @@ function CommentsPanel({
                     ownUserId={user?.id}
                     onDelete={(id) => deleteMutation.mutate(id)}
                     deleting={deleteMutation.isPending}
+                    onEdit={(id, text) => editMutation.mutate({ id, text })}
+                    saving={editingId === r.id}
                   />
                 </div>
               ))}
@@ -1061,6 +1219,9 @@ function EditableDocument({
             </span>
           )}
           <Viewers documentId={doc.id} />
+          {doc.title.startsWith("📖") && (
+            <PaperInteractionBar documentId={doc.id} />
+          )}
           <button
             className={`document-icon-button ${star ? "starred" : ""}`}
             onClick={() => toggleStar(doc.id, star)}
@@ -1202,6 +1363,9 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
       <TopRightActions>
         <div className="document-actions">
           <Viewers documentId={doc.id} />
+          {doc.title.startsWith("📖") && (
+            <PaperInteractionBar documentId={doc.id} />
+          )}
           <button
             className={`document-icon-button ${star ? "starred" : ""}`}
             onClick={() => toggleStar(doc.id, star)}

@@ -23,10 +23,10 @@ const READ_LABEL: Record<ReadState, string> = {
   read: "已读",
 };
 
-type SortKey = "recommended" | "views" | "likes" | "score" | "title";
+type SortKey = "updated" | "views" | "likes" | "score" | "title";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recommended", label: "推荐时间 新→旧" },
+  { value: "updated", label: "更新时间 新→旧" },
   { value: "views", label: "阅读量 多→少" },
   { value: "likes", label: "点赞 多→少" },
   { value: "score", label: "评分 高→低" },
@@ -43,19 +43,15 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
  */
 type PapersUiState = {
   q: string;
-  year: number | null;
-  month: number | null;
   tag: string | null;
   readFilter: ReadState | null;
   sortKey: SortKey;
 };
 let savedUi: PapersUiState = {
   q: "",
-  year: null,
-  month: null,
   tag: null,
   readFilter: null,
-  sortKey: "recommended",
+  sortKey: "updated",
 };
 
 function StarPicker({
@@ -241,8 +237,6 @@ export default function PapersView(): React.ReactElement {
   const { menu: contextMenu, onContextMenu } = useDocContextMenu();
 
   const [q, setQ] = useState(savedUi.q);
-  const [year, setYear] = useState<number | null>(savedUi.year);
-  const [month, setMonth] = useState<number | null>(savedUi.month);
   const [tag, setTag] = useState<string | null>(savedUi.tag);
   const [readFilter, setReadFilter] = useState<ReadState | null>(savedUi.readFilter);
   const [sortKey, setSortKey] = useState<SortKey>(savedUi.sortKey);
@@ -250,8 +244,8 @@ export default function PapersView(): React.ReactElement {
   // Persist search / filter / sort so back-navigation restores this exact list
   // (paired with AppShell's per-route scroll restore for /papers).
   useEffect(() => {
-    savedUi = { q, year, month, tag, readFilter, sortKey };
-  }, [q, year, month, tag, readFilter, sortKey]);
+    savedUi = { q, tag, readFilter, sortKey };
+  }, [q, tag, readFilter, sortKey]);
 
   // Changing search/filter/sort re-composes the list from the top, so jump
   // the shared scroll container back up — otherwise a previously scrolled
@@ -263,27 +257,8 @@ export default function PapersView(): React.ReactElement {
       return;
     }
     document.querySelector(".app-content")?.scrollTo({ top: 0 });
-  }, [q, year, month, tag, readFilter, sortKey]);
+  }, [q, tag, readFilter, sortKey]);
 
-  const years = useMemo(
-    () =>
-      [...new Set(papers.map((p) => p.year).filter((y): y is number => !!y))].sort(
-        (a, b) => b - a,
-      ),
-    [papers],
-  );
-  const months = useMemo(
-    () =>
-      [
-        ...new Set(
-          papers
-            .filter((p) => year === null || p.year === year)
-            .map((p) => p.month)
-            .filter((m): m is number => !!m),
-        ),
-      ].sort((a, b) => b - a),
-    [papers, year],
-  );
   const allTags = useMemo(() => {
     const counts = new Map<string, number>();
     for (const m of metas.values()) {
@@ -296,8 +271,6 @@ export default function PapersView(): React.ReactElement {
   }, [metas]);
 
   const filtered = papers.filter((p) => {
-    if (year !== null && p.year !== year) return false;
-    if (month !== null && p.month !== month) return false;
     if (readFilter !== null && stateFor(p.id) !== readFilter) return false;
     const meta = metas.get(p.id);
     if (tag !== null && !(meta?.tags ?? []).includes(tag)) return false;
@@ -309,11 +282,19 @@ export default function PapersView(): React.ReactElement {
   });
 
   const sorted = useMemo(() => {
-    // papers arrive pre-sorted by recommendation time (usePaperEntries)
-    if (sortKey === "recommended") return filtered;
+    if (sortKey === "updated") {
+      // One ordering key for the whole library: the document's last-updated
+      // time (newest first), regardless of 年/月 folder or 精选专题 origin.
+      const ts = (p: PaperEntry): number => {
+        const updated = metas.get(p.id)?.updatedAt;
+        const d = updated ? new Date(updated) : null;
+        return d && !isNaN(d.getTime()) ? d.getTime() : 0;
+      };
+      return [...filtered].sort((a, b) => ts(b) - ts(a));
+    }
     if (sortKey === "title") return sortDocsByTitle(filtered);
     const cmp: Record<
-      Exclude<SortKey, "recommended" | "title">,
+      Exclude<SortKey, "updated" | "title">,
       (p: PaperEntry) => number
     > = {
       views: (p) => views.get(p.id) ?? 0,
@@ -327,7 +308,7 @@ export default function PapersView(): React.ReactElement {
     const key = cmp[sortKey];
     return [...filtered].sort((a, b) => key(b) - key(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, sortKey, views, summaryFor]);
+  }, [filtered, sortKey, views, summaryFor, metas]);
 
   const readCount = papers.filter((p) => stateFor(p.id) === "read").length;
 
@@ -337,7 +318,7 @@ export default function PapersView(): React.ReactElement {
         <div>
           <h2>论文库</h2>
           <p className="papers-hint">
-            推荐阅读目录的检索视图 — 年/月归档不变,这里按领域、状态与关键词查找。
+            推荐阅读目录的检索视图 — 默认按笔记更新时间排序,可按领域、状态与关键词查找。
           </p>
         </div>
         <span className="papers-stats">
@@ -352,33 +333,6 @@ export default function PapersView(): React.ReactElement {
           onChange={(e) => setQ(e.target.value)}
           placeholder="搜索标题 / 领域 / 作者 / 机构…"
         />
-        <select
-          className="papers-select"
-          value={year ?? ""}
-          onChange={(e) => {
-            setYear(e.target.value ? Number(e.target.value) : null);
-            setMonth(null);
-          }}
-        >
-          <option value="">全部年份</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y} 年
-            </option>
-          ))}
-        </select>
-        <select
-          className="papers-select"
-          value={month ?? ""}
-          onChange={(e) => setMonth(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">全部月份</option>
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {m} 月
-            </option>
-          ))}
-        </select>
         <select
           className="papers-select"
           value={readFilter ?? ""}
