@@ -59,7 +59,10 @@ export default function PaperGraphView(): React.ReactElement {
   const { nodes, links, isLoading } = usePaperGraph(root);
 
   const [q, setQ] = useState("");
-  const [onlyConnected, setOnlyConnected] = useState(false);
+  // Default to hiding isolated papers: only recent interpretations cross-link
+  // others in-body, so most nodes are unconnected — showing them all reads as
+  // "a field of empty dots". Users can untick to see the full set.
+  const [onlyConnected, setOnlyConnected] = useState(true);
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

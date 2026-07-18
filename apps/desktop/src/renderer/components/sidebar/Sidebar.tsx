@@ -768,7 +768,6 @@ export default function Sidebar(): React.ReactElement {
           discussNew,
         )}
         {navItem("/papers", "论文库", <OIcon name="academicCap" size={18} />, true)}
-        {navItem("/papers/graph", "关系图", <OIcon name="graph" size={18} />, true)}
         {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={18} />, true)}
         {navItem("/shares", "共享链接", <OIcon name="globe" size={18} />, true)}
       </nav>
@@ -858,26 +857,40 @@ export default function Sidebar(): React.ReactElement {
       </div>
       </div>
 
-      <a
-        href="#/settings"
-        className="sb-account"
-        onClick={(e) => {
-          e.preventDefault();
-          navigate("/settings");
-        }}
-      >
-        {avatar ? (
-          <img className="sb-account-avatar" src={avatar} alt={user?.name} />
-        ) : (
-          <div className="sb-account-avatar sb-account-avatar-fallback">
-            {(user?.name || "?").slice(0, 1).toUpperCase()}
+      <div className="sb-footer">
+        <a
+          href="#/settings"
+          className="sb-account"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate("/settings");
+          }}
+        >
+          {avatar ? (
+            <img className="sb-account-avatar" src={avatar} alt={user?.name} />
+          ) : (
+            <div className="sb-account-avatar sb-account-avatar-fallback">
+              {(user?.name || "?").slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="sb-account-info">
+            <div className="sb-account-name">{user?.name ?? "…"}</div>
+            {user?.email && <div className="sb-account-email">{user.email}</div>}
           </div>
-        )}
-        <div className="sb-account-info">
-          <div className="sb-account-name">{user?.name ?? "…"}</div>
-          {user?.email && <div className="sb-account-email">{user.email}</div>}
-        </div>
-      </a>
+        </a>
+        <a
+          href="#/papers/graph"
+          className={`sb-footer-graph ${location.pathname === "/papers/graph" ? "active" : ""}`}
+          title="关系图"
+          aria-label="关系图"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate("/papers/graph");
+          }}
+        >
+          <OIcon name="graph" size={18} />
+        </a>
+      </div>
     </div>
   );
 }
