@@ -463,26 +463,57 @@ body.image-resizing {
   margin: 0;
 }
 
-/* table editing menu (text buttons) */
+/* table row/column menu — vertical dropdown, shown on grip selection (web-style) */
 .table-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 1px;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
 }
-.table-btn {
-  height: 28px;
-  padding: 0 8px;
+.table-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
   border: none;
   background: transparent;
   color: var(--color-text);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   white-space: nowrap;
+  text-align: left;
   transition: background 0.08s, color 0.08s;
 }
-.table-btn:hover {
+.table-menu-item:hover {
   background: var(--color-bg-secondary);
-  color: var(--color-primary);
+}
+.table-menu-item.danger {
+  color: var(--color-danger);
+}
+.table-menu-item.danger:hover {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+.table-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+.table-menu-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--color-border);
 }
 
 /* ---- web-style grip bars + ⊕ insert buttons (ported from Outline) ----

@@ -18,6 +18,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Underline from "@tiptap/extension-underline";
 import { Markdown } from "tiptap-markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import { CellSelection } from "@tiptap/pm/tables";
 import type MarkdownIt from "markdown-it";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
@@ -574,42 +575,82 @@ function SelectionToolbar({
   );
 }
 
-/* ---------- table editing menu (shown when the cursor is in a table) ---------- */
+/* ---------- table row/column menu (like Outline web) ----------
+ * Insert is handled by the ⊕ grip buttons (see TableControls). This menu only
+ * appears once a whole row or column is selected by clicking its grip, and
+ * offers the operations that don't have a ⊕ affordance — header toggle, insert
+ * before/after, merge/split, delete row/col, delete table. */
 
 function TableMenu({ editor }: { editor: TiptapEditor }): React.ReactElement {
+  // Re-render on selection changes so the row/column branch stays current.
+  const [, force] = useState(0);
+  useEffect(() => {
+    const h = (): void => force((x) => x + 1);
+    editor.on("selectionUpdate", h);
+    editor.on("transaction", h);
+    return () => {
+      editor.off("selectionUpdate", h);
+      editor.off("transaction", h);
+    };
+  }, [editor]);
+
+  const sel = editor.state.selection;
+  const isRow = sel instanceof CellSelection && sel.isRowSelection();
+  const isCol = sel instanceof CellSelection && sel.isColSelection();
+
   const chain = () => editor.chain().focus();
-  const btn = (label: string, title: string, run: () => void) => (
+  const item = (
+    icon: string,
+    label: string,
+    run: () => void,
+    danger = false,
+  ) => (
     <button
       type="button"
-      className="table-btn"
-      title={title}
+      className={`table-menu-item ${danger ? "danger" : ""}`}
       onMouseDown={(e) => {
         e.preventDefault();
         run();
       }}
     >
-      {label}
+      <span className="table-menu-icon">{icon}</span>
+      <span>{label}</span>
     </button>
   );
+
   return (
     <BubbleMenu
       editor={editor}
       pluginKey="tableMenu"
-      shouldShow={({ editor: ed }) => ed.isActive("table")}
-      tippyOptions={{ duration: 100, placement: "bottom", maxWidth: "none" }}
-      className="bubble-menu table-menu"
+      shouldShow={({ editor: ed }) => {
+        const s = ed.state.selection;
+        return (
+          s instanceof CellSelection &&
+          (s.isRowSelection() || s.isColSelection())
+        );
+      }}
+      tippyOptions={{ duration: 100, placement: "bottom-start", maxWidth: "none" }}
+      className="table-menu"
     >
-      {btn("＋行↑", "上方插入行", () => chain().addRowBefore().run())}
-      {btn("＋行↓", "下方插入行", () => chain().addRowAfter().run())}
-      {btn("✕行", "删除当前行", () => chain().deleteRow().run())}
-      <span className="bubble-divider" />
-      {btn("＋列←", "左侧插入列", () => chain().addColumnBefore().run())}
-      {btn("＋列→", "右侧插入列", () => chain().addColumnAfter().run())}
-      {btn("✕列", "删除当前列", () => chain().deleteColumn().run())}
-      <span className="bubble-divider" />
-      {btn("合并/拆分", "合并或拆分单元格", () => chain().mergeOrSplit().run())}
-      {btn("表头", "切换表头行", () => chain().toggleHeaderRow().run())}
-      {btn("删除表格", "删除整个表格", () => chain().deleteTable().run())}
+      {isRow &&
+        item("⊞", "切换表头", () => chain().toggleHeaderRow().run())}
+      {isCol &&
+        item("⊞", "切换表头", () => chain().toggleHeaderColumn().run())}
+      {isRow &&
+        item("↑", "在上方插入行", () => chain().addRowBefore().run())}
+      {isRow &&
+        item("↓", "在下方插入行", () => chain().addRowAfter().run())}
+      {isCol &&
+        item("←", "在左侧插入列", () => chain().addColumnBefore().run())}
+      {isCol &&
+        item("→", "在右侧插入列", () => chain().addColumnAfter().run())}
+      {item("⿹", "合并 / 拆分单元格", () => chain().mergeOrSplit().run())}
+      <span className="table-menu-divider" />
+      {isRow &&
+        item("🗑", "删除此行", () => chain().deleteRow().run(), true)}
+      {isCol &&
+        item("🗑", "删除此列", () => chain().deleteColumn().run(), true)}
+      {item("✕", "删除整个表格", () => chain().deleteTable().run(), true)}
     </BubbleMenu>
   );
 }
