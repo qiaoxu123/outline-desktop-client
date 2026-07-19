@@ -187,6 +187,36 @@
   border-radius: 6px;
   padding: 1px 4px 1px 2px;
   transition: background 0.08s;
+  position: relative;
+}
+
+/* drag-to-reorder affordances */
+.sb-item.dragging {
+  opacity: 0.4;
+}
+
+/* insert-before / insert-after lines */
+.sb-item.drop-before::before,
+.sb-item.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.sb-item.drop-before::before {
+  top: -1px;
+}
+.sb-item.drop-after::after {
+  bottom: -1px;
+}
+
+/* drop-inside: highlight the target as the new parent */
+.sb-item.drop-inside {
+  box-shadow: inset 0 0 0 1.5px var(--color-primary);
 }
 
 .sb-item:hover {

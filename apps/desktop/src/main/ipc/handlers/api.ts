@@ -36,6 +36,7 @@ const ALLOWED_METHODS = new Set([
   "documents.drafts",
   "documents.create",
   "documents.update",
+  "documents.move",
   "documents.duplicate",
   "documents.archive",
   "documents.delete",

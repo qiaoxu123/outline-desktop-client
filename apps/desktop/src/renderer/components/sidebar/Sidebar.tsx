@@ -103,6 +103,46 @@ function Chevron({ open }: { open: boolean }): React.ReactElement {
   );
 }
 
+/* ---------- drag-and-drop reordering (like Outline web) ---------- */
+
+type DropPos = "before" | "after" | "inside";
+
+interface TreeDnd {
+  dragId: string | null;
+  over: { id: string; pos: DropPos } | null;
+  onDragStart: (id: string) => void;
+  onDragOver: (id: string, pos: DropPos) => void;
+  onDrop: (targetId: string, pos: DropPos) => void;
+  onDragEnd: () => void;
+}
+
+type CDoc = OutlineCollectionDocument;
+
+/** Locate a node in the tree, returning it plus its sibling array, index and
+ * parent-document id (null at the top level). */
+function locate(
+  tree: CDoc[],
+  id: string,
+  parentId: string | null = null,
+): { node: CDoc; siblings: CDoc[]; index: number; parentId: string | null } | null {
+  for (let i = 0; i < tree.length; i++) {
+    if (tree[i].id === id)
+      return { node: tree[i], siblings: tree, index: i, parentId };
+    const found = tree[i].children?.length
+      ? locate(tree[i].children, id, tree[i].id)
+      : null;
+    if (found) return found;
+  }
+  return null;
+}
+
+/** True if `id` is `node` itself or anywhere in its subtree (can't drop a node
+ * into its own descendant). */
+function containsId(node: CDoc, id: string): boolean {
+  if (node.id === id) return true;
+  return (node.children ?? []).some((c) => containsId(c, id));
+}
+
 /* ---------- recursive document node ---------- */
 
 function DocNode({
@@ -110,11 +150,13 @@ function DocNode({
   expanded,
   toggle,
   collectionId,
+  dnd,
 }: {
   doc: OutlineCollectionDocument;
   expanded: Set<string>;
   toggle: (id: string) => void;
   collectionId?: string;
+  dnd?: TreeDnd;
 }): React.ReactElement {
   const navigate = useNavigate();
   const selectDocument = useUIStore((s) => s.selectDocument);
@@ -123,10 +165,37 @@ function DocNode({
   const isOpen = expanded.has(doc.id);
   const actionsRef = useRef<DocActionsHandle>(null);
 
+  const dropClass =
+    dnd?.over?.id === doc.id ? `drop-${dnd.over.pos}` : "";
+  const dragging = dnd?.dragId === doc.id ? "dragging" : "";
+
   return (
     <div className="sb-node">
       <div
-        className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
+        className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""} ${dropClass} ${dragging}`}
+        draggable={!!dnd}
+        onDragStart={(e) => {
+          if (!dnd) return;
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = "move";
+          dnd.onDragStart(doc.id);
+        }}
+        onDragOver={(e) => {
+          if (!dnd || !dnd.dragId || dnd.dragId === doc.id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const r = e.currentTarget.getBoundingClientRect();
+          const y = (e.clientY - r.top) / r.height;
+          const pos: DropPos = y < 0.3 ? "before" : y > 0.7 ? "after" : "inside";
+          dnd.onDragOver(doc.id, pos);
+        }}
+        onDrop={(e) => {
+          if (!dnd || !dnd.over) return;
+          e.preventDefault();
+          e.stopPropagation();
+          dnd.onDrop(dnd.over.id, dnd.over.pos);
+        }}
+        onDragEnd={() => dnd?.onDragEnd()}
         onContextMenu={(e) => {
           e.preventDefault();
           actionsRef.current?.openMenu(e.clientX, e.clientY);
@@ -146,6 +215,7 @@ function DocNode({
         <a
           href={`#/document/${doc.id}`}
           className="sb-link"
+          draggable={false}
           onClick={(e) => {
             e.preventDefault();
             selectDocument(doc.id);
@@ -172,6 +242,7 @@ function DocNode({
               expanded={expanded}
               toggle={toggle}
               collectionId={collectionId}
+              dnd={dnd}
             />
           ))}
         </div>
@@ -191,7 +262,10 @@ function CollectionTree({
 }): React.ReactElement {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [over, setOver] = useState<{ id: string; pos: DropPos } | null>(null);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -202,14 +276,93 @@ function CollectionTree({
     });
   };
 
+  const treeKey = [
+    "profile",
+    activeProfileId,
+    "collection",
+    collectionId,
+    "documents",
+  ];
   const { data, isLoading, error } = useQuery({
-    queryKey: ["profile", activeProfileId, "collection", collectionId, "documents"],
+    queryKey: treeKey,
     queryFn: () =>
       unwrapIpc<CollectionDocumentsResponse>(
         api.collections.documents(activeProfileId!, collectionId),
       ),
     enabled: !!activeProfileId,
   });
+
+  // Drag-to-reorder (like Outline web). Optimistically rewrites the cached tree,
+  // then persists via documents.move (index = position among the destination's
+  // siblings, matching the local insertion) and reconciles on settle.
+  const performMove = (sourceId: string, targetId: string, pos: DropPos) => {
+    if (sourceId === targetId) return;
+    const snapshot =
+      queryClient.getQueryData<CollectionDocumentsResponse>(treeKey);
+    if (!snapshot?.data) return;
+    const tree: CDoc[] = JSON.parse(JSON.stringify(snapshot.data));
+    const src = locate(tree, sourceId);
+    if (!src || containsId(src.node, targetId)) return; // no self / descendant
+    // Outline's `index` is the target's slot in the CURRENT (pre-removal)
+    // sibling list: before → target index, after → +1 (matches the web client).
+    const tgtOrig = locate(tree, targetId);
+    if (!tgtOrig) return;
+    const apiIndex =
+      pos === "inside" ? 0 : pos === "before" ? tgtOrig.index : tgtOrig.index + 1;
+    const parentDocId = pos === "inside" ? targetId : tgtOrig.parentId;
+
+    // Local optimistic update: detach source, then re-find the target (its index
+    // may have shifted) and insert adjacent to it so the visual matches.
+    src.siblings.splice(src.index, 1);
+    const tgt = locate(tree, targetId);
+    if (!tgt) return;
+    if (pos === "inside") {
+      if (!tgt.node.children) tgt.node.children = [];
+      tgt.node.children.splice(0, 0, src.node);
+    } else {
+      tgt.siblings.splice(
+        pos === "before" ? tgt.index : tgt.index + 1,
+        0,
+        src.node,
+      );
+    }
+    queryClient.setQueryData(treeKey, { ...snapshot, data: tree });
+    if (pos === "inside")
+      setExpanded((prev) => new Set(prev).add(targetId));
+    const params: Record<string, unknown> = {
+      id: sourceId,
+      collectionId,
+      index: apiIndex,
+    };
+    if (parentDocId) params.parentDocumentId = parentDocId;
+    void (async () => {
+      try {
+        await unwrapIpc(api.call(activeProfileId!, "documents.move", params));
+      } catch {
+        /* revert below via invalidate */
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: treeKey });
+      }
+    })();
+  };
+
+  const manualSortable = sort?.field !== "title";
+  const dnd: TreeDnd = {
+    dragId,
+    over,
+    onDragStart: setDragId,
+    onDragOver: (id, pos) =>
+      setOver((o) => (o?.id === id && o.pos === pos ? o : { id, pos })),
+    onDrop: (targetId, pos) => {
+      if (dragId) performMove(dragId, targetId, pos);
+      setDragId(null);
+      setOver(null);
+    },
+    onDragEnd: () => {
+      setDragId(null);
+      setOver(null);
+    },
+  };
 
   if (isLoading) return <div className="sb-note">加载中…</div>;
   if (error) return <div className="sb-note">加载失败</div>;
@@ -231,6 +384,7 @@ function CollectionTree({
           expanded={expanded}
           toggle={toggle}
           collectionId={collectionId}
+          dnd={manualSortable ? dnd : undefined}
         />
       ))}
     </div>
@@ -349,6 +503,7 @@ function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
         <a
           href={`#/document/${doc.id}`}
           className="sb-link"
+          draggable={false}
           onClick={(e) => {
             e.preventDefault();
             selectDocument(doc.id);
