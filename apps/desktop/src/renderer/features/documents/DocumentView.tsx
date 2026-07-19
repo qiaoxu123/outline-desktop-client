@@ -1090,15 +1090,27 @@ function EditableDocument({
   const doSave = useCallback(async () => {
     setSaveState("saving");
     const savingTitle = pendingRef.current.title;
+    const savingText = pendingRef.current.text;
     try {
       await unwrapIpc(
         api.documents.update(activeProfileId!, {
           id: doc.id,
           title: savingTitle,
-          text: pendingRef.current.text,
+          text: savingText,
         }),
       );
       setSaveState("saved");
+      // Keep the document-detail cache in sync with what we just saved.
+      // Without this, reopening the doc re-seeds the title input from a stale
+      // cached copy (the title state only initializes on mount), so a rename
+      // appeared to "not stick" even though the server had it.
+      queryClient.setQueryData(
+        ["profile", activeProfileId, "document", doc.id],
+        (old: { data?: OutlineDocument } | undefined) =>
+          old?.data
+            ? { ...old, data: { ...old.data, title: savingTitle, text: savingText } }
+            : old,
+      );
       // The sidebar tree and tabs cache titles independently of the editor;
       // refresh them so a renamed doc updates everywhere without a reload.
       if (savingTitle !== syncedTitleRef.current) {
