@@ -263,6 +263,63 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
 
 /* ---------- paper byline (view count + like, shown under the title) ---------- */
 
+/** Overlapping viewer avatars with a "+N" overflow chip, like Outline web. */
+function ViewerAvatars({
+  viewers,
+  max = 5,
+}: {
+  viewers: Viewer[];
+  max?: number;
+}): React.ReactElement | null {
+  if (viewers.length === 0) return null;
+  const sorted = [...viewers].sort((a, b) =>
+    (b.lastViewedAt ?? "").localeCompare(a.lastViewedAt ?? ""),
+  );
+  const shown = sorted.slice(0, max);
+  const extra = sorted.length - shown.length;
+  return (
+    <div className="viewer-avatars">
+      {shown.map((v) => {
+        const url = absoluteUrl(v.user.avatarUrl);
+        return url ? (
+          <img
+            key={v.id}
+            className="viewer-avatar"
+            src={url}
+            alt={v.user.name}
+            title={v.user.name}
+          />
+        ) : (
+          <div
+            key={v.id}
+            className="viewer-avatar viewer-avatar-fallback"
+            title={v.user.name}
+          >
+            {(v.user.name || "?").slice(0, 1).toUpperCase()}
+          </div>
+        );
+      })}
+      {extra > 0 && <div className="viewer-avatar viewer-more">+{extra}</div>}
+    </div>
+  );
+}
+
+/** Rough reading stats from the markdown body (CJK chars + latin words). */
+function computeDocStats(md: string): {
+  words: number;
+  chars: number;
+  emojis: number;
+  readMinutes: number;
+} {
+  const emojis = (md.match(/\p{Extended_Pictographic}/gu) ?? []).length;
+  const cjk = (md.match(/[㐀-鿿]/g) ?? []).length;
+  const latinWords = (md.match(/[A-Za-z0-9]+/g) ?? []).length;
+  const words = cjk + latinWords;
+  const chars = [...md].length;
+  const readMinutes = Math.max(1, Math.round(words / 240));
+  return { words, chars, emojis, readMinutes };
+}
+
 function PaperByline({
   documentId,
 }: {
@@ -288,6 +345,7 @@ function PaperByline({
 
   return (
     <div className="paper-byline">
+      <ViewerAvatars viewers={data?.data ?? []} max={5} />
       <span className="paper-byline-views">{viewerCount} 人读过</span>
       <span className="paper-byline-sep" aria-hidden="true">
         ·
@@ -301,6 +359,109 @@ function PaperByline({
         <OIcon name="thumbsUp" size={14} />
         <span>{s.likes}</span>
       </button>
+    </div>
+  );
+}
+
+/* ---------- document info / statistics panel (like Outline web) ---------- */
+
+function ContributorRow({
+  person,
+  role,
+}: {
+  person: { name: string; avatarUrl?: string | null };
+  role: string;
+}): React.ReactElement {
+  const url = absoluteUrl(person.avatarUrl);
+  return (
+    <div className="doc-info-person">
+      {url ? (
+        <img className="viewer-avatar" src={url} alt={person.name} />
+      ) : (
+        <div className="viewer-avatar viewer-avatar-fallback">
+          {(person.name || "?").slice(0, 1).toUpperCase()}
+        </div>
+      )}
+      <div className="doc-info-person-text">
+        <div className="doc-info-person-name">{person.name}</div>
+        <div className="doc-info-person-role">{role}</div>
+      </div>
+    </div>
+  );
+}
+
+function DocInfoPanel({
+  doc,
+  onClose,
+}: {
+  doc: OutlineDocument;
+  onClose: () => void;
+}): React.ReactElement {
+  const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { data } = useQuery({
+    queryKey: ["profile", activeProfileId, "views", doc.id],
+    queryFn: () =>
+      unwrapIpc<{ data: Viewer[] }>(
+        api.call(activeProfileId!, "views.list", { documentId: doc.id }),
+      ),
+    enabled: !!activeProfileId,
+  });
+  const viewers = data?.data ?? [];
+  const stats = computeDocStats(doc.text || "");
+  const fmt = (s?: string | null): string =>
+    s ? new Date(s).toLocaleString() : "—";
+  const sameAuthor = doc.updatedBy?.id === doc.createdBy?.id;
+  const otherEditors = Math.max(
+    0,
+    (doc.collaboratorIds?.length ?? 0) - (sameAuthor ? 1 : 2),
+  );
+
+  return (
+    <div className="history-panel doc-info-panel">
+      <div className="history-header">
+        <span>统计</span>
+        <button className="history-close" onClick={onClose} title="关闭">
+          ✕
+        </button>
+      </div>
+      <div className="doc-info-body">
+        <section className="doc-info-section">
+          <h4>源</h4>
+          <div className="doc-info-line">创建于 {fmt(doc.createdAt)}</div>
+          <div className="doc-info-line">
+            最后更新 {fmt(doc.updatedAt)}
+            {doc.updatedBy ? ` · ${doc.updatedBy.name}` : ""}
+          </div>
+        </section>
+        <section className="doc-info-section">
+          <h4>统计信息</h4>
+          <div className="doc-info-line">约 {stats.readMinutes} 分钟阅读</div>
+          <div className="doc-info-line">{stats.words} 字</div>
+          <div className="doc-info-line">{stats.chars} 字符</div>
+          <div className="doc-info-line">{stats.emojis} 个表情符号</div>
+        </section>
+        <section className="doc-info-section">
+          <h4>贡献者</h4>
+          {doc.createdBy && (
+            <ContributorRow person={doc.createdBy} role="创建者" />
+          )}
+          {doc.updatedBy && !sameAuthor && (
+            <ContributorRow person={doc.updatedBy} role="最近编辑" />
+          )}
+          {otherEditors > 0 && (
+            <div className="doc-info-line muted">
+              另有 {otherEditors} 人参与编辑
+            </div>
+          )}
+        </section>
+        {viewers.length > 0 && (
+          <section className="doc-info-section">
+            <h4>浏览者（{viewers.length} 人）</h4>
+            <ViewerAvatars viewers={viewers} max={12} />
+          </section>
+        )}
+      </div>
     </div>
   );
 }
@@ -908,7 +1069,9 @@ function EditableDocument({
   const isDiscussTopic =
     !!doc.collectionId && doc.collectionId === discussCollectionId();
   const inlineCommentsRef = useRef<HTMLDivElement>(null);
-  const [panel, setPanel] = useState<"none" | "history" | "comments">("none");
+  const [panel, setPanel] = useState<
+    "none" | "history" | "comments" | "info"
+  >("none");
   const [shareOpen, setShareOpen] = useState(false);
   const { comments } = useComments(doc.id);
   const commentCount = comments.length;
@@ -1248,6 +1411,13 @@ function EditableDocument({
             <HistoryIcon />
           </button>
           <button
+            className={`document-icon-button ${panel === "info" ? "active" : ""}`}
+            onClick={() => setPanel(panel === "info" ? "none" : "info")}
+            title="统计信息"
+          >
+            <OIcon name="info" size={18} />
+          </button>
+          <button
             className="document-icon-button"
             onClick={() => setShareOpen(true)}
             title="分享"
@@ -1328,6 +1498,9 @@ function EditableDocument({
           quote={commentQuote}
           onQuoteChange={setCommentQuote}
         />
+      )}
+      {panel === "info" && (
+        <DocInfoPanel doc={doc} onClose={() => setPanel("none")} />
       )}
     </div>
   );

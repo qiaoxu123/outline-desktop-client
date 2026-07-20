@@ -906,25 +906,25 @@ export default function Sidebar(): React.ReactElement {
       </div>
 
       <nav className="sb-quick-nav">
-        {navItem("/search", "搜索", <OIcon name="search" size={18} />, true)}
-        {navItem("/", "主页", <OIcon name="home" size={18} />, true)}
+        {navItem("/search", "搜索", <OIcon name="search" size={20} />, true)}
+        {navItem("/", "主页", <OIcon name="home" size={20} />, true)}
         {navItem(
           "/settings",
           "设置",
-          <OIcon name="settings" size={18} />,
+          <OIcon name="settings" size={20} />,
           true,
         )}
         <span className="sb-nav-divider" aria-hidden="true">｜</span>
         {navItem(
           "/discuss",
           "讨论区",
-          <OIcon name="comment" size={18} />,
+          <OIcon name="comment" size={20} />,
           true,
           discussNew,
         )}
-        {navItem("/papers", "论文库", <OIcon name="academicCap" size={18} />, true)}
-        {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={18} />, true)}
-        {navItem("/shares", "共享链接", <OIcon name="globe" size={18} />, true)}
+        {navItem("/papers", "论文库", <OIcon name="academicCap" size={20} />, true)}
+        {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={20} />, true)}
+        {navItem("/shares", "共享链接", <OIcon name="globe" size={20} />, true)}
       </nav>
 
       <div className="sb-scroll">
@@ -1043,7 +1043,7 @@ export default function Sidebar(): React.ReactElement {
             navigate("/papers/graph");
           }}
         >
-          <OIcon name="graph" size={18} />
+          <OIcon name="graph" size={20} />
         </a>
       </div>
     </div>

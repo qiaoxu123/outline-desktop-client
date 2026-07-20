@@ -34,6 +34,7 @@ export interface OutlineDocument {
   revision: number;
   createdBy: { id: string; name: string; avatarUrl: string | null };
   updatedBy: { id: string; name: string; avatarUrl: string | null };
+  collaboratorIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
