@@ -24,6 +24,7 @@ import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
 import { AttachmentImage } from "./extensions/image";
 import { TableControls } from "./extensions/tableControls";
+import { KeymapFixes } from "./extensions/keymapFixes";
 import { OIcon } from "../../components/outlineIcons";
 import "katex/dist/katex.min.css";
 import "./Editor.css";
@@ -264,6 +265,7 @@ export function useMarkdownEditor(
         TableCell,
         TableHeader,
         TableControls,
+        KeymapFixes,
         Placeholder.configure({ placeholder: "开始编写…" }),
         MarkdownUnderline,
         MarkdownHighlight,
