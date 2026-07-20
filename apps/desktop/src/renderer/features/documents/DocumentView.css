@@ -812,19 +812,36 @@
 
 .comment-meta {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: baseline;
+  flex-wrap: nowrap;
 }
 
 .comment-author {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .comment-time {
   font-size: 11px;
   color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* push the 编辑/删除 buttons to the right edge, keep them on one line */
+.comment-meta button:first-of-type {
+  margin-left: auto;
+}
+.comment-meta .comment-op {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .comment-text {

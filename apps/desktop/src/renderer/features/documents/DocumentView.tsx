@@ -615,7 +615,13 @@ function CommentItem({
         <div className="comment-meta">
           <span className="comment-author">{comment.createdBy?.name}</span>
           <span className="comment-time">
-            {new Date(comment.createdAt).toLocaleString()}
+            {new Date(comment.createdAt).toLocaleString(undefined, {
+              year: "numeric",
+              month: "numeric",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </span>
           {own && !editing && (
             <>
