@@ -221,7 +221,8 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
   const viewers = data?.data ?? [];
   if (viewers.length === 0) return null;
 
-  const totalViews = viewers.reduce((sum, v) => sum + (v.count ?? 1), 0);
+  // Distinct viewers (people), not total view events.
+  const viewerCount = viewers.length;
 
   // Most recent first, cap at 5 avatars + overflow count
   const sorted = [...viewers].sort((a, b) =>
@@ -253,11 +254,8 @@ function Viewers({ documentId }: { documentId: string }): React.ReactElement | n
         );
       })}
       {extra > 0 && <div className="viewer-avatar viewer-more">+{extra}</div>}
-      <span
-        className="viewer-count"
-        title={`${sorted.length} 人浏览过，共 ${totalViews} 次`}
-      >
-        {totalViews} 次浏览
+      <span className="viewer-count" title={`${viewerCount} 人读过`}>
+        {viewerCount} 人读过
       </span>
     </div>
   );
@@ -285,14 +283,12 @@ function PaperByline({
     enabled: !!activeProfileId,
     refetchInterval: 30_000,
   });
-  const totalViews = (data?.data ?? []).reduce(
-    (sum, v) => sum + (v.count ?? 1),
-    0,
-  );
+  // Distinct viewers (people), not total view events.
+  const viewerCount = (data?.data ?? []).length;
 
   return (
     <div className="paper-byline">
-      <span className="paper-byline-views">{totalViews} 次浏览</span>
+      <span className="paper-byline-views">{viewerCount} 人读过</span>
       <span className="paper-byline-sep" aria-hidden="true">
         ·
       </span>

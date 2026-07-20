@@ -638,7 +638,7 @@
 }
 
 /* paper interaction bar (likes + star ratings, shared with 论文库) */
-/* paper byline under the title: 「N 次浏览 · 👍 N」(CSDN-style meta line) */
+/* paper byline under the title: 「N 人读过 · 👍 N」(CSDN-style meta line) */
 .paper-byline {
   display: flex;
   align-items: center;

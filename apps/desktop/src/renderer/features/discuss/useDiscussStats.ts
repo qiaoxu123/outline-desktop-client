@@ -136,7 +136,8 @@ export function useDiscussLikes(): {
 
 /* ---------- view counts (batched views.list + cache) ---------- */
 
-const VIEWS_CACHE_KEY = "discuss.viewsCache.v1";
+// v2: counts distinct viewers (record count), not total view events.
+const VIEWS_CACHE_KEY = "discuss.viewsCache.v2";
 const VIEWS_REFRESH_MS = 30 * 60_000;
 
 interface ViewsCache {
@@ -183,10 +184,8 @@ export function useDiscussViews(topicIds: string[]): Map<string, number> {
               const res = await unwrapIpc<{ data: { count?: number }[] }>(
                 api.call(activeProfileId, "views.list", { documentId: id }),
               );
-              const total = (res.data ?? []).reduce(
-                (sum, v) => sum + (v.count ?? 1),
-                0,
-              );
+              // Distinct viewers: one record per user (not sum of view events).
+              const total = (res.data ?? []).length;
               return [id, total] as const;
             } catch {
               return [id, acc[id] ?? 0] as const;

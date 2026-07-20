@@ -37,7 +37,7 @@ const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "updated", label: "更新时间 新→旧" },
-  { value: "views", label: "阅读量 多→少" },
+  { value: "views", label: "阅读人数 多→少" },
   { value: "likes", label: "点赞 多→少" },
   { value: "score", label: "评分 高→低" },
   { value: "title", label: "标题 A→Z" },
@@ -162,7 +162,7 @@ function PaperRow({
             <span className="paper-unparsed">未整理</span>
           )}
           {(viewCount ?? 0) > 0 && (
-            <span className="paper-views">{viewCount} 阅读</span>
+            <span className="paper-views">{viewCount} 人读过</span>
           )}
         </div>
       </div>

@@ -92,8 +92,8 @@ function TopicRow({
         </span>
       </span>
       {(viewCount ?? 0) > 0 && (
-        <span className="topic-views" title={`${viewCount} 次阅读`}>
-          {viewCount} 阅读
+        <span className="topic-views" title={`${viewCount} 人读过`}>
+          {viewCount} 人读过
         </span>
       )}
       <span

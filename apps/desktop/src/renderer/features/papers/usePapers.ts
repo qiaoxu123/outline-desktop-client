@@ -726,7 +726,8 @@ function mergeEntry(
 
 /* ---------- per-paper view counts (background batch fetch + cache) ---------- */
 
-const VIEWS_CACHE_KEY = "papers.viewsCache.v1";
+// v2: counts distinct viewers (record count), not total view events.
+const VIEWS_CACHE_KEY = "papers.viewsCache.v2";
 const VIEWS_REFRESH_MS = 30 * 60_000;
 
 interface ViewsCache {
@@ -781,10 +782,9 @@ export function usePaperViews(papers: PaperEntry[]): Map<string, number> {
               const res = await unwrapIpc<{ data: { count?: number }[] }>(
                 api.call(activeProfileId, "views.list", { documentId: id }),
               );
-              const total = (res.data ?? []).reduce(
-                (sum, v) => sum + (v.count ?? 1),
-                0,
-              );
+              // Distinct viewers: one record per user, so the count is the
+              // number of records (not the sum of per-user view events).
+              const total = (res.data ?? []).length;
               return [id, total] as const;
             } catch {
               return [id, acc[id] ?? 0] as const;
