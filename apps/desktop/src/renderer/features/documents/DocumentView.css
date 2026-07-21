@@ -397,6 +397,15 @@
   font-size: var(--text-md);
   color: var(--color-text);
   text-rendering: optimizeLegibility;
+  /* Roomier line + character spacing — 1.5 read too tight for CJK long-form. */
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+}
+
+/* code stays monospace-tight, no added letter-spacing */
+.document-body pre,
+.document-body code {
+  letter-spacing: normal;
 }
 
 .document-body h1 {
@@ -484,7 +493,7 @@
 }
 
 .document-body p {
-  margin: 0.6em 0;
+  margin: 0.8em 0;
 }
 
 .document-body a {
@@ -505,7 +514,7 @@
 }
 
 .document-body li {
-  margin: 0.2em 0;
+  margin: 0.3em 0;
 }
 
 .document-body blockquote {
