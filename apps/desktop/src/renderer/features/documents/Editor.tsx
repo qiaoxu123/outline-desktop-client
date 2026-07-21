@@ -19,6 +19,7 @@ import Underline from "@tiptap/extension-underline";
 import { Markdown } from "tiptap-markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { CellSelection } from "@tiptap/pm/tables";
+import markPlugin from "markdown-it-mark";
 import type MarkdownIt from "markdown-it";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
@@ -160,6 +161,11 @@ function patchTableSerializer(editor: TiptapEditor): void {
       }
       return false;
     });
+    // ==highlight== → <mark> (tiptap-markdown parses via the HTML render path,
+    // so Highlight's parseHTML picks up <mark>). Matches the read renderer,
+    // which already uses the same plugin; without this the editor shows web-
+    // created highlights as literal "==text==".
+    parserMd.use(markPlugin);
     parserMd.__brPatched = true;
   }
 }
@@ -289,10 +295,10 @@ export function useMarkdownEditor(
   useEffect(() => {
     if (!editor) return;
     patchTableSerializer(editor);
-    // The initial content was parsed before the <u> rule was installed, so any
-    // <u>…</u> got escaped instead of becoming an underline mark. Re-parse once
-    // with the patched parser (emitUpdate=false so it doesn't trigger a save).
-    if (/<u>/i.test(initialMarkdown)) {
+    // The initial content was parsed before the <u> / ==highlight== rules were
+    // installed, so those came through as literal text. Re-parse once with the
+    // patched parser (emitUpdate=false so it doesn't trigger a save).
+    if (/<u>/i.test(initialMarkdown) || /==[^=]/.test(initialMarkdown)) {
       editor.commands.setContent(initialMarkdown, false);
     }
   }, [editor, initialMarkdown]);
