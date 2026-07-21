@@ -88,7 +88,7 @@ function TopicRow({
           {row.category && (
             <span className="topic-category">{row.category.title}</span>
           )}
-          {topic.createdBy?.name} · 最后活动 {timeAgo(lastActivity)}
+          {topic.createdBy?.name} · 发表于 {timeAgo(topic.createdAt)}
         </span>
       </span>
       {(viewCount ?? 0) > 0 && (

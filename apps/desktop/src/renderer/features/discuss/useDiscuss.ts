@@ -230,7 +230,10 @@ export function useTopicsWithActivity(collectionId: string | null): {
       category: categoryOf.get(topic.id) ?? null,
     };
   });
-  rows.sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  // Sort by publish time (newest posts first). lastActivity is still computed
+  // and kept on each row for unread detection, just not used for ordering — so
+  // editing/replying to an old post no longer bumps it to the top.
+  rows.sort((a, b) => b.topic.createdAt.localeCompare(a.topic.createdAt));
 
   return { rows, categories, isLoading, error };
 }
