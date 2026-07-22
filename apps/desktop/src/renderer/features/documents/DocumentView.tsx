@@ -26,6 +26,7 @@ import { OIcon } from "../../components/outlineIcons";
 import { discussCollectionId } from "../discuss/useDiscuss";
 import { usePaperInteractions } from "../papers/usePapers";
 import QuickNotePopover from "../notes/QuickNotePopover";
+import QuickTodoPopover from "../todos/QuickTodoPopover";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
 
@@ -1081,6 +1082,7 @@ function EditableDocument({
   >("none");
   const [shareOpen, setShareOpen] = useState(false);
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
+  const [quickTodoOpen, setQuickTodoOpen] = useState(false);
   const { comments } = useComments(doc.id);
   const commentCount = comments.length;
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
@@ -1434,6 +1436,13 @@ function EditableDocument({
           </button>
           <button
             className="document-icon-button"
+            onClick={() => setQuickTodoOpen(true)}
+            title="加一条待办（关联本文）"
+          >
+            <OIcon name="todoList" size={18} />
+          </button>
+          <button
+            className="document-icon-button"
             onClick={() => setShareOpen(true)}
             title="分享"
           >
@@ -1449,6 +1458,16 @@ function EditableDocument({
             title: doc.title || "无标题",
           }}
           onClose={() => setQuickNoteOpen(false)}
+        />
+      )}
+      {quickTodoOpen && (
+        <QuickTodoPopover
+          link={{
+            docId: doc.id,
+            urlId: (doc as { urlId?: string }).urlId,
+            title: doc.title || "无标题",
+          }}
+          onClose={() => setQuickTodoOpen(false)}
         />
       )}
       {shareOpen && (

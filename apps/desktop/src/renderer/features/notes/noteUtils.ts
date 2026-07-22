@@ -20,25 +20,6 @@ export function makeId(nowMs: number, rand: number): string {
   return `n_${nowMs}_${r}`;
 }
 
-/** Union by id; on the same id keep the newer updatedAt. Order not guaranteed. */
-export function mergeNotes(local: Note[], remote: Note[]): Note[] {
-  const byId = new Map<string, Note>();
-  for (const n of remote) byId.set(n.id, n);
-  for (const n of local) {
-    const prev = byId.get(n.id);
-    if (!prev || n.updatedAt >= prev.updatedAt) byId.set(n.id, n);
-  }
-  return [...byId.values()];
-}
-
-const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-
-export function purgeExpired(notes: Note[], nowMs: number): Note[] {
-  return notes.filter(
-    (n) => !n.deletedAt || nowMs - new Date(n.deletedAt).getTime() < THIRTY_DAYS,
-  );
-}
-
 export function sortNotes(notes: Note[]): Note[] {
   return [...notes].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
