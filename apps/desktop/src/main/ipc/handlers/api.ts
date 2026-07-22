@@ -31,6 +31,7 @@ const ALLOWED_METHODS = new Set([
   // documents
   "documents.info",
   "documents.viewed",
+  "documents.search",
   "documents.list",
   "documents.recently_viewed",
   "documents.drafts",

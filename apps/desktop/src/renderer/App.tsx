@@ -6,6 +6,7 @@ import DocumentView from "./features/documents/DocumentView";
 import HomeView from "./features/home/HomeView";
 import SharesView from "./features/shares/SharesView";
 import DiscussView from "./features/discuss/DiscussView";
+import NotesView from "./features/notes/NotesView";
 import PapersView from "./features/papers/PapersView";
 import PaperGraphView from "./features/papers/PaperGraphView";
 import QuizView from "./features/quiz/QuizView";
@@ -208,6 +209,7 @@ export default function App(): React.ReactElement {
               <Route path="/document/:documentId" element={<DocumentView />} />
               <Route path="/shares" element={<SharesView />} />
               <Route path="/discuss" element={<DiscussView />} />
+              <Route path="/notes" element={<NotesView />} />
               <Route path="/papers" element={<PapersView />} />
               <Route path="/papers/graph" element={<PaperGraphView />} />
               <Route path="/quiz" element={<QuizView />} />

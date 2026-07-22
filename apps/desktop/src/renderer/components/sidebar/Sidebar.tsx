@@ -923,6 +923,7 @@ export default function Sidebar(): React.ReactElement {
           discussNew,
         )}
         {navItem("/papers", "论文库", <OIcon name="academicCap" size={20} />, true)}
+        {navItem("/notes", "随记", <OIcon name="note" size={20} />, true)}
         {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={20} />, true)}
         {navItem("/shares", "共享链接", <OIcon name="globe" size={20} />, true)}
       </nav>
