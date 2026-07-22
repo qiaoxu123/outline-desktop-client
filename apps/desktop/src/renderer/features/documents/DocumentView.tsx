@@ -25,6 +25,7 @@ import { openOutlineLink } from "../../lib/outlineLinks";
 import { OIcon } from "../../components/outlineIcons";
 import { discussCollectionId } from "../discuss/useDiscuss";
 import { usePaperInteractions } from "../papers/usePapers";
+import QuickNotePopover from "../notes/QuickNotePopover";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
 
@@ -1079,6 +1080,7 @@ function EditableDocument({
     "none" | "history" | "comments" | "info"
   >("none");
   const [shareOpen, setShareOpen] = useState(false);
+  const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const { comments } = useComments(doc.id);
   const commentCount = comments.length;
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
@@ -1425,6 +1427,13 @@ function EditableDocument({
           </button>
           <button
             className="document-icon-button"
+            onClick={() => setQuickNoteOpen(true)}
+            title="记一条随记（关联本文）"
+          >
+            <OIcon name="note" size={18} />
+          </button>
+          <button
+            className="document-icon-button"
             onClick={() => setShareOpen(true)}
             title="分享"
           >
@@ -1432,6 +1441,16 @@ function EditableDocument({
           </button>
         </div>
       </TopRightActions>
+      {quickNoteOpen && (
+        <QuickNotePopover
+          link={{
+            docId: doc.id,
+            urlId: (doc as { urlId?: string }).urlId,
+            title: doc.title || "无标题",
+          }}
+          onClose={() => setQuickNoteOpen(false)}
+        />
+      )}
       {shareOpen && (
         <ShareDialog url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""} onClose={() => setShareOpen(false)} />
       )}
