@@ -67,33 +67,52 @@ interface TableSerState {
   renderInline: (n: PMNode) => void;
   text: (s: string, escape?: boolean) => void;
   flushClose?: (size?: number) => void;
+  // prosemirror-markdown MarkdownSerializerState internals — used to spin up an
+  // isolated sub-state per cell (see serializeCell).
+  nodes?: unknown;
+  marks?: unknown;
+  options?: unknown;
+}
+
+/**
+ * Serialize ONE cell's content to markdown in a FRESH, isolated serializer
+ * state. Critical: prosemirror-markdown closes mark delimiters lazily, so
+ * rendering every cell into the shared table state (and rewinding `out`)
+ * desynced its mark bookkeeping — a cell with a mark (**bold**, ==highlight==)
+ * leaked its delimiters into the NEXT cell and ate its text
+ * (`| **x** | arXiv:1234 |` → `| **x** | arXiv**:34 |`). A per-cell sub-state
+ * opens and closes all marks within that cell, so nothing leaks across `|`.
+ */
+function serializeCell(state: TableSerState, cell: PMNode): string {
+  const Ctor = (
+    state as unknown as {
+      constructor: new (n: unknown, m: unknown, o: unknown) => TableSerState;
+    }
+  ).constructor;
+  const sub = new Ctor(state.nodes, state.marks, state.options ?? {});
+  cell.forEach((block, _bp, blockIdx) => {
+    if (blockIdx) sub.write("<br>");
+    if (block.isTextblock) sub.renderInline(block);
+    else sub.text(block.textContent);
+  });
+  return sub.out
+    .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
+    .replace(/\[hardBreak\]/gi, "<br>") // hard_break may fall back to this literal
+    .replace(/\\\r?\n/g, "<br>") // prosemirror hard_break: backslash + newline
+    .replace(/\r?\n+/g, "<br>") // any remaining in-cell newlines
+    .replace(/\|/g, "\\|")
+    .trim();
 }
 
 function serializeTable(state: TableSerState, node: PMNode): void {
   state.inTable = true;
   // Emit the pending block separator (e.g. after a preceding heading) BEFORE we
-  // start capturing cell output, otherwise the first cell swallows it.
+  // start writing the table, otherwise the first row swallows it.
   state.flushClose?.(2);
   node.forEach((row, _rp, rowIdx) => {
     const cells: string[] = [];
     row.forEach((cell) => {
-      // Capture each cell's inline markdown so we can post-process it: join
-      // multiple block children / hard breaks with <br>, undo the parser's
-      // HTML-escaping of literal <br> (&lt;br&gt;), and escape pipes.
-      const start = state.out.length;
-      cell.forEach((block, _bp, blockIdx) => {
-        if (blockIdx) state.write("<br>");
-        if (block.isTextblock) state.renderInline(block);
-        else state.text(block.textContent);
-      });
-      let md = state.out.slice(start);
-      state.out = state.out.slice(0, start); // rewind — we re-emit below
-      md = md
-        .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
-        .replace(/\r?\n+/g, "<br>")
-        .replace(/\|/g, "\\|")
-        .trim();
-      cells.push(md || " ");
+      cells.push(serializeCell(state, cell) || " ");
     });
     state.write("| " + cells.join(" | ") + " |");
     state.ensureNewLine();
