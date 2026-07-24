@@ -135,6 +135,12 @@ function collectPapers(
  * docs are papers (topic overview pages are not). Without this, papers filed
  * under 精选论文 were invisible to the library (only findable via global
  * search). `topic` = the first-level 专题 title.
+ *
+ * NB: a 📖 paper's descendants are STILL walked, because users often file a
+ * new paper directly under another 📖 paper — those nested 📖 docs are real
+ * papers, not appendices, and must be collected too (only 📖-prefixed nodes
+ * are ever pushed, so genuine non-📖 appendices are naturally ignored). The
+ * topic carried into a paper's subtree stays the nearest non-📖 folder.
  */
 function collectFeatured(
   nodes: OutlineCollectionDocument[],
@@ -152,7 +158,9 @@ function collectFeatured(
         month: null,
         topic,
       });
-      continue; // a paper's children are appendices, not papers
+      // keep same topic — a paper nested here belongs to the same 专题
+      collectFeatured(n.children ?? [], topic, out);
+      continue;
     }
     collectFeatured(n.children ?? [], topic ?? title, out);
   }
@@ -176,6 +184,8 @@ function collectInternalWork(
         month: null,
         topic: "组内工作",
       });
+      // still descend: a paper filed under another 📖 is a real paper too
+      collectInternalWork(n.children ?? [], out);
       continue;
     }
     collectInternalWork(n.children ?? [], out);
