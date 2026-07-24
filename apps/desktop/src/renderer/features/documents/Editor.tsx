@@ -24,6 +24,7 @@ import type MarkdownIt from "markdown-it";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
 import { AttachmentImage } from "./extensions/image";
+import { normalizeOutlineMarkdown } from "../../lib/markdown/normalize";
 import { TableControls } from "./extensions/tableControls";
 import { KeymapFixes } from "./extensions/keymapFixes";
 import { OIcon } from "../../components/outlineIcons";
@@ -285,7 +286,7 @@ export function useMarkdownEditor(
           transformPastedText: true,
         }),
       ],
-      content: initialMarkdown,
+      content: normalizeOutlineMarkdown(initialMarkdown),
     },
     [],
   );
@@ -298,8 +299,12 @@ export function useMarkdownEditor(
     // The initial content was parsed before the <u> / ==highlight== rules were
     // installed, so those came through as literal text. Re-parse once with the
     // patched parser (emitUpdate=false so it doesn't trigger a save).
-    if (/<u>/i.test(initialMarkdown) || /==[^=]/.test(initialMarkdown)) {
-      editor.commands.setContent(initialMarkdown, false);
+    if (
+      /<u>/i.test(initialMarkdown) ||
+      /==[^=]/.test(initialMarkdown) ||
+      /!\[[^\]]*\]\([^\n)]*\)>/.test(initialMarkdown)
+    ) {
+      editor.commands.setContent(normalizeOutlineMarkdown(initialMarkdown), false);
     }
   }, [editor, initialMarkdown]);
 

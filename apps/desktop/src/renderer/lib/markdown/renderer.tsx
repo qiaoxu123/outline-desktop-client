@@ -7,6 +7,7 @@ import markPlugin from "markdown-it-mark";
 import hljs from "highlight.js";
 import { absoluteAttachmentUrl } from "../server";
 import { parseImageTitle } from "./imageTitle";
+import { normalizeOutlineMarkdown } from "./normalize";
 import { openOutlineLink } from "../outlineLinks";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUIStore } from "../../state/uiStore";
@@ -150,7 +151,7 @@ export function MarkdownRenderer({
   const api = useElectronAPI();
   const profileId = useUIStore((s) => s.activeProfileId);
   const html = useMemo(
-    () => (breaks ? mdBreaks : md).render(content),
+    () => (breaks ? mdBreaks : md).render(normalizeOutlineMarkdown(content)),
     [content, breaks],
   );
 
