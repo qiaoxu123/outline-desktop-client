@@ -1,3 +1,11 @@
+## [1.13.4] - 2026-07-25
+
+### Changes
+- **笔记正文行间距调小**：`line-height` 1.8→1.6、段落间距 0.8→0.55em、列表项 0.3→0.15em、字距 0.02→0.01em，长文更紧凑。
+
+### Fixes
+- **修复：`==高亮==` 渲染与网页端不一致（尤其相邻高亮显示成字面 `==`）。** 读了 Outline 源码后发现它用的是自研规则 `markRule({delim:"==",mark:"highlight"})`（`shared/editor/rules/mark.ts`），而非 `markdown-it-mark`。关键差别：Outline 把每个定界符的 `length` 设为 0，从而**关闭 markdown-it 的「rule of 3」**——正是这条让 `markdown-it-mark` 把相邻高亮 `==a====b==` 的 `====` 判死、渲染成字面 `==`。现已把 Outline 的规则原样移植（`highlightRule.ts`，输出 `<mark>`），读视图与编辑器均替换 `markdown-it-mark` 为它。另对「左侧高亮以全角标点结尾 + 紧邻下一个高亮」这种 CommonMark flanking 无法闭合的历史产物，在 `normalizeOutlineMarkdown` 里把裸的行内 `====` 规范成 `== ==`（两侧即可正常 flanking；setext `===` 下划线在行首、不受影响）。CDP 验证：`==yixian==<br>==henan （major）====ghayoumo==` 三个高亮全部正确渲染，无字面 `==`。
+
 ## [1.13.3] - 2026-07-24
 
 ### Fixes

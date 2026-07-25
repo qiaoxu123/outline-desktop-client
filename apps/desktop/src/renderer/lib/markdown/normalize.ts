@@ -23,5 +23,16 @@
  */
 export function normalizeOutlineMarkdown(src: string): string {
   if (!src) return src;
-  return src.replace(/(!\[[^\]]*\]\([^\n)]*\))>/g, "$1\n\n>");
+  return (
+    src
+      .replace(/(!\[[^\]]*\]\([^\n)]*\))>/g, "$1\n\n>")
+      // Two adjacent highlights serialize with their delimiters merged into a
+      // bare inline `====` run (`==a====b==`). When the left highlight ends in
+      // punctuation (common with CJK full-width `）。，` etc.) CommonMark's
+      // flanking rule forbids that run from closing, so it renders literal `==`.
+      // A bare inline `====` only ever means "one highlight ends, next begins",
+      // so splitting it into `== ==` lets both sides flank cleanly. Setext `===`
+      // underlines sit on their own line (newline-flanked) and never match.
+      .replace(/([^\n=])====([^\n=])/g, "$1== ==$2")
+  );
 }

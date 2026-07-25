@@ -19,7 +19,7 @@ import Underline from "@tiptap/extension-underline";
 import { Markdown } from "tiptap-markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { CellSelection } from "@tiptap/pm/tables";
-import markPlugin from "markdown-it-mark";
+import highlightRule from "../../lib/markdown/highlightRule";
 import type MarkdownIt from "markdown-it";
 import { MathInline, MathBlock } from "./extensions/math";
 import { CommentHighlights } from "./extensions/commentHighlights";
@@ -181,11 +181,12 @@ function patchTableSerializer(editor: TiptapEditor): void {
       }
       return false;
     });
-    // ==highlight== → <mark> (tiptap-markdown parses via the HTML render path,
-    // so Highlight's parseHTML picks up <mark>). Matches the read renderer,
-    // which already uses the same plugin; without this the editor shows web-
-    // created highlights as literal "==text==".
-    parserMd.use(markPlugin);
+    // ==highlight== → <mark> via Outline's own rule (see highlightRule), so
+    // the editor parses highlights EXACTLY like web — including adjacent
+    // highlights (==a====b==) that markdown-it-mark rendered as literal "==".
+    // tiptap-markdown parses via the HTML render path, so Highlight's parseHTML
+    // picks up the <mark>.
+    parserMd.use(highlightRule);
     parserMd.__brPatched = true;
   }
 }

@@ -397,9 +397,9 @@
   font-size: var(--text-md);
   color: var(--color-text);
   text-rendering: optimizeLegibility;
-  /* Roomier line + character spacing — 1.5 read too tight for CJK long-form. */
-  line-height: 1.8;
-  letter-spacing: 0.02em;
+  /* Comfortable but compact for CJK long-form (1.5 too tight, 1.8 too airy). */
+  line-height: 1.6;
+  letter-spacing: 0.01em;
 }
 
 /* code stays monospace-tight, no added letter-spacing */
@@ -493,7 +493,7 @@
 }
 
 .document-body p {
-  margin: 0.8em 0;
+  margin: 0.55em 0;
 }
 
 .document-body a {
@@ -510,11 +510,11 @@
 .document-body ul,
 .document-body ol {
   padding-left: 1.5em;
-  margin: 0.5em 0;
+  margin: 0.4em 0;
 }
 
 .document-body li {
-  margin: 0.3em 0;
+  margin: 0.15em 0;
 }
 
 .document-body blockquote {

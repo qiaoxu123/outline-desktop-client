@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import katexPlugin from "@vscode/markdown-it-katex";
-import markPlugin from "markdown-it-mark";
+import highlightRule from "./highlightRule";
 import hljs from "highlight.js";
 import { absoluteAttachmentUrl } from "../server";
 import { parseImageTitle } from "./imageTitle";
@@ -54,11 +54,9 @@ function createMd(breaks: boolean): MarkdownIt {
       (katexPlugin as unknown as MdPlugin),
     { throwOnError: false, strict: false },
   );
-  // ==highlight== → <mark> (pairs with the editor's highlight button)
-  inst.use(
-    (markPlugin as unknown as { default?: MdPlugin }).default ??
-      (markPlugin as unknown as MdPlugin),
-  );
+  // ==highlight== → <mark>, using Outline's own rule (see highlightRule) so
+  // adjacent highlights (==a====b==) parse correctly, matching web.
+  inst.use(highlightRule);
 
   // Render bare <br> tags as real line breaks even though html:false. Outline
   // serialises in-cell line breaks (and some hard breaks) as literal <br>, so
