@@ -37,8 +37,10 @@ export default function OutlineView(): React.ReactElement {
   const [sourceMode, setSourceMode] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [draft, setDraft] = useState<OutlineNode[] | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<null | (() => void)>(null);
+  const latestTitleRef = useRef<string | null>(null);
 
   const active: OutlineDoc | null = useMemo(
     () => store.outlines.find((d) => d.id === activeId) ?? store.outlines[0] ?? null,
@@ -46,14 +48,20 @@ export default function OutlineView(): React.ReactElement {
   );
   const currentActiveId = active?.id ?? null;
 
-  // 仅在切换到另一份文档时重置 draft（依赖 currentActiveId，不是 active.root）——
+  // 仅在切换到另一份文档时重置 draft 和 titleDraft（依赖 currentActiveId，不是 active.root）——
   // 否则每次网络回包触发的 store.outlines 更新都会用滞后的 root 覆盖掉
   // 用户在等待期间已做的本地编辑。
   // 注意：若同一份已打开的文档在另一设备上被改动，本视图不会自动刷新，
   // 需要重新打开才能看到——这是文档级合并模型下的可接受权衡（MVP）。
   useEffect(() => {
     setDraft(active ? active.root : null);
+    setTitleDraft(active ? active.title : null);
   }, [currentActiveId]); // 有意只依赖 currentActiveId，见上方注释
+
+  // 保持 latestTitleRef 与 titleDraft 同步，以便在清理时读取最新标题。
+  useEffect(() => {
+    latestTitleRef.current = titleDraft;
+  }, [titleDraft]);
 
   const flushPending = () => {
     if (debounceRef.current) {
@@ -67,10 +75,16 @@ export default function OutlineView(): React.ReactElement {
     }
   };
 
-  // 切换文档 / 卸载组件时 flush 上一份文档尚未到期的防抖提交，避免丢失。
+  // 切换文档 / 卸载组件时 flush 上一份文档尚未到期的防抖提交，以及未失焦的标题改动。
   useEffect(() => {
+    const doc = active;
     return () => {
       flushPending();
+      // 离开当前大纲前，提交未失焦的标题改动。
+      const t = latestTitleRef.current;
+      if (doc && t != null && t !== doc.title) {
+        void store.renameDoc(doc.id, t);
+      }
     };
   }, [currentActiveId]); // 依赖同上：仅在文档切换 / 卸载时 flush
 
@@ -159,8 +173,13 @@ export default function OutlineView(): React.ReactElement {
             <div className="ol-toolbar">
               <input
                 className="ol-doc-name"
-                value={active.title}
-                onChange={(e) => void store.renameDoc(active.id, e.target.value)}
+                value={titleDraft ?? active.title}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => {
+                  if (titleDraft != null && titleDraft !== active.title) {
+                    void store.renameDoc(active.id, titleDraft);
+                  }
+                }}
               />
               <div className="ol-toolbar-actions">
                 <button className={sourceMode ? "" : "active"} onClick={() => setSourceMode(false)}>
