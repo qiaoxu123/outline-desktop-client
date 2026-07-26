@@ -1,3 +1,20 @@
+## [1.14.0] - 2026-07-26
+
+### Features
+- 新增「大纲」功能（幕布式）：可折叠项目符号树、节点内联 markdown 所见即所得（加粗/==高亮==/链接）、节点备注、拖拽重排/升降级、Enter/Tab/Alt+方向键/Backspace 合并等键盘流、markdown 源码模式、一键导出为 Outline 文档。数据存 WebDAV 私有单文件 `大纲/<userId>.json`（复用 useWebdavStore，文档级合并）。侧边栏新增入口，路由 /outline。
+
+### Design Rationale
+- 编辑器方案 B：React 自管树（折叠/拖拽/键盘/备注纯前端），仅当前聚焦节点挂一个 TipTap 内联编辑器做所见即所得（禁用块级、限定单段落 schema），失焦节点用 markdown-it 静态渲染；兼顾幕布观感与性能。
+- OutlineView 采用乐观本地 root（draft）+ pending flush：因 useWebdavStore 的 setItems 在 WebDAV PUT 之后才更新，快速连续编辑若直接基于滞后的 store 状态会相互覆盖丢失，故本地 draft 同步更新、切文档/卸载时 flush 待写。
+- NodeEditor 复用文档编辑器的 MarkdownHighlight（==序列化）并对初始内容做 normalizeOutlineMarkdown，避免相邻高亮退化为字面 ==。
+
+### Notes & Caveats
+- 源码模式往返会重建节点 id，折叠状态重置为全展开；树视图内日常编辑不受影响。
+- 备注支持多段落（段落间空行已保留）；但备注中以「- 」开头的行在源码往返时会被解析成子节点（格式歧义，避免在备注里用行首「- 」）。
+- 节点内 Enter 切分点在含 markdown 标记符时为近似（按纯文本坐标）。
+- 拖拽用原生 HTML5 DnD、源码用原生 textarea，未引入新依赖；仅新增 vitest（纯逻辑单测）与 @tiptap/extension-document。
+- 同一打开中的大纲若在其他设备被修改，不会实时刷新（需重开；符合文档级合并模型）。
+
 ## [1.13.4] - 2026-07-25
 
 ### Changes
