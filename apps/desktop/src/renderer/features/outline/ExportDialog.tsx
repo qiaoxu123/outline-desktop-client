@@ -33,9 +33,12 @@ export default function ExportDialog(props: ExportDialogProps): React.ReactEleme
     if (!profileId) return;
     void (async () => {
       try {
-        const list = await unwrapIpc<OutlineCollection[]>(api.collections.list(profileId));
-        setCollections(Array.isArray(list) ? list : []);
-        if (Array.isArray(list) && list[0]) setCollectionId(list[0].id);
+        const res = await unwrapIpc<OutlineCollection[] | { data: OutlineCollection[] }>(
+          api.collections.list(profileId),
+        );
+        const list = Array.isArray(res) ? res : res?.data ?? [];
+        setCollections(list);
+        if (list[0]) setCollectionId(list[0].id);
       } catch (e) {
         setError(String(e));
       }
