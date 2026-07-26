@@ -67,3 +67,158 @@ export function insertSiblingAfter(
     return children === x.children ? x : { ...x, children };
   });
 }
+
+/** 定位节点：返回其所在数组、下标、父节点（顶层父为 null）。 */
+interface Loc {
+  siblings: OutlineNode[];
+  index: number;
+  parent: OutlineNode | null;
+}
+function locate(root: OutlineNode[], id: string, parent: OutlineNode | null = null): Loc | null {
+  const index = root.findIndex((x) => x.id === id);
+  if (index >= 0) return { siblings: root, index, parent };
+  for (const node of root) {
+    const hit = locate(node.children, id, node);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** 用「替换某父节点 children」的方式重建树（父为 null 表示顶层）。 */
+function replaceChildren(
+  root: OutlineNode[],
+  parentId: string | null,
+  children: OutlineNode[],
+): OutlineNode[] {
+  if (parentId === null) return children;
+  return root.map((node) => {
+    if (node.id === parentId) return { ...node, children };
+    if (node.children.length === 0) return node;
+    const next = replaceChildren(node.children, parentId, children);
+    return next === node.children ? node : { ...node, children: next };
+  });
+}
+
+export function indent(root: OutlineNode[], id: string): OutlineNode[] {
+  const loc = locate(root, id);
+  if (!loc || loc.index === 0) return root; // 无前兄弟
+  const node = loc.siblings[loc.index];
+  const prev = loc.siblings[loc.index - 1];
+  const newSiblings = loc.siblings.slice();
+  newSiblings.splice(loc.index, 1);
+  newSiblings[loc.index - 1] = { ...prev, children: [...prev.children, node] };
+  return replaceChildren(root, loc.parent ? loc.parent.id : null, newSiblings);
+}
+
+export function outdent(root: OutlineNode[], id: string): OutlineNode[] {
+  const loc = locate(root, id);
+  if (!loc || loc.parent === null) return root; // 已在顶层
+  const node = loc.siblings[loc.index];
+  const parentLoc = locate(root, loc.parent.id);
+  if (!parentLoc) return root;
+  // 从父的 children 移除
+  const withoutNode = replaceChildren(
+    root,
+    loc.parent.id,
+    loc.siblings.filter((_, i) => i !== loc.index),
+  );
+  // 插到「父节点之后」的祖父层
+  const grandSiblings = parentLoc.siblings;
+  const insertAt = parentLoc.index + 1;
+  // parentLoc.siblings 来自旧树；需要从 withoutNode 里重新取父层数组
+  const freshParentLoc = locate(withoutNode, loc.parent.id);
+  const targetSiblings = freshParentLoc ? freshParentLoc.siblings : withoutNode;
+  const next = targetSiblings.slice();
+  next.splice(insertAt, 0, node);
+  return replaceChildren(
+    withoutNode,
+    freshParentLoc && freshParentLoc.parent ? freshParentLoc.parent.id : null,
+    next,
+  );
+}
+
+function swap(root: OutlineNode[], id: string, delta: -1 | 1): OutlineNode[] {
+  const loc = locate(root, id);
+  if (!loc) return root;
+  const j = loc.index + delta;
+  if (j < 0 || j >= loc.siblings.length) return root;
+  const next = loc.siblings.slice();
+  [next[loc.index], next[j]] = [next[j], next[loc.index]];
+  return replaceChildren(root, loc.parent ? loc.parent.id : null, next);
+}
+export function moveUp(root: OutlineNode[], id: string): OutlineNode[] {
+  return swap(root, id, -1);
+}
+export function moveDown(root: OutlineNode[], id: string): OutlineNode[] {
+  return swap(root, id, 1);
+}
+
+export interface MergeResult {
+  root: OutlineNode[];
+  focusId: string | null;
+  caretOffset: number;
+}
+export function mergeDelete(root: OutlineNode[], id: string): MergeResult {
+  const order = visibleNodesInOrder(root);
+  const pos = order.findIndex((x) => x.id === id);
+  if (pos <= 0) return { root, focusId: null, caretOffset: 0 };
+  const prev = order[pos - 1];
+  const self = order[pos];
+  const caretOffset = prev.text.length;
+  // 1) 上一节点 text 拼接、并接管 self 的子节点
+  let next = setText(root, prev.id, prev.text + self.text);
+  const prevNode = findNode(next, prev.id)!;
+  next = mapChildren(next, prev.id, [...prevNode.children, ...self.children]);
+  // 2) 删除 self（此时 self 已无子内容依赖，直接摘除）
+  next = removeNode(next, id);
+  return { root: next, focusId: prev.id, caretOffset };
+}
+
+/** 替换某节点自身的 children（内部工具）。 */
+function mapChildren(root: OutlineNode[], id: string, children: OutlineNode[]): OutlineNode[] {
+  return root.map((node) => {
+    if (node.id === id) return { ...node, children };
+    if (node.children.length === 0) return node;
+    const next = mapChildren(node.children, id, children);
+    return next === node.children ? node : { ...node, children: next };
+  });
+}
+
+function removeNode(root: OutlineNode[], id: string): OutlineNode[] {
+  const filtered = root.filter((x) => x.id !== id);
+  if (filtered.length !== root.length) return filtered;
+  return root.map((node) => {
+    if (node.children.length === 0) return node;
+    const next = removeNode(node.children, id);
+    return next === node.children ? node : { ...node, children: next };
+  });
+}
+
+function isDescendant(node: OutlineNode, maybeChildId: string): boolean {
+  for (const c of node.children) {
+    if (c.id === maybeChildId || isDescendant(c, maybeChildId)) return true;
+  }
+  return false;
+}
+
+export function dragMove(
+  root: OutlineNode[],
+  id: string,
+  targetParentId: string | null,
+  index: number,
+): OutlineNode[] {
+  if (id === targetParentId) return root;
+  const node = findNode(root, id);
+  if (!node) return root;
+  if (targetParentId && isDescendant(node, targetParentId)) return root; // 禁止移进自身子树
+  // 摘除
+  const without = removeNode(root, id);
+  // 目标 children
+  const targetChildren =
+    targetParentId === null ? without : findNode(without, targetParentId)?.children ?? null;
+  if (targetChildren === null) return root;
+  const nextChildren = targetChildren.slice();
+  const clamped = Math.max(0, Math.min(index, nextChildren.length));
+  nextChildren.splice(clamped, 0, node);
+  return replaceChildren(without, targetParentId, nextChildren);
+}
