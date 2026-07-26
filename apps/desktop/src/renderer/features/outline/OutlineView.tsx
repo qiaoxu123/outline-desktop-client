@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutlines } from "./useOutlines";
 import OutlineTree from "./OutlineTree";
 import SourceMode from "./SourceMode";
@@ -15,32 +15,82 @@ import "./OutlineView.css";
  * `{ immediate: true }`，立即 `updateNodes`；纯文本编辑（标题/备注逐字输入）
  * 不带该 flag，这里防抖 800ms 后才提交，避免每次按键都写 WebDAV。
  *
- * 防抖用一个 `useRef` 定时器，每次调度前清掉上一个 —— 由于闭包捕获的是
- * "调度那一刻" 的 `docId`/`next`（而不是渲染时的最新值），即便用户在等待
- * 窗口内切换到另一份文档，这次延迟提交仍然精准落在原文档上，不会串写。
- * 代价：切换文档或卸载组件时，若正好有一次未到期的防抖提交，它不会被
- * flush 或 cancel —— 800ms 后仍会照常写入它捕获的那份文档。这是可接受的
- * （数据不丢、目标不错），但如果用户期望「离开即保存」的即时反馈，这里
- * 有最多 800ms 的可见延迟，暂未在离开时主动 flush。
+ * 乐观本地 draft：`useWebdavStore.commit` 只在 WebDAV PUT resolve 后才
+ * `setItems`，`store.outlines`（进而 `active.root`）落后一个网络往返。若
+ * 直接把 `active.root` 传给 `OutlineTree`，用户在往返时间内连续两次操作
+ * （如 Enter 新建节点后立刻 Tab 缩进）时，第二次操作会基于缺失第一次编辑的
+ * 陈旧树计算，`outlineOps` 对不存在的 id 静默 no-op，随后整棵（缺失编辑
+ * #1）的树被 PUT 上去，把编辑 #1 覆盖丢失。
+ *
+ * 修复：本地维护 `draft` root，每次编辑都同步更新它，`OutlineTree`/
+ * `SourceMode` 一律读 `draft`（而不是网络滞后的 `active.root`），保证后续
+ * 操作永远看到最新树。持久化仍走防抖/立即 `updateNodes`，只是屏幕真相源
+ * 换成了本地 draft。
+ *
+ * 防抖用一个 `useRef` 定时器，每次调度前清掉上一个；`pendingRef` 记录待
+ * flush 的持久化函数，在切换文档 / 组件卸载时主动 flush，避免 800ms 内的
+ * 文本编辑被无声丢弃。
  */
 export default function OutlineView(): React.ReactElement {
   const store = useOutlines();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sourceMode, setSourceMode] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [draft, setDraft] = useState<OutlineNode[] | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<null | (() => void)>(null);
 
   const active: OutlineDoc | null = useMemo(
     () => store.outlines.find((d) => d.id === activeId) ?? store.outlines[0] ?? null,
     [store.outlines, activeId],
   );
+  const currentActiveId = active?.id ?? null;
+
+  // 仅在切换到另一份文档时重置 draft（依赖 currentActiveId，不是 active.root）——
+  // 否则每次网络回包触发的 store.outlines 更新都会用滞后的 root 覆盖掉
+  // 用户在等待期间已做的本地编辑。
+  // 注意：若同一份已打开的文档在另一设备上被改动，本视图不会自动刷新，
+  // 需要重新打开才能看到——这是文档级合并模型下的可接受权衡（MVP）。
+  useEffect(() => {
+    setDraft(active ? active.root : null);
+  }, [currentActiveId]); // 有意只依赖 currentActiveId，见上方注释
+
+  const flushPending = () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (pendingRef.current) {
+      const fn = pendingRef.current;
+      pendingRef.current = null;
+      fn();
+    }
+  };
+
+  // 切换文档 / 卸载组件时 flush 上一份文档尚未到期的防抖提交，避免丢失。
+  useEffect(() => {
+    return () => {
+      flushPending();
+    };
+  }, [currentActiveId]); // 依赖同上：仅在文档切换 / 卸载时 flush
+
+  const treeRoot = draft ?? active?.root ?? [];
 
   const commitNodes = (docId: string, next: OutlineNode[], immediate?: boolean) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (immediate) {
+    setDraft(next); // 乐观本地更新：后续操作永远基于最新树，避免竞态覆盖
+    const persist = () => {
+      pendingRef.current = null;
       void store.updateNodes(docId, () => next);
+    };
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (immediate) {
+      persist();
     } else {
-      debounceRef.current = setTimeout(() => void store.updateNodes(docId, () => next), 800);
+      pendingRef.current = persist;
+      debounceRef.current = setTimeout(persist, 800);
     }
   };
 
@@ -125,8 +175,9 @@ export default function OutlineView(): React.ReactElement {
 
             {sourceMode ? (
               <SourceMode
-                root={active.root}
+                root={treeRoot}
                 onApply={(next) => {
+                  setDraft(next); // 同步反映解析结果，不等 PUT 回包
                   void store.updateNodes(active.id, () => next);
                   setSourceMode(false);
                 }}
@@ -135,7 +186,7 @@ export default function OutlineView(): React.ReactElement {
             ) : (
               <OutlineTree
                 key={active.id}
-                root={active.root}
+                root={treeRoot}
                 makeId={() => makeNodeId(Date.now(), Math.random())}
                 onChange={(next, opts) => commitNodes(active.id, next, opts?.immediate)}
               />
