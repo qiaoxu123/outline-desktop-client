@@ -143,7 +143,11 @@ export default function OutlineTree(props: OutlineTreeProps): React.ReactElement
               // before：放到 target 同层、target 之前
               const parentId = parentOf(root, targetId);
               const siblings = parentId ? findNode(root, parentId)!.children : root;
-              const idx = siblings.findIndex((n) => n.id === targetId);
+              const srcIdx = siblings.findIndex((n) => n.id === src);
+              const rawIdx = siblings.findIndex((n) => n.id === targetId);
+              // dragMove removes src before splicing; if src was before target in the same
+              // parent, target's index shifts down by one after removal — compensate.
+              const idx = srcIdx !== -1 && srcIdx < rawIdx ? rawIdx - 1 : rawIdx;
               props.onChange(dragMove(root, src, parentId, Math.max(0, idx)), { immediate: true });
             }
           }}
