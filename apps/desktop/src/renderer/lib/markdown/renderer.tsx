@@ -172,4 +172,12 @@ export function MarkdownRenderer({
   );
 }
 
+/**
+ * 内联渲染一行 markdown（加粗/斜体/==高亮==/链接/行内代码/行内公式），
+ * 不产生块级 <p> 包裹，供大纲节点标题这类单行内容使用。复用主 md 实例。
+ */
+export function renderInlineMarkdown(text: string): string {
+  return md.renderInline(normalizeOutlineMarkdown(text));
+}
+
 export default MarkdownRenderer;

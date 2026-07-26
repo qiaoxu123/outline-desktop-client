@@ -16,6 +16,7 @@ export interface ElectronAPI {
   };
   documents: {
     info: (profileId: string, documentId: string) => Promise<unknown>;
+    create: (payload: unknown) => Promise<unknown>;
     update: (
       profileId: string,
       params: { id: string; title?: string; text?: string },
@@ -89,6 +90,7 @@ const api: ElectronAPI = {
   documents: {
     info: (profileId, documentId) =>
       ipcRenderer.invoke("documents:info", { profileId, documentId }),
+    create: (payload) => ipcRenderer.invoke("documents:create", payload),
     update: (profileId, params) =>
       ipcRenderer.invoke("documents:update", { profileId, ...params }),
     search: (profileId, params) =>
