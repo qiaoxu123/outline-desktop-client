@@ -41,6 +41,14 @@ describe("round-trip", () => {
     const back = parseMarkdown(md);
     expect(strip(back)).toEqual(strip(sample()));
   });
+
+  it("preserves a blank line inside a multi-paragraph note", () => {
+    const t = [
+      { id: "a", text: "顶点", collapsed: false, note: "第一段\n\n第二段", children: [] },
+    ];
+    const back = parseMarkdown(toMarkdown(t));
+    expect(back[0].note).toBe("第一段\n\n第二段");
+  });
 });
 
 describe("toExportMarkdown", () => {

@@ -44,20 +44,30 @@ export function parseMarkdown(md: string): OutlineNode[] {
     stack.push({ node, depth });
   };
 
+  let pendingBlanks = 0;
   for (const raw of md.split("\n")) {
-    if (raw.trim() === "") continue;
+    if (raw.trim() === "") {
+      pendingBlanks++;
+      continue;
+    }
     const bullet = raw.match(/^(\s*)- (.*)$/);
     if (bullet) {
+      pendingBlanks = 0; // bullet 前的空行是结构性的，丢弃
       const depth = Math.floor(bullet[1].length / INDENT.length);
       attach({ id: nextId(), text: bullet[2], collapsed: false, children: [] }, depth);
       continue;
     }
-    // 非 bullet 行：归为栈顶节点的 note（去掉「其缩进 + 2 空格」的前缀近似）。
+    // 非 bullet 行：归为栈顶节点的 note（保留段落间空行）。
     const top = stack[stack.length - 1];
     if (top) {
       const line = raw.replace(/^\s+/, "");
-      top.node.note = top.node.note ? `${top.node.note}\n${line}` : line;
+      if (top.node.note === undefined) {
+        top.node.note = line;
+      } else {
+        top.node.note = top.node.note + "\n".repeat(pendingBlanks + 1) + line;
+      }
     }
+    pendingBlanks = 0;
   }
   return root;
 }
