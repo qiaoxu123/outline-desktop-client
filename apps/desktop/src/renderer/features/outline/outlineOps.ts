@@ -123,7 +123,6 @@ export function outdent(root: OutlineNode[], id: string): OutlineNode[] {
     loc.siblings.filter((_, i) => i !== loc.index),
   );
   // 插到「父节点之后」的祖父层
-  const grandSiblings = parentLoc.siblings;
   const insertAt = parentLoc.index + 1;
   // parentLoc.siblings 来自旧树；需要从 withoutNode 里重新取父层数组
   const freshParentLoc = locate(withoutNode, loc.parent.id);
@@ -165,12 +164,23 @@ export function mergeDelete(root: OutlineNode[], id: string): MergeResult {
   const prev = order[pos - 1];
   const self = order[pos];
   const caretOffset = prev.text.length;
-  // 1) 上一节点 text 拼接、并接管 self 的子节点
+  const selfLoc = locate(root, id);
+  const prevIsParent = selfLoc?.parent?.id === prev.id;
+
+  // 上一节点接管 self 的子节点：
+  // 若 prev 就是 self 的父节点，用 self 的子节点原位替换 self（保持文档顺序）；
+  // 否则把 self 的子节点追加到 prev 的子节点末尾。
+  const newPrevChildren = prevIsParent
+    ? [
+        ...prev.children.slice(0, selfLoc!.index),
+        ...self.children,
+        ...prev.children.slice(selfLoc!.index + 1),
+      ]
+    : [...prev.children, ...self.children];
+
   let next = setText(root, prev.id, prev.text + self.text);
-  const prevNode = findNode(next, prev.id)!;
-  next = mapChildren(next, prev.id, [...prevNode.children, ...self.children]);
-  // 2) 删除 self（此时 self 已无子内容依赖，直接摘除）
-  next = removeNode(next, id);
+  next = mapChildren(next, prev.id, newPrevChildren);
+  if (!prevIsParent) next = removeNode(next, id); // prevIsParent 时 self 已被上面的切片移除
   return { root: next, focusId: prev.id, caretOffset };
 }
 

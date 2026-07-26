@@ -117,6 +117,26 @@ describe("mergeDelete", () => {
     expect(r.focusId).toBeNull();
     expect(findNode(r.root, "a")).not.toBeNull();
   });
+  it("re-parents self's children into self's slot when prev is the parent", () => {
+    // p -> [self(->gc), q] ; backspace at start of self merges into p
+    const t: OutlineNode[] = [
+      {
+        id: "p",
+        text: "p",
+        collapsed: false,
+        children: [
+          { id: "self", text: "S", collapsed: false, children: [{ id: "gc", text: "gc", collapsed: false, children: [] }] },
+          { id: "q", text: "q", collapsed: false, children: [] },
+        ],
+      },
+    ];
+    const r = mergeDelete(t, "self");
+    expect(r.focusId).toBe("p");
+    expect(r.caretOffset).toBe(1); // "p".length, before concat
+    expect(findNode(r.root, "p")?.text).toBe("pS");
+    expect(findNode(r.root, "p")?.children.map((x) => x.id)).toEqual(["gc", "q"]);
+    expect(findNode(r.root, "self")).toBeNull();
+  });
 });
 
 describe("dragMove", () => {
