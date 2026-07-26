@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { useEditor, EditorContent, type Editor as TiptapEditor } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
+import Document from "@tiptap/extension-document";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import { Markdown } from "tiptap-markdown";
 import type MarkdownIt from "markdown-it";
 import highlightRule from "../../lib/markdown/highlightRule";
+import { normalizeOutlineMarkdown } from "../../lib/markdown/normalize";
 
 export interface NodeEditorProps {
   initialMarkdown: string;
@@ -99,18 +101,39 @@ function splitAtCaret(
 }
 
 /**
+ * Constrain the document schema to exactly one paragraph. StarterKit's
+ * default Document is `content: 'block+'`, which lets pasted multi-paragraph
+ * text create multiple paragraph nodes — breaking the "a node is a single
+ * line" invariant that caretAtStart/caretAtEnd (and thus onMergeBackspace/
+ * onFocusPrev/onFocusNext) rely on. With exactly one paragraph, the
+ * paragraph IS the whole node, so those $from.parentOffset checks stay
+ * correct. tiptap-markdown still serializes fine: it needs at least one
+ * paragraph block to carry the inline content through getMarkdown().
+ */
+const SingleParagraphDocument = Document.extend({ content: "paragraph" });
+
+/**
  * Inline-only TipTap editor mounted on exactly the currently-focused outline
  * node. Renders one line of WYSIWYG markdown (bold/italic/code/highlight/
  * link/underline — no block nodes, no hard breaks) and intercepts
  * structural/navigation keys, forwarding them to the outline's own
  * split/indent/move logic instead of letting ProseMirror handle them.
+ *
+ * Remount contract: the parent MUST remount this component via a per-node
+ * React `key` (only one node is ever focused/mounted at a time). The mount
+ * effect below only applies `initialMarkdown`/`autoFocusCaret` once, on
+ * `[editor]` — matching the document editor's remount-per-document
+ * precedent (features/documents/Editor.tsx's useMarkdownEditor).
  */
 export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
   const editor = useEditor(
     {
       extensions: [
+        // Single-paragraph schema base — see SingleParagraphDocument.
+        SingleParagraphDocument,
         // Block nodes disabled — every outline node renders as a single line.
         StarterKit.configure({
+          document: false,
           heading: false,
           bulletList: false,
           orderedList: false,
@@ -119,13 +142,14 @@ export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
           codeBlock: false,
           horizontalRule: false,
           hardBreak: false,
+          strike: false,
         }),
         Underline,
         Link.configure({ openOnClick: false }),
         MarkdownHighlight,
         Markdown.configure({ html: false, transformPastedText: true }),
       ],
-      content: props.initialMarkdown,
+      content: normalizeOutlineMarkdown(props.initialMarkdown),
       editorProps: {
         handleKeyDown(view, event) {
           if (!editor) return false;
@@ -191,7 +215,7 @@ export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
     if (!editor) return;
     patchHighlightParser(editor);
     if (/==[^=]/.test(props.initialMarkdown)) {
-      editor.commands.setContent(props.initialMarkdown, false);
+      editor.commands.setContent(normalizeOutlineMarkdown(props.initialMarkdown), false);
     }
     const caret = props.autoFocusCaret ?? "end";
     if (caret === "start") editor.commands.focus("start");
