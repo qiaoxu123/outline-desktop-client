@@ -60,7 +60,7 @@ export default function BlockRow(props: BlockRowProps): React.ReactElement {
     const pos = props.caret === "start" ? 0 : el.value.length;
     el.setSelectionRange(pos, pos);
     autoGrow(el);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 仅在聚焦态或块切换时定位光标；故意不依赖 props.caret 之外的值。
   }, [focused, block.id]);
 
   return (
