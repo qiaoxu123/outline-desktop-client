@@ -83,14 +83,17 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
   };
 
   // 打开页面（每页 key 重挂载）时自动聚焦第一个可见块，给出即时可打字的光标——
-  // 否则空块/未聚焦时页面无光标，用户会以为不能输入。只在挂载时执行一次。
+  // 否则空块/未聚焦时页面无光标，用户会以为不能输入。用 ref 守卫：在“可见块就绪
+  // 且当前无聚焦”的首个渲染触发一次（pages 异步加载完成前 visible 可能为空，故
+  // 不能用挂载即跑的 [] 依赖）。
+  const didAutoFocus = useRef(false);
   useEffect(() => {
-    if (visible.length > 0) {
+    if (!didAutoFocus.current && focusedId === null && visible.length > 0) {
+      didAutoFocus.current = true;
       setCaret("end");
       setFocusedId(visible[0].id);
     }
-    // 依赖留空：仅挂载执行一次（BlockTree 随 active 页 key 重挂载）。
-  }, []);
+  });
   const focusRelative = (id: string, delta: -1 | 1, c: "start" | "end") => {
     const i = visible.findIndex((n) => n.id === id);
     const target = visible[i + delta];
