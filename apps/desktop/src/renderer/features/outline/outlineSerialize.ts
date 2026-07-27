@@ -47,8 +47,9 @@ function stripBullet(line: string): string {
 export function parsePastedOutline(text: string): Block[] {
   const root: Block[] = [];
   const stack: { block: Block; indent: number }[] = [];
-  let seq = 0;
-  const nextId = (): string => makeBlockId(0, (++seq % 999999) / 1_000_000);
+  // 每块用 Date.now()+随机数生成唯一 id：多次粘贴之间不会碰撞（否则同 id 会让
+  // findNode/setText/mergeDelete 命中错误的块，导致树损坏、新块不可编辑）。
+  const nextId = (): string => makeBlockId(Date.now(), Math.random());
 
   for (const raw of text.replace(/\r\n?/g, "\n").split("\n")) {
     if (raw.trim() === "") continue;
