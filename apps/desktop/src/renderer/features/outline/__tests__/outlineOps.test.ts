@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
-import type { OutlineNode } from "../types";
+import type { Block } from "../types";
 import {
   findNode,
   visibleNodesInOrder,
   setText,
-  setNote,
   toggleCollapse,
   insertSiblingAfter,
   indent,
@@ -15,7 +14,7 @@ import {
   dragMove,
 } from "../outlineOps";
 
-const n = (id: string, children: OutlineNode[] = [], collapsed = false): OutlineNode => ({
+const n = (id: string, children: Block[] = [], collapsed = false): Block => ({
   id,
   text: id,
   collapsed,
@@ -25,7 +24,7 @@ const n = (id: string, children: OutlineNode[] = [], collapsed = false): Outline
 // a
 // ├─ b (collapsed) → b1
 // └─ c
-const tree = (): OutlineNode[] => [n("a", [n("b", [n("b1")], true), n("c")])];
+const tree = (): Block[] => [n("a", [n("b", [n("b1")], true), n("c")])];
 
 describe("findNode", () => {
   it("finds nested", () => {
@@ -42,15 +41,12 @@ describe("visibleNodesInOrder", () => {
   });
 });
 
-describe("setText / setNote", () => {
+describe("setText", () => {
   it("setText is immutable and updates one node", () => {
     const before = tree();
     const after = setText(before, "c", "hello");
     expect(findNode(after, "c")?.text).toBe("hello");
     expect(findNode(before, "c")?.text).toBe("c"); // original untouched
-  });
-  it("setNote sets note", () => {
-    expect(findNode(setNote(tree(), "a", "memo"), "a")?.note).toBe("memo");
   });
 });
 
@@ -62,12 +58,12 @@ describe("toggleCollapse", () => {
 
 describe("insertSiblingAfter", () => {
   it("inserts right after target at same level", () => {
-    const node: OutlineNode = { id: "new", text: "new", collapsed: false, children: [] };
+    const node: Block = { id: "new", text: "new", collapsed: false, children: [] };
     const after = insertSiblingAfter(tree(), "b", node);
     expect(findNode(after, "a")?.children.map((x) => x.id)).toEqual(["b", "new", "c"]);
   });
   it("inserts after a top-level node", () => {
-    const node: OutlineNode = { id: "top2", text: "", collapsed: false, children: [] };
+    const node: Block = { id: "top2", text: "", collapsed: false, children: [] };
     expect(insertSiblingAfter(tree(), "a", node).map((x) => x.id)).toEqual(["a", "top2"]);
   });
 });
@@ -119,7 +115,7 @@ describe("mergeDelete", () => {
   });
   it("re-parents self's children into self's slot when prev is the parent", () => {
     // p -> [self(->gc), q] ; backspace at start of self merges into p
-    const t: OutlineNode[] = [
+    const t: Block[] = [
       {
         id: "p",
         text: "p",

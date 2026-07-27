@@ -1,7 +1,7 @@
-import type { OutlineNode } from "./types";
+import type { Block } from "./types";
 
 /** 深度优先查找节点（返回引用，仅供读；写操作走 map 变换）。 */
-export function findNode(root: OutlineNode[], id: string): OutlineNode | null {
+export function findNode(root: Block[], id: string): Block | null {
   for (const node of root) {
     if (node.id === id) return node;
     const hit = findNode(node.children, id);
@@ -11,9 +11,9 @@ export function findNode(root: OutlineNode[], id: string): OutlineNode | null {
 }
 
 /** 前序遍历所有可见节点：折叠节点自身可见，其子树不可见。 */
-export function visibleNodesInOrder(root: OutlineNode[]): OutlineNode[] {
-  const out: OutlineNode[] = [];
-  const walk = (nodes: OutlineNode[]): void => {
+export function visibleNodesInOrder(root: Block[]): Block[] {
+  const out: Block[] = [];
+  const walk = (nodes: Block[]): void => {
     for (const node of nodes) {
       out.push(node);
       if (!node.collapsed) walk(node.children);
@@ -25,10 +25,10 @@ export function visibleNodesInOrder(root: OutlineNode[]): OutlineNode[] {
 
 /** 对匹配 id 的节点应用 patch，返回新树（不可变）。 */
 function mapNode(
-  root: OutlineNode[],
+  root: Block[],
   id: string,
-  patch: (n: OutlineNode) => OutlineNode,
-): OutlineNode[] {
+  patch: (n: Block) => Block,
+): Block[] {
   return root.map((node) => {
     if (node.id === id) return patch(node);
     if (node.children.length === 0) return node;
@@ -37,24 +37,20 @@ function mapNode(
   });
 }
 
-export function setText(root: OutlineNode[], id: string, text: string): OutlineNode[] {
+export function setText(root: Block[], id: string, text: string): Block[] {
   return mapNode(root, id, (n) => ({ ...n, text }));
 }
 
-export function setNote(root: OutlineNode[], id: string, note: string): OutlineNode[] {
-  return mapNode(root, id, (n) => ({ ...n, note }));
-}
-
-export function toggleCollapse(root: OutlineNode[], id: string): OutlineNode[] {
+export function toggleCollapse(root: Block[], id: string): Block[] {
   return mapNode(root, id, (n) => ({ ...n, collapsed: !n.collapsed }));
 }
 
 /** 在与目标同层、目标之后插入新节点。 */
 export function insertSiblingAfter(
-  root: OutlineNode[],
+  root: Block[],
   id: string,
-  node: OutlineNode,
-): OutlineNode[] {
+  node: Block,
+): Block[] {
   const idx = root.findIndex((x) => x.id === id);
   if (idx >= 0) {
     const next = root.slice();
@@ -70,11 +66,11 @@ export function insertSiblingAfter(
 
 /** 定位节点：返回其所在数组、下标、父节点（顶层父为 null）。 */
 interface Loc {
-  siblings: OutlineNode[];
+  siblings: Block[];
   index: number;
-  parent: OutlineNode | null;
+  parent: Block | null;
 }
-function locate(root: OutlineNode[], id: string, parent: OutlineNode | null = null): Loc | null {
+function locate(root: Block[], id: string, parent: Block | null = null): Loc | null {
   const index = root.findIndex((x) => x.id === id);
   if (index >= 0) return { siblings: root, index, parent };
   for (const node of root) {
@@ -86,10 +82,10 @@ function locate(root: OutlineNode[], id: string, parent: OutlineNode | null = nu
 
 /** 用「替换某父节点 children」的方式重建树（父为 null 表示顶层）。 */
 function replaceChildren(
-  root: OutlineNode[],
+  root: Block[],
   parentId: string | null,
-  children: OutlineNode[],
-): OutlineNode[] {
+  children: Block[],
+): Block[] {
   if (parentId === null) return children;
   return root.map((node) => {
     if (node.id === parentId) return { ...node, children };
@@ -99,7 +95,7 @@ function replaceChildren(
   });
 }
 
-export function indent(root: OutlineNode[], id: string): OutlineNode[] {
+export function indent(root: Block[], id: string): Block[] {
   const loc = locate(root, id);
   if (!loc || loc.index === 0) return root; // 无前兄弟
   const node = loc.siblings[loc.index];
@@ -110,7 +106,7 @@ export function indent(root: OutlineNode[], id: string): OutlineNode[] {
   return replaceChildren(root, loc.parent ? loc.parent.id : null, newSiblings);
 }
 
-export function outdent(root: OutlineNode[], id: string): OutlineNode[] {
+export function outdent(root: Block[], id: string): Block[] {
   const loc = locate(root, id);
   if (!loc || loc.parent === null) return root; // 已在顶层
   const node = loc.siblings[loc.index];
@@ -136,7 +132,7 @@ export function outdent(root: OutlineNode[], id: string): OutlineNode[] {
   );
 }
 
-function swap(root: OutlineNode[], id: string, delta: -1 | 1): OutlineNode[] {
+function swap(root: Block[], id: string, delta: -1 | 1): Block[] {
   const loc = locate(root, id);
   if (!loc) return root;
   const j = loc.index + delta;
@@ -145,19 +141,19 @@ function swap(root: OutlineNode[], id: string, delta: -1 | 1): OutlineNode[] {
   [next[loc.index], next[j]] = [next[j], next[loc.index]];
   return replaceChildren(root, loc.parent ? loc.parent.id : null, next);
 }
-export function moveUp(root: OutlineNode[], id: string): OutlineNode[] {
+export function moveUp(root: Block[], id: string): Block[] {
   return swap(root, id, -1);
 }
-export function moveDown(root: OutlineNode[], id: string): OutlineNode[] {
+export function moveDown(root: Block[], id: string): Block[] {
   return swap(root, id, 1);
 }
 
 export interface MergeResult {
-  root: OutlineNode[];
+  root: Block[];
   focusId: string | null;
   caretOffset: number;
 }
-export function mergeDelete(root: OutlineNode[], id: string): MergeResult {
+export function mergeDelete(root: Block[], id: string): MergeResult {
   const order = visibleNodesInOrder(root);
   const pos = order.findIndex((x) => x.id === id);
   if (pos <= 0) return { root, focusId: null, caretOffset: 0 };
@@ -185,7 +181,7 @@ export function mergeDelete(root: OutlineNode[], id: string): MergeResult {
 }
 
 /** 替换某节点自身的 children（内部工具）。 */
-function mapChildren(root: OutlineNode[], id: string, children: OutlineNode[]): OutlineNode[] {
+function mapChildren(root: Block[], id: string, children: Block[]): Block[] {
   return root.map((node) => {
     if (node.id === id) return { ...node, children };
     if (node.children.length === 0) return node;
@@ -194,7 +190,7 @@ function mapChildren(root: OutlineNode[], id: string, children: OutlineNode[]): 
   });
 }
 
-function removeNode(root: OutlineNode[], id: string): OutlineNode[] {
+function removeNode(root: Block[], id: string): Block[] {
   const filtered = root.filter((x) => x.id !== id);
   if (filtered.length !== root.length) return filtered;
   return root.map((node) => {
@@ -204,7 +200,7 @@ function removeNode(root: OutlineNode[], id: string): OutlineNode[] {
   });
 }
 
-function isDescendant(node: OutlineNode, maybeChildId: string): boolean {
+function isDescendant(node: Block, maybeChildId: string): boolean {
   for (const c of node.children) {
     if (c.id === maybeChildId || isDescendant(c, maybeChildId)) return true;
   }
@@ -212,11 +208,11 @@ function isDescendant(node: OutlineNode, maybeChildId: string): boolean {
 }
 
 export function dragMove(
-  root: OutlineNode[],
+  root: Block[],
   id: string,
   targetParentId: string | null,
   index: number,
-): OutlineNode[] {
+): Block[] {
   if (id === targetParentId) return root;
   const node = findNode(root, id);
   if (!node) return root;

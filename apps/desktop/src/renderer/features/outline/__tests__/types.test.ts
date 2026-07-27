@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { outlineFilePath, outlineCacheKey, makeNodeId, emptyNode } from "../types";
+import { outlineFilePath, outlineCacheKey, makeBlockId, emptyBlock } from "../types";
 
 describe("types helpers", () => {
-  it("builds per-user file path under 大纲/", () => {
-    expect(outlineFilePath("u1")).toBe("大纲/u1.json");
+  it("builds per-user file path under 大纲笔记/", () => {
+    expect(outlineFilePath("u1")).toBe("大纲笔记/u1.json");
   });
   it("builds versioned cache key", () => {
-    expect(outlineCacheKey("u1")).toBe("outline.cache.u1.v1");
+    expect(outlineCacheKey("u1")).toBe("outline2.cache.u1.v1");
   });
-  it("makeNodeId is deterministic given inputs", () => {
-    expect(makeNodeId(1000, 0.5)).toBe("on_1000_500000");
+  it("makeBlockId is deterministic given inputs", () => {
+    expect(makeBlockId(1000, 0.5)).toBe("ob_1000_500000");
   });
-  it("emptyNode is a blank expanded leaf", () => {
-    expect(emptyNode("x")).toEqual({ id: "x", text: "", collapsed: false, children: [] });
+  it("emptyBlock is a blank expanded leaf", () => {
+    expect(emptyBlock("x")).toEqual({ id: "x", text: "", collapsed: false, children: [] });
   });
 });

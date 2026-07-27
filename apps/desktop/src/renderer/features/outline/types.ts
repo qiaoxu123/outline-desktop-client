@@ -2,48 +2,51 @@ import type { StoreItem } from "../../hooks/useWebdavStore";
 
 export const OUTLINE_VERSION = 1;
 
-export interface OutlineNode {
+/**
+ * 一个块（Logseq block）：大纲的最小单位。text 是原始 markdown（可含软换行 \n）。
+ * collapsed 折叠状态持久化（Logseq 折叠是持久的）。
+ */
+export interface Block {
   id: string;
-  /** 标题行的内联 markdown 源码（加粗/==高亮==/链接等）。 */
   text: string;
-  /** 备注：节点下的长文本 markdown，可选。 */
-  note?: string;
-  /** 折叠状态：仅视图态，不进导出 markdown。 */
   collapsed: boolean;
-  children: OutlineNode[];
+  children: Block[];
 }
 
-/** 满足 useWebdavStore 的 StoreItem（id/updatedAt/deletedAt）。 */
-export interface OutlineDoc extends StoreItem {
+/** 一页大纲。满足 useWebdavStore 的 StoreItem（id/updatedAt/deletedAt）。 */
+export interface Page extends StoreItem {
   title: string;
-  root: OutlineNode[];
+  root: Block[];
   createdAt: string;
   pinned?: boolean;
 }
 
 export interface OutlineFile {
   version: number;
-  outlines: OutlineDoc[];
+  pages: Page[];
 }
 
-/** 每用户私有单文件，位于共享 WebDAV 根下。 */
+/**
+ * 每用户私有单文件。用新路径 `大纲笔记/` 与 v1.14.0 的旧 `大纲/` 数据彻底隔离
+ * （旧属实验数据，不迁移）。
+ */
 export function outlineFilePath(userId: string): string {
-  return `大纲/${userId}.json`;
+  return `大纲笔记/${userId}.json`;
 }
 
 /** localStorage 镜像 key，用于 WebDAV 就绪前即时上屏。 */
 export function outlineCacheKey(userId: string): string {
-  return `outline.cache.${userId}.v1`;
+  return `outline2.cache.${userId}.v1`;
 }
 
 /** 稳定 id：与 notes.makeId 同风格，前缀区分。 */
-export function makeNodeId(nowMs: number, rand: number): string {
+export function makeBlockId(nowMs: number, rand: number): string {
   const r = Math.floor(rand * 1_000_000)
     .toString()
     .padStart(6, "0");
-  return `on_${nowMs}_${r}`;
+  return `ob_${nowMs}_${r}`;
 }
 
-export function emptyNode(id: string): OutlineNode {
+export function emptyBlock(id: string): Block {
   return { id, text: "", collapsed: false, children: [] };
 }
