@@ -1,24 +1,109 @@
+/* Logseq 式块大纲：页面列表 + zoom 面包屑 + 块树。颜色全部走全局
+   --color-* 变量（见 AppShell.css），随 :root[data-theme="dark"] 自动切换。 */
+
 .ol-view { display: flex; height: 100%; overflow: hidden; }
+
+/* ---------- 左侧页面列表 ---------- */
 .ol-doclist { width: 220px; border-right: 1px solid var(--color-border); overflow-y: auto; flex-shrink: 0; }
 .ol-doclist-head { display: flex; justify-content: space-between; align-items: center; padding: 12px; font-weight: 600; }
+.ol-doclist-head button {
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font: inherit;
+  padding: 2px 4px;
+}
+.ol-doclist-head button:hover { color: var(--color-primary-hover); }
 .ol-doc-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; cursor: pointer; gap: 4px; }
-.ol-doc-item.active { background: var(--color-bg-secondary, rgba(127,127,127,0.12)); }
-.ol-doc-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ol-doc-pin, .ol-doc-del { opacity: 0; border: none; background: none; cursor: pointer; color: var(--color-text-secondary); flex-shrink: 0; }
+.ol-doc-item:hover { background: var(--color-bg-secondary); }
+.ol-doc-item.active { background: var(--color-bg-secondary); font-weight: 600; }
+.ol-doc-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
+.ol-doc-pin, .ol-doc-del {
+  opacity: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
 .ol-doc-item:hover .ol-doc-pin, .ol-doc-item:hover .ol-doc-del { opacity: 1; }
+.ol-doc-del:hover { color: var(--color-danger); }
+.ol-doc-pin:hover { color: var(--color-star); }
+
+/* ---------- 右侧主区 ---------- */
 .ol-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .ol-toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--color-border); }
-.ol-doc-name { flex: 1; font-size: 20px; font-weight: 700; border: none; background: none; color: var(--color-text); outline: none; }
-.ol-toolbar-actions { display: flex; gap: 8px; }
-.ol-toolbar-actions button.active { font-weight: 700; }
+.ol-doc-name {
+  flex: 1;
+  font-size: var(--text-xl, 22px);
+  font-weight: 700;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  outline: none;
+}
+.ol-doc-name::placeholder { color: var(--color-placeholder); }
+
+/* ---------- zoom 面包屑 ---------- */
+.ol-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm, 13px);
+  color: var(--color-text-secondary);
+}
+.ol-crumb {
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+.ol-crumb:hover { color: var(--color-primary); text-decoration: underline; }
+.ol-crumb-current { color: var(--color-text); font-weight: 600; cursor: default; }
+.ol-crumb-current:hover { text-decoration: none; color: var(--color-text); }
+.ol-crumb-sep { margin: 0 2px; color: var(--color-text-muted); }
+
+/* ---------- 块树 ---------- */
 .ol-tree { flex: 1; overflow-y: auto; padding: 16px 20px; }
-.ol-row { position: relative; }
-.ol-row-main { display: flex; align-items: flex-start; gap: 4px; line-height: 1.6; }
-.ol-caret { border: none; background: none; cursor: pointer; color: var(--color-text-secondary); padding: 2px; }
-.ol-bullet { width: 6px; height: 6px; margin: 9px 6px 0 0; border-radius: 50%; background: var(--color-text-secondary); flex-shrink: 0; cursor: pointer; }
-.ol-bullet.has-hidden { box-shadow: 0 0 0 4px var(--color-bg-secondary, rgba(127,127,127,0.2)); }
-.ol-block-render, .ol-block-input { flex: 1; min-width: 0; }
+.ol-row { position: relative; border-radius: 4px; }
+.ol-row-main { display: flex; align-items: flex-start; gap: 4px; line-height: var(--leading-relaxed, 1.75); padding: 1px 0; }
+
+.ol-caret {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 2px;
+  margin-top: 5px;
+  opacity: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.ol-row:hover .ol-caret { opacity: 1; }
+.ol-caret:hover { color: var(--color-text); }
+
+.ol-bullet {
+  width: 6px;
+  height: 6px;
+  margin: 9px 6px 0 0;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ol-bullet:hover { background: var(--color-primary); transform: scale(1.3); }
+.ol-bullet.has-hidden { box-shadow: 0 0 0 4px var(--color-bg-secondary); }
+.ol-bullet.has-hidden:hover { box-shadow: 0 0 0 4px var(--color-bg-tertiary); }
+
+.ol-block-render, .ol-block-input { flex: 1; min-width: 0; color: var(--color-text); }
 .ol-block-render { cursor: text; }
+.ol-block-render:empty::before { content: "\00a0"; }
 .ol-block-input {
   width: 100%;
   border: none;
@@ -31,16 +116,12 @@
   line-height: inherit;
   padding: 0;
 }
-.ol-row[data-drop="before"] { box-shadow: inset 0 2px 0 var(--color-primary, #4c6ef5); }
-.ol-row[data-drop="child"] { box-shadow: inset 0 -2px 0 var(--color-primary, #4c6ef5); }
+
+/* 拖拽放置提示 */
+.ol-row[data-drop="before"] { box-shadow: inset 0 2px 0 var(--color-primary); }
+.ol-row[data-drop="child"] { box-shadow: inset 0 -2px 0 var(--color-primary); }
+
 .ol-tail { height: 40px; cursor: text; }
-.ol-source { flex: 1; display: flex; flex-direction: column; }
-.ol-source-bar { display: flex; gap: 8px; align-items: center; padding: 8px 20px; }
-.ol-source-hint { flex: 1; font-size: 12px; color: var(--color-text-secondary); }
-.ol-source-err { padding: 4px 20px; color: #e03131; font-size: 13px; }
-.ol-source-area { flex: 1; width: 100%; font-family: var(--font-mono, monospace); font-size: 13px; padding: 16px 20px; border: none; outline: none; resize: none; background: var(--color-bg); color: var(--color-text); }
+
+/* ---------- 空状态 ---------- */
 .ol-empty { padding: 40px; color: var(--color-text-secondary); text-align: center; }
-.ol-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.ol-modal { background: var(--color-bg); border-radius: 12px; padding: 24px; width: 360px; display: flex; flex-direction: column; gap: 10px; }
-.ol-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-.ol-modal-err { color: #e03131; font-size: 13px; }

@@ -1,3 +1,18 @@
+## [1.16.0] - 2026-07-27
+
+### Features
+- 大纲笔记改为 **Logseq 式块大纲编辑器**（取代 v1.14.0 自造模块）：块式大纲，聚焦某块显示原始 markdown、失焦渲染；键盘流（Enter 新块 / Shift+Enter 软换行 / Tab 升降级 / Backspace 合并 / Alt+方向 移动 / Cmd·Ctrl+. 折叠）；折叠持久化；zoom 聚焦某块（面包屑返回）；拖拽重排；多页管理。数据存 WebDAV 私有单文件 `大纲笔记/<userId>.json`（复用 useWebdavStore，多设备同步）。
+- 修复粘贴：从幕布/Logseq/普通大纲复制的多层内容，粘贴时按缩进解析成对应层级的块（parsePastedOutline）。
+
+### Design Rationale
+- 块级采用 textarea（原始 markdown）+ markdown-it 渲染，而非每块富文本编辑器：实现简洁、粘贴天然可用，符合 Logseq 原生手感。
+- 沿用乐观本地 root（draft）+ pending flush，规避 useWebdavStore 的 PUT 后才 setItems 导致的快速编辑覆盖丢失。
+
+### Notes & Caveats
+- 块渲染为「聚焦原始 markdown / 失焦渲染」（Logseq 原生，编辑时可见标记）。
+- 与 v1.14.0 旧数据（`大纲/` 目录）完全隔离、不迁移。
+- 粘贴走 plain-text 缩进解析；幕布/Logseq 的富 HTML 嵌套后续可增强。
+
 ## [1.14.0] - 2026-07-26
 
 ### Features
