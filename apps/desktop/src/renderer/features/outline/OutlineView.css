@@ -102,8 +102,10 @@
 .ol-bullet.has-hidden:hover { box-shadow: 0 0 0 4px var(--color-bg-tertiary); }
 
 .ol-block-render, .ol-block-input { flex: 1; min-width: 0; color: var(--color-text); }
-.ol-block-render { cursor: text; }
-.ol-block-render:empty::before { content: "\00a0"; }
+/* 空块的渲染结果是空的 .markdown-body（高度会塌成 0，无处可点、看不到光标）——
+   给最小行高保证每个块都是一条可点击的整行。 */
+.ol-block-render { cursor: text; min-height: 1.75em; }
+.ol-block-render .markdown-body:empty::before { content: "\00a0"; }
 .ol-block-input {
   width: 100%;
   border: none;

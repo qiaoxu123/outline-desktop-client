@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BlockRow, { type BlockKeyHandlers } from "./BlockRow";
 import type { Block } from "./types";
 import {
@@ -81,6 +81,16 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
     setCaret(c);
     setFocusedId(id);
   };
+
+  // 打开页面（每页 key 重挂载）时自动聚焦第一个可见块，给出即时可打字的光标——
+  // 否则空块/未聚焦时页面无光标，用户会以为不能输入。只在挂载时执行一次。
+  useEffect(() => {
+    if (visible.length > 0) {
+      setCaret("end");
+      setFocusedId(visible[0].id);
+    }
+    // 依赖留空：仅挂载执行一次（BlockTree 随 active 页 key 重挂载）。
+  }, []);
   const focusRelative = (id: string, delta: -1 | 1, c: "start" | "end") => {
     const i = visible.findIndex((n) => n.id === id);
     const target = visible[i + delta];
