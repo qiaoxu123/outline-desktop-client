@@ -3,6 +3,8 @@
 ### Features
 - 大纲笔记改为 **Logseq 式块大纲编辑器**（取代 v1.14.0 自造模块）：块式大纲，聚焦某块显示原始 markdown、失焦渲染；键盘流（Enter 新块 / Shift+Enter 软换行 / Tab 升降级 / Backspace 合并 / Alt+方向 移动 / Cmd·Ctrl+. 折叠）；折叠持久化；zoom 聚焦某块（面包屑返回）；拖拽重排；多页管理。数据存 WebDAV 私有单文件 `大纲笔记/<userId>.json`（复用 useWebdavStore，多设备同步）。
 - 修复粘贴：从幕布/Logseq/普通大纲复制的多层内容，粘贴时按缩进解析成对应层级的块（parsePastedOutline）。
+- 打开页面自动聚焦首块、空块给最小行高（可点），消除「没有光标」；正文字号调大；标题块（# 开头）圆点/折叠三角对齐放大后标题的首行中线。
+- 新增目录（TOC）：以 `#` 标记的标题块生成右侧目录，点击滚动定位。左侧笔记目录可拖拽调宽、可收起（宽度/收起状态本地记忆）。
 
 ### Design Rationale
 - 块级采用 textarea（原始 markdown）+ markdown-it 渲染，而非每块富文本编辑器：实现简洁、粘贴天然可用，符合 Logseq 原生手感。
