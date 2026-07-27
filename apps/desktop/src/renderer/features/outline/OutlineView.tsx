@@ -1,9 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePages } from "./usePages";
 import BlockTree from "./BlockTree";
-import { makeBlockId } from "./types";
+import { makeBlockId, headingLevel } from "./types";
 import type { Block, Page } from "./types";
 import "./OutlineView.css";
+
+interface TocEntry {
+  id: string;
+  level: number;
+  text: string;
+}
+
+/** 收集页面里所有标题块（正文以 # 开头），按文档顺序，供目录使用。 */
+function collectHeadings(root: Block[]): TocEntry[] {
+  const out: TocEntry[] = [];
+  const walk = (nodes: Block[]): void => {
+    for (const n of nodes) {
+      const lv = headingLevel(n.text);
+      if (lv > 0) out.push({ id: n.id, level: lv, text: crumbSnippet(n.text) });
+      walk(n.children);
+    }
+  };
+  walk(root);
+  return out;
+}
 
 /** 面包屑上一段块摘要的最大字符数。 */
 const CRUMB_SNIPPET_LEN = 40;
@@ -66,6 +86,48 @@ export default function OutlineView(): React.ReactElement {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<null | (() => void)>(null);
   const latestTitleRef = useRef<string | null>(null);
+
+  // 左侧页面列表：可调宽 + 可收起（持久化到 localStorage）。
+  const [sidebarW, setSidebarW] = useState<number>(() => {
+    const v = Number(localStorage.getItem("outline.sidebarW"));
+    return v >= 160 && v <= 480 ? v : 240;
+  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(
+    () => localStorage.getItem("outline.sidebarCollapsed") === "1",
+  );
+  const [showToc, setShowToc] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("outline.sidebarW", String(sidebarW));
+  }, [sidebarW]);
+  useEffect(() => {
+    localStorage.setItem("outline.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
+
+  // 拖拽右缘调节侧栏宽度：记录起点，move 时按位移更新（clamp 160–480）。
+  const startResize = (e: React.MouseEvent): void => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarW;
+    const onMove = (ev: MouseEvent): void => {
+      setSidebarW(Math.min(480, Math.max(160, startW + ev.clientX - startX)));
+    };
+    const onUp = (): void => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // 目录点击：滚动到对应块（zoom 时先退出 zoom，保证目标块在可见集合内）。
+  const scrollToBlock = (id: string): void => {
+    if (zoomedBlockId) setZoomedBlockId(null);
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-block-id="${id}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
 
   const active: Page | null = useMemo(
     () => store.pages.find((p) => p.id === activeId) ?? store.pages[0] ?? null,
@@ -133,6 +195,7 @@ export default function OutlineView(): React.ReactElement {
   };
 
   const zoomTrail = zoomedBlockId ? ancestorPath(treeRoot, zoomedBlockId) : [];
+  const headings = collectHeadings(treeRoot);
 
   if (store.loading && store.pages.length === 0) {
     return <div className="ol-view ol-empty">正在加载大纲…</div>;
@@ -140,20 +203,39 @@ export default function OutlineView(): React.ReactElement {
 
   return (
     <div className="ol-view">
-      <aside className="ol-doclist">
-        <div className="ol-doclist-head">
-          <span>大纲</span>
-          <button
-            onClick={async () => {
-              const id = await store.addPage("未命名大纲");
-              setActiveId(id);
-              setZoomedBlockId(null);
-            }}
-          >
-            ＋新建
-          </button>
-        </div>
-        {store.pages.map((p) => (
+      {sidebarCollapsed ? (
+        <button
+          className="ol-doclist-expand"
+          title="展开笔记目录"
+          onClick={() => setSidebarCollapsed(false)}
+        >
+          ›
+        </button>
+      ) : (
+        <>
+          <aside className="ol-doclist" style={{ width: sidebarW }}>
+            <div className="ol-doclist-head">
+              <span>大纲</span>
+              <div className="ol-doclist-head-actions">
+                <button
+                  onClick={async () => {
+                    const id = await store.addPage("未命名大纲");
+                    setActiveId(id);
+                    setZoomedBlockId(null);
+                  }}
+                >
+                  ＋新建
+                </button>
+                <button
+                  className="ol-doclist-collapse"
+                  title="收起笔记目录"
+                  onClick={() => setSidebarCollapsed(true)}
+                >
+                  ‹
+                </button>
+              </div>
+            </div>
+            {store.pages.map((p) => (
           <div
             key={p.id}
             className={`ol-doc-item ${active?.id === p.id ? "active" : ""}`}
@@ -188,8 +270,17 @@ export default function OutlineView(): React.ReactElement {
             </button>
           </div>
         ))}
-        {store.pages.length === 0 && <div className="ol-empty">还没有大纲，点「新建」开始。</div>}
-      </aside>
+            {store.pages.length === 0 && (
+              <div className="ol-empty">还没有大纲，点「新建」开始。</div>
+            )}
+          </aside>
+          <div
+            className="ol-resizer"
+            title="拖拽调节宽度"
+            onMouseDown={startResize}
+          />
+        </>
+      )}
 
       <main className="ol-main">
         {!active ? (
@@ -207,6 +298,13 @@ export default function OutlineView(): React.ReactElement {
                   }
                 }}
               />
+              <button
+                className={`ol-toc-toggle ${showToc ? "active" : ""}`}
+                title="目录（以 # 标记的标题）"
+                onClick={() => setShowToc((v) => !v)}
+              >
+                目录
+              </button>
             </div>
 
             {zoomedBlockId && (
@@ -242,6 +340,28 @@ export default function OutlineView(): React.ReactElement {
           </>
         )}
       </main>
+
+      {active && showToc && (
+        <aside className="ol-toc">
+          <div className="ol-toc-head">目录</div>
+          {headings.length === 0 ? (
+            <div className="ol-toc-empty">用 <code># 标题</code> 标记标题即可生成目录。</div>
+          ) : (
+            <div className="ol-toc-list">
+              {headings.map((h) => (
+                <div
+                  key={h.id}
+                  className={`ol-toc-item ol-toc-l${h.level}`}
+                  onClick={() => scrollToBlock(h.id)}
+                  title={h.text}
+                >
+                  {h.text}
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
+      )}
     </div>
   );
 }

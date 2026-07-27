@@ -50,3 +50,9 @@ export function makeBlockId(nowMs: number, rand: number): string {
 export function emptyBlock(id: string): Block {
   return { id, text: "", collapsed: false, children: [] };
 }
+
+/** 块正文若以 markdown 标题（# … ######）开头，返回标题级别 1–6，否则 0。 */
+export function headingLevel(text: string): number {
+  const m = /^(#{1,6})\s/.exec(text);
+  return m ? m[1].length : 0;
+}

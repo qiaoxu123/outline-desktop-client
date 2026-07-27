@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { OIcon } from "../../components/outlineIcons";
 import MarkdownRenderer from "../../lib/markdown/renderer";
 import { parsePastedOutline } from "./outlineSerialize";
+import { headingLevel } from "./types";
 import type { Block } from "./types";
 
 /** 转发给聚焦行 textarea 的按键/编辑回调（由调用方绑定到具体 block.id）。 */
@@ -63,9 +64,13 @@ export default function BlockRow(props: BlockRowProps): React.ReactElement {
     // 仅在聚焦态或块切换时定位光标；故意不依赖 props.caret 之外的值。
   }, [focused, block.id]);
 
+  const hLevel = headingLevel(block.text);
+
   return (
     <div
       className="ol-row"
+      data-block-id={block.id}
+      data-h={hLevel || undefined}
       style={{ paddingLeft: depth * 24 }}
       draggable
       onDragStart={(e) => {
