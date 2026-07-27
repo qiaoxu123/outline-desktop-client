@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { renderMermaidIn } from "./mermaid";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import katexPlugin from "@vscode/markdown-it-katex";
@@ -28,6 +29,10 @@ function createMd(breaks: boolean): MarkdownIt {
     typographer: true,
     breaks,
     highlight(str: string, lang: string): string {
+      // mermaid 交给 renderMermaidIn 后处理成 SVG：输出带标记类、保留原始源码。
+      if (lang === "mermaid") {
+        return '<pre class="mermaid-src">' + inst.utils.escapeHtml(str) + "</pre>";
+      }
       if (lang && hljs.getLanguage(lang)) {
         try {
           return (
@@ -148,10 +153,16 @@ export function MarkdownRenderer({
   const navigate = useNavigate();
   const api = useElectronAPI();
   const profileId = useUIStore((s) => s.activeProfileId);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const html = useMemo(
     () => (breaks ? mdBreaks : md).render(normalizeOutlineMarkdown(content)),
     [content, breaks],
   );
+
+  // 渲染后把 ```mermaid 代码块替换成 SVG 流程图（内容变化时重跑）。
+  useEffect(() => {
+    if (bodyRef.current) void renderMermaidIn(bodyRef.current);
+  }, [html]);
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const a = (e.target as HTMLElement).closest("a");
@@ -165,6 +176,7 @@ export function MarkdownRenderer({
 
   return (
     <div
+      ref={bodyRef}
       className="markdown-body"
       onClick={onClick}
       dangerouslySetInnerHTML={{ __html: html }}

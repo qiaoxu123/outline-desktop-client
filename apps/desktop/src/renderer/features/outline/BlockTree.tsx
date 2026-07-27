@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import BlockRow, { type BlockKeyHandlers } from "./BlockRow";
+import BlockRow, { type BlockKeyHandlers, type Caret } from "./BlockRow";
 import type { Block } from "./types";
 import {
   visibleNodesInOrder,
@@ -70,7 +70,7 @@ function appendChild(root: Block[], parentId: string, block: Block): Block[] {
 export default function BlockTree(props: BlockTreeProps): React.ReactElement {
   const { root, rootBlockId } = props;
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [caret, setCaret] = useState<"start" | "end">("end");
+  const [caret, setCaret] = useState<Caret>("end");
   const dragId = useRef<string | null>(null);
 
   // 性能关键：BlockRow 用 React.memo 忽略回调 identity，只在 block/depth/focused/caret
@@ -85,7 +85,7 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
   const baseNodes = rootBlockId ? (zoomBlock ? zoomBlock.children : []) : root;
   const visible = visibleNodesInOrder(baseNodes);
 
-  const focusBlock = (id: string, c: "start" | "end" = "end") => {
+  const focusBlock = (id: string, c: Caret = "end") => {
     setCaret(c);
     setFocusedId(id);
   };
@@ -120,26 +120,26 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
       props.onChange(next, { immediate: true });
       focusBlock(newId, "start");
     },
-    onIndent: () => {
+    onIndent: (caretPos) => {
       props.onChange(indent(rootRef.current, id), { immediate: true });
-      focusBlock(id, "end");
+      focusBlock(id, caretPos);
     },
-    onOutdent: () => {
+    onOutdent: (caretPos) => {
       props.onChange(outdent(rootRef.current, id), { immediate: true });
-      focusBlock(id, "end");
+      focusBlock(id, caretPos);
     },
     onMergeBackspace: () => {
       const r = mergeDelete(rootRef.current, id);
       props.onChange(r.root, { immediate: true });
-      if (r.focusId) focusBlock(r.focusId, "end");
+      if (r.focusId) focusBlock(r.focusId, r.caretOffset);
     },
-    onMoveUp: () => {
+    onMoveUp: (caretPos) => {
       props.onChange(moveUp(rootRef.current, id), { immediate: true });
-      focusBlock(id, "end");
+      focusBlock(id, caretPos);
     },
-    onMoveDown: () => {
+    onMoveDown: (caretPos) => {
       props.onChange(moveDown(rootRef.current, id), { immediate: true });
-      focusBlock(id, "end");
+      focusBlock(id, caretPos);
     },
     onToggleCollapse: () => props.onChange(toggleCollapse(rootRef.current, id), { immediate: true }),
     onFocusPrev: () => focusRelative(id, -1, "end"),

@@ -5,15 +5,19 @@ import { parsePastedOutline } from "./outlineSerialize";
 import { headingLevel } from "./types";
 import type { Block } from "./types";
 
-/** 转发给聚焦行 textarea 的按键/编辑回调（由调用方绑定到具体 block.id）。 */
+/** 光标落点：行首/行尾/具体字符偏移。 */
+export type Caret = "start" | "end" | number;
+
+/** 转发给聚焦行 textarea 的按键/编辑回调（由调用方绑定到具体 block.id）。
+ *  缩进/移动类回调带上当前光标偏移，父层据此在操作后把光标放回原处（而非跳到行尾）。 */
 export interface BlockKeyHandlers {
   onChange: (text: string) => void;
   onEnter: (before: string, after: string) => void;
-  onIndent: () => void;
-  onOutdent: () => void;
+  onIndent: (caret: number) => void;
+  onOutdent: (caret: number) => void;
   onMergeBackspace: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
+  onMoveUp: (caret: number) => void;
+  onMoveDown: (caret: number) => void;
   onToggleCollapse: () => void;
   onFocusPrev: () => void;
   onFocusNext: () => void;
@@ -25,13 +29,48 @@ export interface BlockRowProps {
   block: Block;
   depth: number;
   focused: boolean;
-  caret: "start" | "end";
-  onFocusBlock: (id: string, caret?: "start" | "end") => void;
+  caret: Caret;
+  onFocusBlock: (id: string, caret?: Caret) => void;
   onToggleCollapse: (id: string) => void;
   onZoom: (id: string) => void;
   handlers: BlockKeyHandlers;
   onDragStart: (id: string) => void;
   onDropOn: (id: string, position: "before" | "child") => void;
+}
+
+/**
+ * 估算点击落在渲染块中的字符偏移，用于「点哪就把光标放哪」（而非总跳行尾）。
+ * 纯文本块精确；含 markdown 标记（**、==、[]() 等）的块会有少量偏差——但远好过行尾。
+ */
+function caretOffsetFromClick(e: React.MouseEvent, container: HTMLElement): number {
+  const doc = container.ownerDocument as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+  };
+  let node: Node | null = null;
+  let off = 0;
+  if (doc.caretRangeFromPoint) {
+    const r = doc.caretRangeFromPoint(e.clientX, e.clientY);
+    if (r) {
+      node = r.startContainer;
+      off = r.startOffset;
+    }
+  } else if (doc.caretPositionFromPoint) {
+    const p = doc.caretPositionFromPoint(e.clientX, e.clientY);
+    if (p) {
+      node = p.offsetNode;
+      off = p.offset;
+    }
+  }
+  if (!node || !container.contains(node)) return -1;
+  let total = 0;
+  const walker = doc.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let cur: Node | null;
+  while ((cur = walker.nextNode())) {
+    if (cur === node) return total + off;
+    total += (cur.textContent ?? "").length;
+  }
+  return -1;
 }
 
 /** textarea 高度随内容自增（无滚动条）。 */
@@ -58,7 +97,9 @@ function BlockRow(props: BlockRowProps): React.ReactElement {
     const el = taRef.current;
     if (!el) return;
     el.focus();
-    const pos = props.caret === "start" ? 0 : el.value.length;
+    const c = props.caret;
+    const pos =
+      c === "start" ? 0 : c === "end" ? el.value.length : Math.max(0, Math.min(c, el.value.length));
     el.setSelectionRange(pos, pos);
     autoGrow(el);
     // 仅在聚焦态或块切换时定位光标；故意不依赖 props.caret 之外的值。
@@ -137,8 +178,8 @@ function BlockRow(props: BlockRowProps): React.ReactElement {
               }
               if (e.key === "Tab") {
                 e.preventDefault();
-                if (e.shiftKey) props.handlers.onOutdent();
-                else props.handlers.onIndent();
+                if (e.shiftKey) props.handlers.onOutdent(ta.selectionStart);
+                else props.handlers.onIndent(ta.selectionStart);
                 return;
               }
               if (e.key === "Backspace" && ta.selectionStart === 0 && ta.selectionEnd === 0) {
@@ -148,12 +189,12 @@ function BlockRow(props: BlockRowProps): React.ReactElement {
               }
               if (e.altKey && e.key === "ArrowUp") {
                 e.preventDefault();
-                props.handlers.onMoveUp();
+                props.handlers.onMoveUp(ta.selectionStart);
                 return;
               }
               if (e.altKey && e.key === "ArrowDown") {
                 e.preventDefault();
-                props.handlers.onMoveDown();
+                props.handlers.onMoveDown(ta.selectionStart);
                 return;
               }
               if ((e.metaKey || e.ctrlKey) && e.key === ".") {
@@ -180,7 +221,13 @@ function BlockRow(props: BlockRowProps): React.ReactElement {
             }}
           />
         ) : (
-          <div className="ol-block-render" onClick={() => props.onFocusBlock(block.id, "end")}>
+          <div
+            className="ol-block-render"
+            onClick={(e) => {
+              const off = caretOffsetFromClick(e, e.currentTarget);
+              props.onFocusBlock(block.id, off >= 0 ? off : "end");
+            }}
+          >
             <MarkdownRenderer content={block.text || " "} breaks />
           </div>
         )}
