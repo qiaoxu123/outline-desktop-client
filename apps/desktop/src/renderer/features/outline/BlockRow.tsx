@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { OIcon } from "../../components/outlineIcons";
 import MarkdownRenderer from "../../lib/markdown/renderer";
 import { parsePastedOutline } from "./outlineSerialize";
@@ -45,7 +45,7 @@ function autoGrow(el: HTMLTextAreaElement): void {
  * textarea，失焦时是渲染后的 MarkdownRenderer）。同时承担本行的 HTML5
  * 拖拽收放（draggable + onDragOver 算 before/child 提示）。
  */
-export default function BlockRow(props: BlockRowProps): React.ReactElement {
+function BlockRow(props: BlockRowProps): React.ReactElement {
   const { block, depth, focused } = props;
   const [dropHint, setDropHint] = useState<"before" | "child" | null>(null);
   const hasChildren = block.children.length > 0;
@@ -188,3 +188,18 @@ export default function BlockRow(props: BlockRowProps): React.ReactElement {
     </div>
   );
 }
+
+/**
+ * 只在真正影响这一行显示的 props 变化时才重渲染：block（引用变化=内容变了）、depth、
+ * focused、caret。忽略回调 identity——大页里每次敲键都会重建全部行的回调，若不忽略则
+ * 每键重渲染整棵树（79 行各跑一遍 markdown 渲染）导致光标卡顿。回调的时效性由 BlockTree
+ * 里的 rootRef 保证（失焦行的旧回调也读到最新树）。
+ */
+export default memo(
+  BlockRow,
+  (a, b) =>
+    a.block === b.block &&
+    a.depth === b.depth &&
+    a.focused === b.focused &&
+    a.caret === b.caret,
+);

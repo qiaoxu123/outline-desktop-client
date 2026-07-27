@@ -73,6 +73,14 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
   const [caret, setCaret] = useState<"start" | "end">("end");
   const dragId = useRef<string | null>(null);
 
+  // 性能关键：BlockRow 用 React.memo 忽略回调 identity，只在 block/depth/focused/caret
+  // 变化时重渲染。为此失焦行会保留“上一次渲染的回调闭包”——这些闭包必须读最新的树，
+  // 否则会用陈旧 root 操作。用稳定的 rootRef 让任何闭包都读到当前 root。
+  // （键盘类 handler 只会在“当前聚焦行”触发，而聚焦行总是新渲染，故本就不陈旧；
+  //  真正需要 rootRef 的是失焦行也可能触发的 折叠/拖拽 回调。）
+  const rootRef = useRef(root);
+  rootRef.current = root;
+
   const zoomBlock = rootBlockId ? findNode(root, rootBlockId) : null;
   const baseNodes = rootBlockId ? (zoomBlock ? zoomBlock.children : []) : root;
   const visible = visibleNodesInOrder(baseNodes);
@@ -95,50 +103,53 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
     }
   });
   const focusRelative = (id: string, delta: -1 | 1, c: "start" | "end") => {
-    const i = visible.findIndex((n) => n.id === id);
-    const target = visible[i + delta];
+    const r = rootRef.current;
+    const base = rootBlockId ? (findNode(r, rootBlockId)?.children ?? []) : r;
+    const vis = visibleNodesInOrder(base);
+    const i = vis.findIndex((n) => n.id === id);
+    const target = vis[i + delta];
     if (target) focusBlock(target.id, c);
   };
 
   const handlersFor = (id: string): BlockKeyHandlers => ({
-    onChange: (text) => props.onChange(setText(root, id, text)), // 文本：防抖提交（父层判定）
+    onChange: (text) => props.onChange(setText(rootRef.current, id, text)), // 文本：防抖提交（父层判定）
     onEnter: (before, after) => {
       const newId = props.makeId();
-      let next = setText(root, id, before);
+      let next = setText(rootRef.current, id, before);
       next = insertSiblingAfter(next, id, { id: newId, text: after, collapsed: false, children: [] });
       props.onChange(next, { immediate: true });
       focusBlock(newId, "start");
     },
     onIndent: () => {
-      props.onChange(indent(root, id), { immediate: true });
+      props.onChange(indent(rootRef.current, id), { immediate: true });
       focusBlock(id, "end");
     },
     onOutdent: () => {
-      props.onChange(outdent(root, id), { immediate: true });
+      props.onChange(outdent(rootRef.current, id), { immediate: true });
       focusBlock(id, "end");
     },
     onMergeBackspace: () => {
-      const r = mergeDelete(root, id);
+      const r = mergeDelete(rootRef.current, id);
       props.onChange(r.root, { immediate: true });
       if (r.focusId) focusBlock(r.focusId, "end");
     },
     onMoveUp: () => {
-      props.onChange(moveUp(root, id), { immediate: true });
+      props.onChange(moveUp(rootRef.current, id), { immediate: true });
       focusBlock(id, "end");
     },
     onMoveDown: () => {
-      props.onChange(moveDown(root, id), { immediate: true });
+      props.onChange(moveDown(rootRef.current, id), { immediate: true });
       focusBlock(id, "end");
     },
-    onToggleCollapse: () => props.onChange(toggleCollapse(root, id), { immediate: true }),
+    onToggleCollapse: () => props.onChange(toggleCollapse(rootRef.current, id), { immediate: true }),
     onFocusPrev: () => focusRelative(id, -1, "end"),
     onFocusNext: () => focusRelative(id, 1, "start"),
     onBlur: (text) => {
-      props.onChange(setText(root, id, text), { immediate: true });
+      props.onChange(setText(rootRef.current, id, text), { immediate: true });
       setFocusedId((cur) => (cur === id ? null : cur));
     },
     onPasteOutline: (pasted, before, after) => {
-      let next = setText(root, id, before);
+      let next = setText(rootRef.current, id, before);
       let anchor = id;
       for (const p of pasted) {
         next = insertSiblingAfter(next, anchor, p);
@@ -166,26 +177,27 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
           focused={focusedId === block.id}
           caret={caret}
           onFocusBlock={focusBlock}
-          onToggleCollapse={(id) => props.onChange(toggleCollapse(root, id), { immediate: true })}
+          onToggleCollapse={(id) => props.onChange(toggleCollapse(rootRef.current, id), { immediate: true })}
           onZoom={(id) => props.onZoom?.(id)}
           handlers={handlersFor(block.id)}
           onDragStart={(id) => (dragId.current = id)}
           onDropOn={(targetId, position) => {
+            const r = rootRef.current;
             const src = dragId.current;
             dragId.current = null;
             if (!src || src === targetId) return;
             if (position === "child") {
-              props.onChange(dragMove(root, src, targetId, 0), { immediate: true });
+              props.onChange(dragMove(r, src, targetId, 0), { immediate: true });
             } else {
               // before：放到 target 同层、target 之前
-              const parentId = parentOf(root, targetId);
-              const siblings = parentId ? findNode(root, parentId)!.children : root;
+              const parentId = parentOf(r, targetId);
+              const siblings = parentId ? findNode(r, parentId)!.children : r;
               const srcIdx = siblings.findIndex((n) => n.id === src);
               const rawIdx = siblings.findIndex((n) => n.id === targetId);
               // dragMove removes src before splicing; if src was before target in the same
               // parent, target's index shifts down by one after removal — compensate.
               const idx = srcIdx !== -1 && srcIdx < rawIdx ? rawIdx - 1 : rawIdx;
-              props.onChange(dragMove(root, src, parentId, Math.max(0, idx)), { immediate: true });
+              props.onChange(dragMove(r, src, parentId, Math.max(0, idx)), { immediate: true });
             }
           }}
         />

@@ -71,7 +71,8 @@
 /* ---------- 块树 ---------- */
 .ol-tree { flex: 1; overflow-y: auto; padding: 16px 20px; font-size: 15px; }
 .ol-row { position: relative; border-radius: 4px; }
-.ol-row-main { display: flex; align-items: flex-start; gap: 4px; line-height: var(--leading-relaxed, 1.75); padding: 1px 0; }
+/* 行高与块间距：留出呼吸感（每块上下各 4px = 块间约 8px）。 */
+.ol-row-main { display: flex; align-items: flex-start; gap: 4px; line-height: 1.85; padding: 4px 0; }
 
 /* 折叠三角、圆点都做成「与首行等高、图形垂直居中」的盒子：正文/标题字号变化时都能
    对齐首行中线。标题行的盒高由下方 data-h 规则按级别放大。 */
@@ -82,7 +83,7 @@
   color: var(--color-text-secondary);
   padding: 0;
   width: 16px;
-  height: 1.75em;
+  height: 1.85em;
   opacity: 0;
   flex-shrink: 0;
   display: flex;
@@ -94,7 +95,7 @@
 
 .ol-bullet {
   width: 16px;
-  height: 1.75em;
+  height: 1.85em;
   margin: 0 2px 0 0;
   flex-shrink: 0;
   cursor: pointer;
@@ -117,7 +118,7 @@
 .ol-block-render, .ol-block-input { flex: 1; min-width: 0; color: var(--color-text); }
 /* 空块的渲染结果是空的 .markdown-body（高度会塌成 0，无处可点、看不到光标）——
    给最小行高保证每个块都是一条可点击的整行。 */
-.ol-block-render { cursor: text; min-height: 1.75em; }
+.ol-block-render { cursor: text; min-height: 1.85em; }
 .ol-block-render .markdown-body { font-size: inherit; line-height: inherit; }
 .ol-block-render .markdown-body:empty::before { content: "\00a0"; }
 /* 块内内容紧凑：去掉段落默认外边距 */
@@ -156,7 +157,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  line-height: 1.75;
+  line-height: 1.85;
   padding: 0;
 }
 
