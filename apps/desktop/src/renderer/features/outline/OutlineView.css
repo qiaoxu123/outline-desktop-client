@@ -129,6 +129,21 @@
 .ol-block-render .markdown-body > :last-child { margin-bottom: 0; }
 .ol-block-render .markdown-body p { margin: 0; }
 
+/* 表格：紧凑边框 + 斑马纹，宽表可横向滚动 */
+.ol-block-render .tableWrapper { overflow-x: auto; }
+.ol-block-render .markdown-body table {
+  border-collapse: collapse; font-size: 13px; width: auto;
+  margin: 4px 0;
+}
+.ol-block-render .markdown-body th,
+.ol-block-render .markdown-body td {
+  border: 1px solid var(--color-border); padding: 3px 8px; text-align: left;
+}
+.ol-block-render .markdown-body th {
+  background: var(--color-bg-secondary); font-weight: 600; color: var(--color-text);
+}
+.ol-block-render .markdown-body tr:nth-child(even) td { background: var(--color-bg-secondary); }
+
 /* 标题块：正文以 # 开头时渲染为标题，字号加大但保持紧凑行高 */
 .ol-block-render .markdown-body :is(h1, h2, h3, h4, h5, h6) {
   margin: 0;
