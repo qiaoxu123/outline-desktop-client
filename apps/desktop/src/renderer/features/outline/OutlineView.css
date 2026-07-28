@@ -119,7 +119,7 @@
 /* 空块的渲染结果是空的 .markdown-body（高度会塌成 0，无处可点、看不到光标）——
    给最小行高保证每个块都是一条可点击的整行。
    裁剪溢出：mermaid 大流程图不超出父容器与相邻行重叠。 */
-.ol-block-render { cursor: text; min-height: 1.85em; overflow: auto; }
+.ol-block-render { cursor: text; min-height: 1.85em; overflow: clip; }
 .ol-block-render .markdown-body { font-size: inherit; line-height: inherit; }
 .ol-block-render .markdown-body:empty::before { content: "\00a0"; }
 /* 块内内容紧凑：去掉段落默认外边距 */
