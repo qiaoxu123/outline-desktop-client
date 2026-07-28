@@ -9,15 +9,16 @@ import type { Block } from "./types";
 export type Caret = "start" | "end" | number;
 
 /** 转发给聚焦行 textarea 的按键/编辑回调（由调用方绑定到具体 block.id）。
- *  缩进/移动类回调带上当前光标偏移，父层据此在操作后把光标放回原处（而非跳到行尾）。 */
+ *  缩进/移动/合并回调带上「当前编辑文本 + 光标偏移」——父层据此在操作前先将最新
+ *  文本写入树（Logseq 的 save-current-block! 模式），避免读到渲染前陈旧 rootRef。 */
 export interface BlockKeyHandlers {
   onChange: (text: string) => void;
   onEnter: (before: string, after: string) => void;
-  onIndent: (caret: number) => void;
-  onOutdent: (caret: number) => void;
-  onMergeBackspace: () => void;
-  onMoveUp: (caret: number) => void;
-  onMoveDown: (caret: number) => void;
+  onIndent: (currentText: string, caret: number) => void;
+  onOutdent: (currentText: string, caret: number) => void;
+  onMergeBackspace: (currentText: string) => void;
+  onMoveUp: (currentText: string, caret: number) => void;
+  onMoveDown: (currentText: string, caret: number) => void;
   onToggleCollapse: () => void;
   onFocusPrev: () => void;
   onFocusNext: () => void;
@@ -178,23 +179,23 @@ function BlockRow(props: BlockRowProps): React.ReactElement {
               }
               if (e.key === "Tab") {
                 e.preventDefault();
-                if (e.shiftKey) props.handlers.onOutdent(ta.selectionStart);
-                else props.handlers.onIndent(ta.selectionStart);
+                if (e.shiftKey) props.handlers.onOutdent(ta.value, ta.selectionStart);
+                else props.handlers.onIndent(ta.value, ta.selectionStart);
                 return;
               }
               if (e.key === "Backspace" && ta.selectionStart === 0 && ta.selectionEnd === 0) {
                 e.preventDefault();
-                props.handlers.onMergeBackspace();
+                props.handlers.onMergeBackspace(ta.value);
                 return;
               }
               if (e.altKey && e.key === "ArrowUp") {
                 e.preventDefault();
-                props.handlers.onMoveUp(ta.selectionStart);
+                props.handlers.onMoveUp(ta.value, ta.selectionStart);
                 return;
               }
               if (e.altKey && e.key === "ArrowDown") {
                 e.preventDefault();
-                props.handlers.onMoveDown(ta.selectionStart);
+                props.handlers.onMoveDown(ta.value, ta.selectionStart);
                 return;
               }
               if ((e.metaKey || e.ctrlKey) && e.key === ".") {

@@ -114,31 +114,61 @@ export default function BlockTree(props: BlockTreeProps): React.ReactElement {
   const handlersFor = (id: string): BlockKeyHandlers => ({
     onChange: (text) => props.onChange(setText(rootRef.current, id, text)), // 文本：防抖提交（父层判定）
     onEnter: (before, after) => {
+      const block = findNode(rootRef.current, id);
+      const isEmpty = !before.trim() && !after.trim();
+      // Logseq 式空块 Enter：空白块且非顶层 → 降级（outdent），而非产生一块新空白。
+      // 若已经是最外层，清空该块并跳到下一个可见块——避免死循环式的空白增殖。
+      if (isEmpty) {
+        const base = rootBlockId ? (findNode(rootRef.current, rootBlockId)?.children ?? []) : rootRef.current;
+        const depth = depthOf(base, id);
+        if (depth > 0) {
+          const next = outdent(rootRef.current, id);
+          props.onChange(next, { immediate: true });
+          focusBlock(id, "end");
+        } else {
+          // 顶层空块：清空它（可能已经是空），然后跳到下一个可见块。
+          const next = setText(rootRef.current, id, "");
+          props.onChange(next, { immediate: true });
+          focusRelative(id, 1, "start");
+        }
+        return;
+      }
       const newId = props.makeId();
       let next = setText(rootRef.current, id, before);
       next = insertSiblingAfter(next, id, { id: newId, text: after, collapsed: false, children: [] });
       props.onChange(next, { immediate: true });
       focusBlock(newId, "start");
     },
-    onIndent: (caretPos) => {
-      props.onChange(indent(rootRef.current, id), { immediate: true });
+    // Logseq 式 save-before-structural：先把编辑区的当前文本写回树，再用最新树做
+    // 结构变换——避免读了 React 批量更新前陈旧 rootRef 里的旧文本（导致操作丢失输入）。
+    onIndent: (txt, caretPos) => {
+      let next = setText(rootRef.current, id, txt);
+      next = indent(next, id);
+      props.onChange(next, { immediate: true });
       focusBlock(id, caretPos);
     },
-    onOutdent: (caretPos) => {
-      props.onChange(outdent(rootRef.current, id), { immediate: true });
+    onOutdent: (txt, caretPos) => {
+      let next = setText(rootRef.current, id, txt);
+      next = outdent(next, id);
+      props.onChange(next, { immediate: true });
       focusBlock(id, caretPos);
     },
-    onMergeBackspace: () => {
-      const r = mergeDelete(rootRef.current, id);
+    onMergeBackspace: (txt) => {
+      let next = setText(rootRef.current, id, txt);
+      const r = mergeDelete(next, id);
       props.onChange(r.root, { immediate: true });
       if (r.focusId) focusBlock(r.focusId, r.caretOffset);
     },
-    onMoveUp: (caretPos) => {
-      props.onChange(moveUp(rootRef.current, id), { immediate: true });
+    onMoveUp: (txt, caretPos) => {
+      let next = setText(rootRef.current, id, txt);
+      next = moveUp(next, id);
+      props.onChange(next, { immediate: true });
       focusBlock(id, caretPos);
     },
-    onMoveDown: (caretPos) => {
-      props.onChange(moveDown(rootRef.current, id), { immediate: true });
+    onMoveDown: (txt, caretPos) => {
+      let next = setText(rootRef.current, id, txt);
+      next = moveDown(next, id);
+      props.onChange(next, { immediate: true });
       focusBlock(id, caretPos);
     },
     onToggleCollapse: () => props.onChange(toggleCollapse(rootRef.current, id), { immediate: true }),
