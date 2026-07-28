@@ -70,7 +70,7 @@
 
 /* ---------- 块树 ---------- */
 .ol-tree { flex: 1; overflow-y: auto; padding: 16px 20px; font-size: 15px; }
-.ol-row { position: relative; border-radius: 4px; }
+.ol-row { position: relative; border-radius: 4px; margin-bottom: 2px; }
 /* 行高与块间距：留出呼吸感（每块上下各 4px = 块间约 8px）。 */
 .ol-row-main { display: flex; align-items: flex-start; gap: 4px; line-height: 1.85; padding: 4px 0; }
 

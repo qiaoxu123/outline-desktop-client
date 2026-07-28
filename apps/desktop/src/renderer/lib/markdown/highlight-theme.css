@@ -72,6 +72,11 @@
 /* mermaid 流程图（由 lib/markdown/mermaid.ts 就地替换 ```mermaid 代码块生成） */
 .mermaid-diagram { display: flex; justify-content: center; margin: 6px 0; overflow-x: auto; overflow-y: hidden; }
 .mermaid-diagram svg { max-width: 100% !important; height: auto !important; flex-shrink: 0; }
+/* 渲染完成前：裸 mermaid 代码块也限高，避免多行流程图撑开行高导致重叠 */
+.ol-block-render pre.mermaid-src {
+  max-height: 400px; overflow-y: auto; font-size: 11px;
+  white-space: pre-wrap; word-break: break-all;
+}
 .markdown-body pre[data-mermaid-error]::after {
   content: "mermaid 渲染失败：" attr(data-mermaid-error);
   display: block; color: #e03131; font-size: 12px; margin-top: 4px;
