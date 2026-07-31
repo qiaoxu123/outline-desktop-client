@@ -140,24 +140,46 @@ function createMd(breaks: boolean): MarkdownIt {
 const md = createMd(false);
 const mdBreaks = createMd(true);
 
+const NT_TAG_PREFIX = "#nt-tag-";
+// #标签：# 后跟非空白、非常见中英标点的连续字符（与 noteUtils.parseTags 对齐）。
+const NOTE_TAG_RE = /#([^\s#.,;!?，。；！？、）)\]】]+)/g;
+
+/**
+ * 把裸 #标签 预处理成锚点链接 `[#标签](#nt-tag-ENC)`，交给 markdown-it 正常渲染，
+ * 点击时由 onClick 拦截 → onTagClick。仅在传入 onTagClick 时启用（随记卡片专用），
+ * 文档渲染路径不受影响。
+ */
+function transformNoteTags(src: string): string {
+  return src.replace(
+    NOTE_TAG_RE,
+    (_m, t: string) => `[#${t}](${NT_TAG_PREFIX}${encodeURIComponent(t)})`,
+  );
+}
+
 interface MarkdownRendererProps {
   content: string;
   /** Render single newlines as line breaks (for authored short content). */
   breaks?: boolean;
+  /** 传入后：正文内 #标签 渲染为可点击 chip，点击回调此函数（随记专用）。 */
+  onTagClick?: (tag: string) => void;
 }
 
 export function MarkdownRenderer({
   content,
   breaks = false,
+  onTagClick,
 }: MarkdownRendererProps): React.ReactElement {
   const navigate = useNavigate();
   const api = useElectronAPI();
   const profileId = useUIStore((s) => s.activeProfileId);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const html = useMemo(
-    () => (breaks ? mdBreaks : md).render(normalizeOutlineMarkdown(content)),
-    [content, breaks],
-  );
+  // 仅「是否启用标签转换」影响输出，与回调身份无关，避免每次渲染重算 HTML。
+  const tagsEnabled = !!onTagClick;
+  const html = useMemo(() => {
+    const normalized = normalizeOutlineMarkdown(content);
+    const source = tagsEnabled ? transformNoteTags(normalized) : normalized;
+    return (breaks ? mdBreaks : md).render(source);
+  }, [content, breaks, tagsEnabled]);
 
   // 渲染后把 ```mermaid 代码块替换成 SVG 流程图（内容变化时重跑）。
   useEffect(() => {
@@ -168,7 +190,14 @@ export function MarkdownRenderer({
     const a = (e.target as HTMLElement).closest("a");
     if (!a) return;
     const href = a.getAttribute("href");
-    if (!href || href.startsWith("#")) return; // in-page anchors, footnotes, etc.
+    if (!href) return;
+    // 随记 #标签：拦截并回调筛选，不走链接跳转。
+    if (onTagClick && href.startsWith(NT_TAG_PREFIX)) {
+      e.preventDefault();
+      onTagClick(decodeURIComponent(href.slice(NT_TAG_PREFIX.length)));
+      return;
+    }
+    if (href.startsWith("#")) return; // in-page anchors, footnotes, etc.
     // Internal doc/share links open as an in-app tab; external → system browser.
     e.preventDefault();
     void openOutlineLink(href, { navigate, api, profileId });

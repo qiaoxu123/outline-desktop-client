@@ -1,11 +1,40 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotes } from "./useNotes";
-import Heatmap from "./Heatmap";
+import NotesRail from "./NotesRail";
 import NoteComposer from "./NoteComposer";
 import MemoCard from "./MemoCard";
-import { dayCounts, computeStreak, sortNotes, dayKeyOf, todayKey } from "./noteUtils";
+import {
+  dayCounts,
+  computeStreak,
+  sortNotes,
+  dayKeyOf,
+  todayKey,
+} from "./noteUtils";
 import "./NotesView.css";
+
+function dayLabel(key: string): string {
+  const [, m, d] = key.split("-");
+  return `${Number(m)}月${Number(d)}日`;
+}
+
+// 页宽预设（展示卡片封顶宽度）本地记忆
+const WIDTH_KEY = "notes.pageWidth.v1";
+const WIDTH_PRESETS = [
+  { key: "narrow", label: "窄", css: "560px" },
+  { key: "standard", label: "标准", css: "680px" },
+  { key: "wide", label: "宽", css: "840px" },
+  { key: "full", label: "满", css: "100%" },
+] as const;
+type WidthKey = (typeof WIDTH_PRESETS)[number]["key"];
+// 默认「宽」：随记正文与文档正文同字号（16px）后，680px 一行字数偏少
+const DEFAULT_WIDTH: WidthKey = "wide";
+function loadWidthKey(): WidthKey {
+  const v = localStorage.getItem(WIDTH_KEY);
+  return WIDTH_PRESETS.some((p) => p.key === v)
+    ? (v as WidthKey)
+    : DEFAULT_WIDTH;
+}
 
 export default function NotesView(): React.ReactElement {
   const nav = useNavigate();
@@ -16,6 +45,13 @@ export default function NotesView(): React.ReactElement {
   const [manage, setManage] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [trashOpen, setTrashOpen] = useState(false);
+  const [widthKey, setWidthKey] = useState(loadWidthKey);
+  const widthCss =
+    WIDTH_PRESETS.find((p) => p.key === widthKey)?.css ?? "840px";
+  const changeWidth = (k: WidthKey) => {
+    setWidthKey(k);
+    localStorage.setItem(WIDTH_KEY, k);
+  };
 
   const counts = useMemo(() => dayCounts(n.liveNotes), [n.liveNotes]);
   const allTags = useMemo(() => {
@@ -57,6 +93,12 @@ export default function NotesView(): React.ReactElement {
       return x;
     });
 
+  const clearFilters = () => {
+    setTag(null);
+    setDay(null);
+    setQ("");
+  };
+
   const exportMd = () => {
     const blob = new Blob([n.exportMarkdown()], { type: "text/markdown" });
     const a = document.createElement("a");
@@ -66,143 +108,175 @@ export default function NotesView(): React.ReactElement {
     URL.revokeObjectURL(a.href);
   };
 
+  // 主栏顶部标题反映当前筛选态。
+  const heading = tag ? `#${tag}` : day ? dayLabel(day) : "全部笔记";
+
   return (
     <div className="notes-view">
-      <header className="nt-header">
-        <div className="nt-header-title">
-          <h2>随记</h2>
-          <span className="nt-stats">
-            共 {n.liveNotes.length} 条 · {allTags.length} 个标签 · 连续{" "}
-            {streak} 天
-          </span>
-        </div>
-        <div className="nt-header-actions">
-          <button
-            className={`nt-btn subtle${trashOpen ? " active" : ""}`}
-            onClick={() => setTrashOpen((v) => !v)}
-          >
-            回收站{trashed.length ? `(${trashed.length})` : ""}
-          </button>
-          <button className="nt-btn subtle" onClick={exportMd}>
-            导出
-          </button>
-          <button
-            className={`nt-btn subtle${manage ? " active" : ""}`}
-            onClick={() => {
-              setManage((v) => !v);
-              setSel(new Set());
-            }}
-          >
-            管理
-          </button>
-        </div>
-      </header>
+      <div className="nt-cols">
+        <NotesRail
+          noteCount={n.liveNotes.length}
+          tagCount={allTags.length}
+          activeDays={counts.size}
+          streak={streak}
+          counts={counts}
+          selectedDay={day}
+          onSelectDay={setDay}
+          tags={allTags}
+          activeTag={tag}
+          onSelectTag={(t) => setTag(tag === t ? null : t)}
+          onClearTag={() => setTag(null)}
+        />
 
-      {trashOpen ? (
-        <section className="nt-trash">
-          <h3>回收站（30 天后自动清理）</h3>
-          {trashed.length === 0 && <p className="nt-empty">回收站是空的。</p>}
-          {trashed.map((note) => (
-            <div className="nt-card trashed" key={note.id}>
-              <div className="nt-card-body">{note.content}</div>
-              <div className="nt-card-actions">
-                <button onClick={() => void n.restore(note.id)}>恢复</button>
-                <button className="danger" onClick={() => void n.hardDelete(note.id)}>
-                  彻底删除
-                </button>
-              </div>
-            </div>
-          ))}
-        </section>
-      ) : (
-        <>
-          <NoteComposer onSubmit={(c, l) => void n.add(c, l)} />
-          <Heatmap counts={counts} selected={day} onSelectDay={setDay} />
-
-          {(allTags.length > 0 || hasFilter) && (
-            <div className="nt-filterbar">
-              <input
-                className="nt-search"
-                placeholder="搜索随记…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-              {allTags.map(([t, c]) => (
-                <button
-                  key={t}
-                  className={`nt-tag-pill${tag === t ? " active" : ""}`}
-                  onClick={() => setTag(tag === t ? null : t)}
-                >
-                  #{t} <span>{c}</span>
-                </button>
-              ))}
-              {hasFilter && (
-                <button
-                  className="nt-clear"
-                  onClick={() => {
-                    setTag(null);
-                    setDay(null);
-                    setQ("");
-                  }}
-                >
-                  清除筛选
+        <main
+          className="nt-main"
+          style={{ "--nt-card-w": widthCss } as React.CSSProperties}
+        >
+          <div className="nt-topbar">
+            <div className="nt-topbar-title">
+              {heading}
+              {day && (
+                <button className="nt-clear" onClick={() => setDay(null)}>
+                  ×
                 </button>
               )}
             </div>
-          )}
-
-          {manage && (
-            <div className="nt-manage-bar">
-              <span>已选 {sel.size}</span>
+            <input
+              className="nt-search"
+              placeholder="搜索随记…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <div className="nt-topbar-actions">
+              <div className="nt-width-seg" title="随记页宽">
+                {WIDTH_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    className={widthKey === p.key ? "active" : ""}
+                    onClick={() => changeWidth(p.key)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
               <button
-                disabled={!sel.size}
-                onClick={() => {
-                  void n.bulkPin([...sel], true);
-                  setSel(new Set());
-                }}
+                className={`nt-btn subtle${trashOpen ? " active" : ""}`}
+                onClick={() => setTrashOpen((v) => !v)}
               >
-                批量置顶
+                回收站{trashed.length ? `(${trashed.length})` : ""}
+              </button>
+              <button className="nt-btn subtle" onClick={exportMd}>
+                导出
               </button>
               <button
-                disabled={!sel.size}
-                className="danger"
+                className={`nt-btn subtle${manage ? " active" : ""}`}
                 onClick={() => {
-                  void n.bulkDelete([...sel]);
+                  setManage((v) => !v);
                   setSel(new Set());
                 }}
               >
-                批量删除
+                管理
               </button>
             </div>
-          )}
-
-          <div className="nt-timeline">
-            {n.loading && n.liveNotes.length === 0 && (
-              <p className="nt-empty">加载中…</p>
-            )}
-            {!n.loading && filtered.length === 0 && (
-              <p className="nt-empty">
-                {hasFilter ? "没有匹配的随记。" : "还没有随记，记下第一条吧。"}
-              </p>
-            )}
-            {filtered.map((note) => (
-              <MemoCard
-                key={note.id}
-                note={note}
-                onEdit={(c, l) => void n.update(note.id, c, l)}
-                onDelete={() => void n.softDelete(note.id)}
-                onTogglePin={() => void n.togglePin(note.id)}
-                onCopy={() => void navigator.clipboard.writeText(note.content)}
-                onOpenDoc={(id) => nav(`/document/${id}`)}
-                onToggleTag={(t) => setTag(tag === t ? null : t)}
-                selectMode={manage}
-                selected={sel.has(note.id)}
-                onToggleSelect={() => toggleSel(note.id)}
-              />
-            ))}
           </div>
-        </>
-      )}
+
+          {trashOpen ? (
+            <section className="nt-trash">
+              <h3>回收站（30 天后自动清理）</h3>
+              {trashed.length === 0 && (
+                <p className="nt-empty">回收站是空的。</p>
+              )}
+              {trashed.map((note) => (
+                <div className="nt-card trashed" key={note.id}>
+                  <div className="nt-card-body">{note.content}</div>
+                  <div className="nt-card-actions">
+                    <button onClick={() => void n.restore(note.id)}>
+                      恢复
+                    </button>
+                    <button
+                      className="danger"
+                      onClick={() => void n.hardDelete(note.id)}
+                    >
+                      彻底删除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </section>
+          ) : (
+            <>
+              <NoteComposer onSubmit={(c, l) => void n.add(c, l)} />
+
+              {manage && (
+                <div className="nt-manage-bar">
+                  <span>已选 {sel.size}</span>
+                  <button
+                    disabled={!sel.size}
+                    onClick={() => {
+                      void n.bulkPin([...sel], true);
+                      setSel(new Set());
+                    }}
+                  >
+                    批量置顶
+                  </button>
+                  <button
+                    disabled={!sel.size}
+                    className="danger"
+                    onClick={() => {
+                      void n.bulkDelete([...sel]);
+                      setSel(new Set());
+                    }}
+                  >
+                    批量删除
+                  </button>
+                </div>
+              )}
+
+              {hasFilter && (
+                <div className="nt-active-filter">
+                  <span>
+                    筛选：{heading}
+                    {q.trim() && `（含“${q.trim()}”）`} · {filtered.length} 条
+                  </span>
+                  <button className="nt-clear" onClick={clearFilters}>
+                    清除筛选
+                  </button>
+                </div>
+              )}
+
+              <div className="nt-timeline">
+                {n.loading && n.liveNotes.length === 0 && (
+                  <p className="nt-empty">加载中…</p>
+                )}
+                {!n.loading && filtered.length === 0 && (
+                  <p className="nt-empty">
+                    {hasFilter
+                      ? "没有匹配的随记。"
+                      : "还没有随记，记下第一条吧。"}
+                  </p>
+                )}
+                {filtered.map((note) => (
+                  <MemoCard
+                    key={note.id}
+                    note={note}
+                    onEdit={(c, l) => void n.update(note.id, c, l)}
+                    onDelete={() => void n.softDelete(note.id)}
+                    onTogglePin={() => void n.togglePin(note.id)}
+                    onCopy={() =>
+                      void navigator.clipboard.writeText(note.content)
+                    }
+                    onOpenDoc={(id) => nav(`/document/${id}`)}
+                    onToggleTag={(t) => setTag(tag === t ? null : t)}
+                    selectMode={manage}
+                    selected={sel.has(note.id)}
+                    onToggleSelect={() => toggleSel(note.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

@@ -1,34 +1,207 @@
+/* 外层：只负责外边距 + 建立 container（供内部按“内容区实际宽度”响应式）。
+   container query 只作用于容器的“后代”，故真正的 左栏+主栏 flex 放在子元素 .nt-cols 上。 */
 .notes-view {
-  max-width: 760px;
+  padding: 24px 28px 80px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 24px 20px 80px;
+  container-type: inline-size;
+  container-name: notesview;
+}
+/* shell: rail (left) + main */
+.nt-cols {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
 }
 
-/* header */
-.nt-header {
+/* ── left rail: stats + heatmap + tag nav ─────────────────────── */
+.nt-rail {
+  position: sticky;
+  top: 24px;
+  flex: 0 0 244px;
+  width: 244px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 20px;
+}
+.nt-rail-stats {
+  display: flex;
+  gap: 8px;
+}
+.nt-stat {
+  flex: 1;
+}
+.nt-stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.nt-stat-label {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.nt-rail-nav,
+.nt-rail-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nt-rail-heading {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+.nt-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.nt-nav-item:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+.nt-nav-item.active {
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.nt-nav-ico {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+.nt-nav-item.active .nt-nav-ico {
+  color: var(--color-primary);
+}
+.nt-nav-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-nav-count {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.nt-tags-toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.nt-tags-toggle:hover {
+  color: var(--color-primary);
+  background: var(--color-bg-secondary);
+}
+
+/* ── main column (fills; rail sits flush at the left edge) ────── */
+.nt-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nt-topbar {
+  display: flex;
+  align-items: center;
   gap: 12px;
   margin-bottom: 16px;
 }
-.nt-header-title {
+.nt-topbar-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.nt-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+/* 页宽预设分段控件 */
+.nt-width-seg {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.nt-width-seg button {
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.nt-width-seg button:first-child {
+  border-left: none;
+}
+.nt-width-seg button:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+.nt-width-seg button.active {
+  background: var(--color-primary);
+  color: #fff;
+}
+.nt-active-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
-}
-.nt-header h2 {
-  margin: 0;
-  font-size: var(--text-2xl);
-}
-.nt-stats {
+  margin-bottom: 12px;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
-.nt-header-actions {
-  display: flex;
-  gap: 8px;
+
+/* 内容区变窄（左栏 + 全局侧边栏挤压）时，左栏堆叠到时间线下方，让阅读区吃满宽度。
+   阈值 880 覆盖“主栏 + 左栏放不下”的区间；列方向用 stretch 让两栏自然铺满宽度。
+   order 反转是刻意的：左栏 DOM 在前（这样宽屏下无需 order 即在左侧），但堆叠时
+   统计 + 热力图 + 标签列表是一大块，压在上面会把随记挤出首屏，故沉到底部。 */
+@container notesview (max-width: 880px) {
+  .nt-cols {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+  }
+  .nt-rail {
+    position: static;
+    flex: 0 0 auto;
+    width: auto;
+    max-height: none;
+    order: 2;
+  }
+  .nt-main {
+    flex: 0 0 auto;
+    width: auto;
+    order: 1;
+  }
 }
 
 /* buttons */
@@ -70,13 +243,16 @@
 .nt-composer-input {
   width: 100%;
   min-height: 76px;
-  resize: vertical;
+  /* 高度由 JS auto-grow 控制（随内容撑高，封顶 60vh）；超出封顶才内部滚动 */
+  resize: none;
+  overflow-y: auto;
   border: none;
   outline: none;
   background: transparent;
   color: var(--color-text);
-  font-size: var(--text-base);
-  line-height: 1.7;
+  /* 与展示态正文同字号，编辑/预览不跳字号 */
+  font-size: var(--text-md);
+  line-height: 1.6;
   font-family: inherit;
 }
 .nt-composer-input::placeholder {
@@ -108,56 +284,120 @@
   line-height: 1;
   padding: 0 2px;
 }
+.nt-composer {
+  border-radius: 14px;
+}
+.nt-composer-input {
+  min-height: 88px;
+}
 .nt-composer-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-}
-.nt-link-btn {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text-secondary);
-  border-radius: 7px;
-  padding: 4px 10px;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.nt-link-btn:hover {
-  color: var(--color-text);
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
 }
 .nt-spacer {
   flex: 1;
 }
 
-/* heatmap */
+/* composer toolbar */
+.nt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.nt-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+.nt-tool:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+.nt-tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.nt-tool-text {
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+.nt-tool-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--color-border);
+}
+.nt-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.nt-send:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+.nt-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* heatmap (sized to fit the 244px rail) */
 .nt-heatmap {
-  margin-bottom: 18px;
   overflow-x: auto;
+  /* 关键：作为 rail 的 flex 子项且带 overflow → min-height 变 0，会被 flex-shrink
+     压缩到 0（热力图消失）。禁止收缩，让 rail 自身 overflow-y 处理溢出。 */
+  flex-shrink: 0;
 }
 .nt-heatmap-grid {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   min-width: min-content;
 }
 .nt-heatmap-col {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 .nt-cell {
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
   border: none;
   padding: 0;
   cursor: pointer;
   background: #ebedf0;
 }
-.nt-cell.lvl1 { background: #b7d9ac; }
-.nt-cell.lvl2 { background: #7fbf6e; }
-.nt-cell.lvl3 { background: #4f9d43; }
-.nt-cell.lvl4 { background: #2f7a2a; }
+.nt-cell.lvl1 {
+  background: #b7d9ac;
+}
+.nt-cell.lvl2 {
+  background: #7fbf6e;
+}
+.nt-cell.lvl3 {
+  background: #4f9d43;
+}
+.nt-cell.lvl4 {
+  background: #2f7a2a;
+}
 .nt-cell.sel {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
@@ -168,12 +408,12 @@
 }
 .nt-heatmap-months {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   margin-top: 4px;
   min-width: min-content;
 }
 .nt-month {
-  width: 15px;
+  width: 13px;
   font-size: 10px;
   color: var(--color-text-muted);
   white-space: nowrap;
@@ -181,67 +421,73 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .nt-cell { background: #39393a; }
-  .nt-cell.lvl1 { background: #3f5a3a; }
-  .nt-cell.lvl2 { background: #4f7a45; }
-  .nt-cell.lvl3 { background: #669e57; }
-  .nt-cell.lvl4 { background: #86c072; }
+  .nt-cell {
+    background: #39393a;
+  }
+  .nt-cell.lvl1 {
+    background: #3f5a3a;
+  }
+  .nt-cell.lvl2 {
+    background: #4f7a45;
+  }
+  .nt-cell.lvl3 {
+    background: #669e57;
+  }
+  .nt-cell.lvl4 {
+    background: #86c072;
+  }
 }
-:root[data-theme="dark"] .nt-cell { background: #39393a; }
-:root[data-theme="dark"] .nt-cell.lvl1 { background: #3f5a3a; }
-:root[data-theme="dark"] .nt-cell.lvl2 { background: #4f7a45; }
-:root[data-theme="dark"] .nt-cell.lvl3 { background: #669e57; }
-:root[data-theme="dark"] .nt-cell.lvl4 { background: #86c072; }
-:root[data-theme="light"] .nt-cell { background: #ebedf0; }
-:root[data-theme="light"] .nt-cell.lvl1 { background: #b7d9ac; }
-:root[data-theme="light"] .nt-cell.lvl2 { background: #7fbf6e; }
-:root[data-theme="light"] .nt-cell.lvl3 { background: #4f9d43; }
-:root[data-theme="light"] .nt-cell.lvl4 { background: #2f7a2a; }
+:root[data-theme="dark"] .nt-cell {
+  background: #39393a;
+}
+:root[data-theme="dark"] .nt-cell.lvl1 {
+  background: #3f5a3a;
+}
+:root[data-theme="dark"] .nt-cell.lvl2 {
+  background: #4f7a45;
+}
+:root[data-theme="dark"] .nt-cell.lvl3 {
+  background: #669e57;
+}
+:root[data-theme="dark"] .nt-cell.lvl4 {
+  background: #86c072;
+}
+:root[data-theme="light"] .nt-cell {
+  background: #ebedf0;
+}
+:root[data-theme="light"] .nt-cell.lvl1 {
+  background: #b7d9ac;
+}
+:root[data-theme="light"] .nt-cell.lvl2 {
+  background: #7fbf6e;
+}
+:root[data-theme="light"] .nt-cell.lvl3 {
+  background: #4f9d43;
+}
+:root[data-theme="light"] .nt-cell.lvl4 {
+  background: #2f7a2a;
+}
 
-/* filter bar */
-.nt-filterbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 14px;
-}
+/* search (in top bar) */
 .nt-search {
+  flex: 1 1 auto;
+  min-width: 120px;
+  max-width: 300px;
   border: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
   color: var(--color-text);
-  border-radius: 7px;
-  padding: 5px 10px;
+  border-radius: 8px;
+  padding: 6px 12px;
   font-size: var(--text-sm);
-  min-width: 160px;
-}
-.nt-tag-pill {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: var(--text-xs);
-  cursor: pointer;
-}
-.nt-tag-pill span {
-  color: var(--color-text-muted);
-  margin-left: 2px;
-}
-.nt-tag-pill.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
-}
-.nt-tag-pill.active span {
-  color: rgba(255, 255, 255, 0.8);
 }
 .nt-clear {
   border: none;
   background: none;
   color: var(--color-primary);
   cursor: pointer;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
+  line-height: 1;
+  padding: 0 4px;
 }
 
 /* manage bar */
@@ -277,6 +523,7 @@
 .nt-timeline {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 12px;
 }
 .nt-card {
@@ -285,7 +532,16 @@
   border-radius: 10px;
   background: var(--color-bg-secondary);
   padding: 12px 14px;
+  /* 平时展示：统一宽度、左对齐；编辑时铺宽见下方 .editing 规则 */
+  width: 100%;
+  max-width: var(--nt-card-w, 840px);
 }
+/* 顶部速记框与展示卡片同宽，静止时整列一致 */
+.nt-main > .nt-composer {
+  width: 100%;
+  max-width: var(--nt-card-w, 840px);
+}
+/* 内联编辑保持与展示同宽（跟随页宽预设），避免双击进入编辑时页宽跳动 */
 .nt-card.pinned {
   border-color: var(--color-primary);
 }
@@ -332,24 +588,66 @@
 .nt-card-actions button.danger {
   color: var(--color-danger);
 }
+/* 正文字号/行高与文档阅读区（.document-body）保持一致 */
 .nt-card-body {
-  font-size: var(--text-base);
-  line-height: 1.75;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
   color: var(--color-text);
-  white-space: pre-wrap;
   word-break: break-word;
 }
-.nt-tag {
-  border: none;
-  background: none;
-  color: var(--color-primary);
-  cursor: pointer;
-  font-size: inherit;
-  padding: 0;
+/* trashed cards render raw content as plain text */
+.nt-card.trashed .nt-card-body {
+  white-space: pre-wrap;
 }
-.nt-url {
+
+/* markdown inside a memo card: tighten default document spacing */
+.nt-card-body .markdown-body {
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+/* 代码等宽块不跟随正文字距 */
+.nt-card-body pre,
+.nt-card-body code {
+  letter-spacing: normal;
+}
+.nt-card-body .markdown-body > :first-child {
+  margin-top: 0;
+}
+.nt-card-body .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.nt-card-body .markdown-body p {
+  margin: 0 0 0.5em;
+}
+.nt-card-body .markdown-body ul,
+.nt-card-body .markdown-body ol {
+  margin: 0.35em 0;
+  padding-left: 1.4em;
+}
+.nt-card-body .markdown-body li {
+  margin: 0.15em 0;
+}
+.nt-card-body .markdown-body h1,
+.nt-card-body .markdown-body h2,
+.nt-card-body .markdown-body h3 {
+  font-size: 1.05em;
+  margin: 0.6em 0 0.3em;
+}
+.nt-card-body .markdown-body blockquote {
+  margin: 0.4em 0;
+  padding-left: 0.8em;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+/* inline #标签 chip (rendered from [#tag](#nt-tag-…)) */
+.nt-card-body .markdown-body a[href^="#nt-tag-"] {
   color: var(--color-primary);
-  word-break: break-all;
+  text-decoration: none;
+  font-weight: 500;
+}
+.nt-card-body .markdown-body a[href^="#nt-tag-"]:hover {
+  text-decoration: underline;
 }
 .nt-card-links {
   display: flex;

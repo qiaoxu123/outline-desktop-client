@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { OIcon } from "../../components/outlineIcons";
 import DocPicker from "./DocPicker";
 import type { NoteLink } from "./types";
 
@@ -22,6 +23,17 @@ export default function NoteComposer({
   const [content, setContent] = useState(initialContent);
   const [links, setLinks] = useState<NoteLink[]>(initialLinks);
   const [picking, setPicking] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // 自适应高度：随内容撑高（空时保持 CSS min-height），最高 60vh，超出才内部滚动。
+  // 编辑长笔记时能展开看全，而不是挤在固定的小框里滚动。
+  useLayoutEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const max = Math.round(window.innerHeight * 0.6);
+    ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+  }, [content]);
 
   const submit = () => {
     if (!content.trim()) return;
@@ -33,14 +45,31 @@ export default function NoteComposer({
     }
   };
 
+  // 在光标处插入文本并保持焦点（工具栏 # 使用）
+  const insertAtCursor = (text: string) => {
+    const ta = taRef.current;
+    if (!ta) {
+      setContent((c) => c + text);
+      return;
+    }
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    const next = content.slice(0, s) + text + content.slice(e);
+    setContent(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = s + text.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  };
+
   return (
     <div className="nt-composer">
       <textarea
+        ref={taRef}
         className="nt-composer-input"
         autoFocus={autoFocus}
-        placeholder={
-          placeholder ?? "记点什么…（#标签 归类，⌘/Ctrl+Enter 保存）"
-        }
+        placeholder={placeholder ?? "现在的想法是…"}
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={(e) => {
@@ -69,22 +98,83 @@ export default function NoteComposer({
         </div>
       )}
       <div className="nt-composer-bar">
-        <button className="nt-link-btn" onClick={() => setPicking(true)}>
-          🔗 关联文档
-        </button>
+        <div className="nt-toolbar">
+          <button
+            type="button"
+            className="nt-tool"
+            title="插入标签"
+            onClick={() => insertAtCursor("#")}
+          >
+            <OIcon name="tag" size={18} />
+          </button>
+          <button
+            type="button"
+            className="nt-tool"
+            title="插图（即将支持）"
+            disabled
+          >
+            <ImageGlyph />
+          </button>
+          <span className="nt-tool-sep" />
+          <button
+            type="button"
+            className="nt-tool nt-tool-text"
+            title="字体样式（即将支持）"
+            disabled
+          >
+            Aa
+          </button>
+          <button
+            type="button"
+            className="nt-tool"
+            title="无序列表（即将支持）"
+            disabled
+          >
+            <OIcon name="bulletList" size={18} />
+          </button>
+          <button
+            type="button"
+            className="nt-tool"
+            title="有序列表（即将支持）"
+            disabled
+          >
+            <OIcon name="orderedList" size={18} />
+          </button>
+          <span className="nt-tool-sep" />
+          <button
+            type="button"
+            className="nt-tool nt-tool-text"
+            title="关联文档"
+            onClick={() => setPicking(true)}
+          >
+            @
+          </button>
+        </div>
         <span className="nt-spacer" />
-        {onCancel && (
-          <button className="nt-btn subtle" onClick={onCancel}>
-            取消
+        {onCancel ? (
+          <>
+            <button className="nt-btn subtle" onClick={onCancel}>
+              取消
+            </button>
+            <button
+              className="nt-btn primary"
+              disabled={!content.trim()}
+              onClick={submit}
+            >
+              {submitLabel}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="nt-send"
+            title="保存（⌘/Ctrl+Enter）"
+            disabled={!content.trim()}
+            onClick={submit}
+          >
+            <SendGlyph />
           </button>
         )}
-        <button
-          className="nt-btn primary"
-          disabled={!content.trim()}
-          onClick={submit}
-        >
-          {submitLabel}
-        </button>
       </div>
       {picking && (
         <DocPicker
@@ -101,14 +191,54 @@ export default function NoteComposer({
   );
 }
 
-// 正文渲染：#标签 → chip，URL 自动链接，其余按纯文本（保留换行由 CSS white-space 处理）
+// 工具栏「插图」占位图标（OIcon 无图片图标，内联一个）
+function ImageGlyph(): React.ReactElement {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <rect
+        x={4}
+        y={5}
+        width={16}
+        height={14}
+        rx={2}
+        stroke="currentColor"
+        strokeWidth={1.6}
+      />
+      <circle cx={9} cy={10} r={1.6} fill="currentColor" />
+      <path
+        d="M5 17l4.5-4.5 3 3L16 12l3 3.5"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// 发送按钮图标（纸飞机箭头）
+function SendGlyph(): React.ReactElement {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M5 12h13M12 5l7 7-7 7"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// 单行内联渲染：#标签 → 可点击 chip，URL 自动链接。用于待办等紧凑单行文本
+// （随记卡片改用 MarkdownRenderer 做完整 markdown 渲染，不走此函数）。
 export function renderContent(
   content: string,
   onTag: (t: string) => void,
 ): React.ReactNode {
   const parts: React.ReactNode[] = [];
-  const re =
-    /#([^\s#.,;!?，。；！？、）)\]】]+)|(https?:\/\/[^\s]+)/g;
+  const re = /#([^\s#.,;!?，。；！？、）)\]】]+)|(https?:\/\/[^\s]+)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import NoteComposer, { renderContent } from "./NoteComposer";
+import { MarkdownRenderer } from "../../lib/markdown/renderer";
+import NoteComposer from "./NoteComposer";
 import type { Note, NoteLink } from "./types";
 
 function timeAgo(iso: string): string {
@@ -58,8 +59,17 @@ export default function MemoCard({
     );
   }
 
+  // 双击卡片正文直接进入编辑；点在链接/标签/按钮上时不触发。
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("a, button, input")) return;
+    setEditing(true);
+  };
+
   return (
-    <div className={`nt-card${note.pinned ? " pinned" : ""}`}>
+    <div
+      className={`nt-card${note.pinned ? " pinned" : ""}`}
+      onDoubleClick={onDoubleClick}
+    >
       {selectMode && (
         <input
           type="checkbox"
@@ -101,7 +111,9 @@ export default function MemoCard({
           </button>
         </span>
       </div>
-      <div className="nt-card-body">{renderContent(note.content, onToggleTag)}</div>
+      <div className="nt-card-body">
+        <MarkdownRenderer content={note.content} breaks onTagClick={onToggleTag} />
+      </div>
       {note.links.length > 0 && (
         <div className="nt-card-links">
           {note.links.map((l) => (

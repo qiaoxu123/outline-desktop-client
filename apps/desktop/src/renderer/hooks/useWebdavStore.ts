@@ -58,6 +58,12 @@ export function useWebdavStore<T extends StoreItem>(opts: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const chainRef = useRef<Promise<unknown>>(Promise.resolve());
+  // 始终反映最新 items 的镜像：乐观更新时同步读写，避免快速连续 commit 读到过期 state。
+  const itemsRef = useRef<T[]>([]);
+  const applyItems = useCallback((next: T[]) => {
+    itemsRef.current = next;
+    setItems(next);
+  }, []);
 
   const readCache = useCallback(
     (uid: string): T[] => {
@@ -99,14 +105,14 @@ export function useWebdavStore<T extends StoreItem>(opts: {
 
   useEffect(() => {
     if (!userId) return;
-    setItems(readCache(userId));
+    applyItems(readCache(userId));
     let cancelled = false;
     void (async () => {
       try {
         const remote = await fetchRemote();
         const purged = purgeExpired(remote, Date.now());
         if (cancelled) return;
-        setItems(purged);
+        applyItems(purged);
         writeCache(userId, purged);
         setError(null);
       } catch (e) {
@@ -118,39 +124,62 @@ export function useWebdavStore<T extends StoreItem>(opts: {
     return () => {
       cancelled = true;
     };
-  }, [userId, fetchRemote, readCache, writeCache]);
+  }, [userId, fetchRemote, readCache, writeCache, applyItems]);
 
   const commit = useCallback(
     (mutate: (base: T[]) => T[]): Promise<void> => {
       if (!userId) return Promise.resolve();
+      // 1) 乐观更新：立即把变更反映到本地 state + cache。mutate 只调用一次
+      //    （add 类会在 mutate 内生成 id/时间戳，重复调用会产生重复条目）。
+      const prev = itemsRef.current;
+      const optimistic = purgeExpired(mutate(prev), Date.now());
+      applyItems(optimistic);
+      writeCache(userId, optimistic);
+      // 本次 mutate 主动移除的 id（改前有、改后无）。硬删除无墓碑，若不记下，
+      // 后台 re-GET 的远端会把它「复活」——合并后按此集合剔除。
+      const keptIds = new Set(optimistic.map((n) => n.id));
+      const removedIds = new Set(
+        prev.filter((n) => !keptIds.has(n.id)).map((n) => n.id),
+      );
+      // 2) 后台串行化写：re-GET 远端 → 与最新本地合并 → PUT，保证多设备安全，不阻塞 UI。
       const run = async (): Promise<void> => {
-        const remote = await fetchRemote();
-        const base = mergeById(readCache(userId), remote);
-        const next = purgeExpired(mutate(base), Date.now());
-        await unwrapIpc(
-          api.webdav.put(
-            filePath(userId),
-            JSON.stringify({ version, [itemsKey]: next }),
-          ),
-        );
-        setItems(next);
-        writeCache(userId, next);
+        try {
+          const remote = await fetchRemote();
+          const merged = purgeExpired(
+            mergeById(itemsRef.current, remote).filter(
+              (n) => !removedIds.has(n.id),
+            ),
+            Date.now(),
+          );
+          await unwrapIpc(
+            api.webdav.put(
+              filePath(userId),
+              JSON.stringify({ version, [itemsKey]: merged }),
+            ),
+          );
+          applyItems(merged);
+          writeCache(userId, merged);
+          setError(null);
+        } catch (e) {
+          // 变更已乐观写入本地 cache；下次成功 commit 会重新合并上传。
+          setError(e);
+        }
       };
       const p = chainRef.current.then(run, run);
       chainRef.current = p.catch(() => {});
       return p;
     },
-    [api, userId, fetchRemote, readCache, writeCache, filePath, version, itemsKey],
+    [api, userId, fetchRemote, writeCache, filePath, version, itemsKey, applyItems],
   );
 
   const reload = useCallback(() => {
     if (!userId) return;
     void fetchRemote().then((r) => {
       const p = purgeExpired(r, Date.now());
-      setItems(p);
+      applyItems(p);
       writeCache(userId, p);
     });
-  }, [userId, fetchRemote, writeCache]);
+  }, [userId, fetchRemote, writeCache, applyItems]);
 
   return { items, loading, error, userId, commit, reload };
 }
