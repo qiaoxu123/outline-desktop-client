@@ -763,7 +763,8 @@
 .comments-panel {
   position: sticky;
   top: 16px;
-  width: 300px;
+  /* 300px 下 14px 正文一行放不下几个字，读长评论极碎；网页版评论栏约 380–420 */
+  width: 380px;
   flex-shrink: 0;
   max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   display: flex;
@@ -791,14 +792,14 @@
 
 .comment-item {
   display: flex;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 10px 12px;
 }
 
 .comment-avatar img,
 .comment-avatar-fallback {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -844,21 +845,90 @@
   text-overflow: ellipsis;
 }
 
-/* push the 编辑/删除 buttons to the right edge, keep them on one line */
+/* 编辑/删除靠右，且平时隐藏、悬停才出现（网页版同款）——常驻会把姓名行挤没 */
 .comment-meta button:first-of-type {
   margin-left: auto;
 }
 .comment-meta .comment-op {
   flex-shrink: 0;
   white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.comment-item:hover .comment-meta .comment-op,
+.comment-meta .comment-op:focus-visible {
+  opacity: 1;
 }
 
-.comment-text {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-top: 2px;
-  white-space: pre-wrap;
+/* 锚定原文：正文之上单独一条引用，字号比正文小一档、左侧竖条 */
+.comment-quote-lead {
+  margin: 4px 0 6px;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--color-border);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
   word-break: break-word;
+}
+
+/* 正文走共享 MarkdownRenderer（输出的是块级 HTML），因此不能再用 pre-wrap
+   ——那会把标签之间的换行也当成空白，段间撑出大片空隙。 */
+/* 正文按网页版：与文档正文同色、14px，不再是灰色小字 */
+.comment-text {
+  font-size: 14px;
+  color: var(--color-text);
+  margin-top: 3px;
+  word-break: break-word;
+}
+.comment-text .markdown-body {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.comment-text .markdown-body > :first-child {
+  margin-top: 0;
+}
+.comment-text .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.comment-text .markdown-body p {
+  margin: 0 0 0.5em;
+}
+.comment-text .markdown-body ul,
+.comment-text .markdown-body ol {
+  margin: 0.35em 0;
+  padding-left: 1.3em;
+}
+.comment-text .markdown-body li {
+  margin: 0.15em 0;
+}
+.comment-text .markdown-body h1,
+.comment-text .markdown-body h2,
+.comment-text .markdown-body h3,
+.comment-text .markdown-body h4 {
+  font-size: 1.05em;
+  margin: 0.6em 0 0.3em;
+}
+.comment-text .markdown-body blockquote {
+  margin: 0.4em 0;
+  padding-left: 0.7em;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+/* 代码/表格/长链接在窄栏里自己滚，别把面板撑破 */
+.comment-text .markdown-body pre {
+  margin: 0.4em 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.comment-text .markdown-body table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.comment-text .markdown-body img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* inline (forum) variant: full-width reply stream under the article body */
@@ -896,10 +966,13 @@
 }
 
 /* threaded comments (web parity) */
+/* 线程做成一张浅色卡片：网页版每条评论是独立卡片，边界清楚才不会读成一坨 */
 .comment-thread {
-  margin: 4px 8px;
+  margin: 8px;
+  padding-bottom: 2px;
   border-radius: 10px;
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
 }
 
 .comment-thread.focused {
@@ -911,19 +984,20 @@
   opacity: 0.65;
 }
 
+/* 锚定原文完整显示：原来 -webkit-line-clamp:2 会把超过两行的引文直接切掉，
+   正是「评论显示不完整」的一个真实来源。长引文改为最多 6 行后内部滚动。 */
 .comment-anchor-quote {
-  margin: 8px 14px 0;
+  margin: 8px 12px 0;
   padding: 4px 10px;
   border-left: 3px solid rgba(255, 212, 0, 0.85);
   background: rgba(255, 212, 0, 0.1);
   border-radius: 0 6px 6px 0;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  max-height: 9em;
+  overflow-y: auto;
+  word-break: break-word;
 }
 
 .comment-reply {
@@ -1010,6 +1084,33 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.comments-composer-ops {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 折叠态入口：一行占位，点开才是真输入框（对齐网页版「增加回复…」） */
+.comments-composer-stub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: none;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  color: var(--color-placeholder);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  cursor: text;
+}
+.comments-composer-stub:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
 }
 
 .comments-input {

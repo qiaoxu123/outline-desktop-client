@@ -20,6 +20,7 @@ import {
   MarkdownEditorContent,
 } from "./Editor";
 import { commentHighlightsKey } from "./extensions/commentHighlights";
+import { proseToMarkdown, isRichComment, splitQuoteLead } from "./commentDoc";
 import { ShareDialog } from "./ShareDialog";
 import { openOutlineLink } from "../../lib/outlineLinks";
 import { OIcon } from "../../components/outlineIcons";
@@ -521,6 +522,38 @@ function commentText(c: Comment): string {
   return "";
 }
 
+/** 相对时间，对齐网页版的「不到 1 分钟前 / 2 天前」，久远的退回日期。 */
+function relativeTime(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour} 小时前`;
+  const day = Math.floor(hour / 24);
+  if (day < 30) return `${day} 天前`;
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+}
+
+/** 阅读用：评论正文的 markdown 源码（保留列表 / 加粗 / 代码块 / 链接）。 */
+function commentMarkdown(c: Comment): string {
+  const data = c.data as unknown;
+  if (data && typeof data === "object") {
+    try {
+      const md = proseToMarkdown(data);
+      if (md) return md;
+    } catch {
+      /* 结构异常时退回纯文本，宁可样式退化也不空白 */
+    }
+  }
+  return commentText(c);
+}
+
 /**
  * Text to highlight in the document for a comment.
  * Web-anchored comments carry a server `anchorText`. Desktop comments can't
@@ -590,6 +623,12 @@ function CommentItem({
   const [editDraft, setEditDraft] = useState("");
   const url = absoluteUrl(comment.createdBy?.avatarUrl);
   const own = !!ownUserId && comment.createdBy?.id === ownUserId;
+  // 富文本评论（多为 web 端写的）不能走纯文本编辑回存，否则格式被碾平
+  const rich = useMemo(() => isRichComment(comment.data), [comment.data]);
+  const lead = useMemo(
+    () => splitQuoteLead(commentMarkdown(comment)),
+    [comment],
+  );
 
   const startEdit = (): void => {
     setEditDraft(commentText(comment).replace(/\n+$/, ""));
@@ -616,20 +655,22 @@ function CommentItem({
       <div className="comment-body">
         <div className="comment-meta">
           <span className="comment-author">{comment.createdBy?.name}</span>
-          <span className="comment-time">
-            {new Date(comment.createdAt).toLocaleString(undefined, {
-              year: "numeric",
-              month: "numeric",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+          <span
+            className="comment-time"
+            title={new Date(comment.createdAt).toLocaleString()}
+          >
+            · {relativeTime(comment.createdAt)}
           </span>
           {own && !editing && (
             <>
               <button
                 className="comment-op"
-                disabled={saving || deleting}
+                disabled={saving || deleting || rich}
+                title={
+                  rich
+                    ? "这条评论含列表 / 加粗 / 代码块等格式，客户端的纯文本编辑会把它们碾平，请到网页版修改"
+                    : undefined
+                }
                 onClick={startEdit}
               >
                 编辑
@@ -673,7 +714,19 @@ function CommentItem({
             </div>
           </div>
         ) : (
-          <div className="comment-text">{commentText(comment)}</div>
+          <>
+            {/* 客户端评论把锚定原文塞在正文首行，提出来单独成块，层次同网页版 */}
+            {lead.quote && (
+              <div className="comment-quote-lead" title="评论锚定的原文">
+                {lead.quote}
+              </div>
+            )}
+            {lead.body && (
+              <div className="comment-text">
+                <MarkdownRenderer content={lead.body} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -706,6 +759,14 @@ function CommentsPanel({
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  // 论坛内联流里发帖回复是主要动作，输入框常驻；文档侧栏是「读」为主，点开再写。
+  const [composerOpen, setComposerOpen] = useState(inline);
+  const openComposer = (): void => setComposerOpen(true);
+  const closeComposer = (): void => {
+    setComposerOpen(false);
+    setDraft("");
+    onQuoteChange?.("");
+  };
 
   const { comments, isLoading, error } = useComments(documentId);
 
@@ -761,6 +822,8 @@ function CommentsPanel({
       } else {
         setDraft("");
         onQuoteChange?.("");
+        // 侧栏发完收回折叠态；内联流保持常驻，方便连续回帖
+        if (!inline) setComposerOpen(false);
       }
       invalidate();
     },
@@ -797,6 +860,11 @@ function CommentsPanel({
   const editingId = editMutation.isPending
     ? (editMutation.variables?.id ?? null)
     : null;
+
+  // 从正文选中文字点「评论」带进来的引用：直接展开输入框，否则引用没处可写。
+  useEffect(() => {
+    if (quote?.trim()) setComposerOpen(true);
+  }, [quote]);
 
   // Scroll the focused thread (clicked anchor in the document) into view.
   useEffect(() => {
@@ -927,37 +995,64 @@ function CommentsPanel({
         })}
       </div>
 
-      <div className="comments-composer">
-        {quote?.trim() && (
-          <div className="comment-quote-chip">
-            <span className="comment-quote-text">{quote}</span>
+      {composerOpen ? (
+        <div className="comments-composer">
+          {quote?.trim() && (
+            <div className="comment-quote-chip">
+              <span className="comment-quote-text">{quote}</span>
+              <button
+                className="history-close"
+                title="移除引用"
+                onClick={() => onQuoteChange?.("")}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          <textarea
+            className="comments-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="写下评论…"
+            rows={3}
+            autoFocus={!inline}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !draft.trim()) closeComposer();
+            }}
+          />
+          <div className="comments-composer-ops">
             <button
-              className="history-close"
-              title="移除引用"
-              onClick={() => onQuoteChange?.("")}
+              className="document-button primary"
+              onClick={() =>
+                draft.trim() &&
+                createMutation.mutate({ text: draft.trim(), quoted: quote })
+              }
+              disabled={createMutation.isPending || !draft.trim()}
             >
-              ✕
+              {createMutation.isPending ? "发送中…" : "发表评论"}
             </button>
+            {!inline && (
+              <button className="comment-op" onClick={closeComposer}>
+                取消
+              </button>
+            )}
           </div>
-        )}
-        <textarea
-          className="comments-input"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="写下评论…"
-          rows={3}
-        />
-        <button
-          className="document-button primary"
-          onClick={() =>
-            draft.trim() &&
-            createMutation.mutate({ text: draft.trim(), quoted: quote })
-          }
-          disabled={createMutation.isPending || !draft.trim()}
-        >
-          {createMutation.isPending ? "发送中…" : "发表评论"}
+        </div>
+      ) : (
+        // 侧栏默认不展开输入框（对齐网页版的「增加回复…」），点一下才写
+        <button className="comments-composer-stub" onClick={openComposer}>
+          <span className="comment-avatar">
+            {absoluteUrl(user?.avatarUrl) ? (
+              <img src={absoluteUrl(user?.avatarUrl)!} alt="" />
+            ) : (
+              <span className="comment-avatar-fallback">
+                {(user?.name || "?").slice(0, 1).toUpperCase()}
+              </span>
+            )}
+          </span>
+          <span>写下评论…</span>
         </button>
-      </div>
+      )}
     </div>
   );
 }
