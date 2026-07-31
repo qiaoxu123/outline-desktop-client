@@ -1,6 +1,10 @@
 ## [1.17.0] - 2026-07-28
 
 ### Fixes
+- **随手记可能丢条目（冷启动竞态）**：首次加载的远端拉取经坚果云可达数秒，期间用户记下的新条目会被返回的**旧快照**直接覆盖——不仅从 UI 和缓存消失，后台 PUT 读到被覆盖的本地状态，导致它永远不被上传。改为：拉取期间发生过 commit 时与本地合并（本地较新者胜），无变更时仍以远端为准（否则别的设备的硬删除会复活）。`reload()` 同样处理。纯合并逻辑拆到 `webdavMerge.ts`（不依赖 React，可直接单测）。
+- **评论正文的 markdown 转义**：PM 的 text 是纯文本，直接拼进 markdown 会被重新解释——评论里写 `**不该加粗**`、`- 这不是列表`、`# 这不是标题`、`` `code` `` 都会变成真的格式。补 `escapeMarkdown`（不转义句点以保住裸链接 linkify；`#`/`>`/`-`/序号只在行首转义）；带 code mark 的文本不转义以免显示出反斜杠；含空格或括号的链接地址改用 `<…>` 形式，不再撑破语法。
+- **代码块内空行被吞**：`proseToMarkdown` 末尾的全局 `/\n{3,}/ → \n\n` 折叠会波及代码块**内部**。每个块本就只补一个 `\n\n`，该折叠既无必要又有害，已移除。
+- **评论面板定宽挤压正文**：文档是 `1fr | minmax(0,920px) | 1fr` 三栏网格，正文列可被压到 0 而面板定宽 380px 纹丝不动。改 `clamp(280px, 30vw, 400px)`。
 - **编辑文档时光标乱跳**（`Editor.tsx`）：`useMarkdownEditor` 里那个「安装 `<u>` / `==高亮==` 解析规则后重新解析一次」的 effect 依赖了 `initialMarkdown`，而 `initialMarkdown` 就是 `doc.text`——每次自动保存成功后 `DocumentView` 都会 `setQueryData` 把新正文写回缓存，prop 随之变化、effect 重跑、`setContent()` 整篇替换文档，**选区被销毁**。表现为「打字 1.2 秒后光标突然跑掉」，且只在含 `<u>` 或 `==高亮==` 的文档里出现，所以像是随机不稳定。改为 ref 锁成一次性，后续 prop 变化一律忽略。
 
 ### Features
@@ -23,7 +27,7 @@
 - **保存/修改卡顿修复（乐观更新）**：`useWebdavStore.commit`（随记 + 待办共用）原先把本地 `setItems` 压在「WebDAV GET 整个文件 → PUT 整个文件」两次网络往返之后，用户点保存/更新要等往返完成（经坚果云可达数百 ms~数秒）才见反应。改为**先乐观更新本地 state + localStorage 镜像（瞬时）**，网络 re-GET→合并→PUT 移到后台串行执行、不阻塞 UI。
   - mutate 仅调用一次（`add` 在 mutate 内生成 id/时间戳，重复调用会产生重复条目）。
   - 硬删除无墓碑，记录本次「主动移除的 id」，合并远端后剔除，避免后台 re-GET 把已删条目复活。
-  - 独立单测覆盖 add（单 id + 保留远端并发）/ hardDelete（不复活）/ update（本地胜）/ softDelete（保留+标记）。
+  - 合并规则的单测见 `hooks/__tests__/webdavMerge.test.ts`（此前 changelog 声称已有单测，实为不实描述，本次补齐）。
 
 ### Design Rationale
 - 评论转 markdown 再渲染，而不是自己写一套 PM → React 渲染器：应用里已有 `MarkdownRenderer`（markdown-it，带代码高亮 / KaTeX / mermaid / 链接拦截），复用它评论就自动和文档正文、随记同款，省一套维护。

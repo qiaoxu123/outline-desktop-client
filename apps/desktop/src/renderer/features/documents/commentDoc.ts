@@ -45,13 +45,46 @@ export function proseToPlainText(node: unknown): string {
 
 /* ---------------- Markdown（阅读） ---------------- */
 
+/**
+ * 文本节点 → markdown 字面量。
+ *
+ * PM 的 text 是**纯文本**，直接拼进 markdown 会被重新解释：评论里写
+ * `**不该加粗**`、`- 这不是列表`、`# 这不是标题` 都会变成真的格式。转义只影响
+ * 源码、不改变渲染出来的字，所以宁可多转不可漏转。
+ *
+ * 但不转义 `.`：URL 里的点一旦转义，linkify 就不再把裸链接变成可点链接。
+ * 行首才有语义的字符（#、>、-、+、有序列表序号）只在行首转义，避免 `C#` 这类
+ * 正常文字里出现多余反斜杠。
+ */
+const ALWAYS_ESCAPE = /([\\`*_[\]<|~=$])/g;
+const LINE_START_ESCAPE = /^(\s*)([#>\-+])/;
+const LINE_START_ORDERED = /^(\s*)(\d+)([.)])/;
+
+function escapeMarkdown(text: string): string {
+  return text
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(ALWAYS_ESCAPE, "\\$1")
+        .replace(LINE_START_ESCAPE, "$1\\$2")
+        .replace(LINE_START_ORDERED, "$1$2\\$3"),
+    )
+    .join("\n");
+}
+
+/** 还原 escapeMarkdown 的反斜杠，供「按纯文本显示」的场景使用。 */
+export function unescapeMarkdown(text: string): string {
+  return text.replace(/\\([!-/:-@[-`{-~])/g, "$1");
+}
+
 /** 行内 marks → markdown 包裹。顺序固定，避免 **`x`** / `**x**` 随机摇摆。 */
 function applyMarks(text: string, marks: ProseNode["marks"]): string {
-  if (!marks?.length || !text) return text;
-  let out = text;
-  const has = (t: string): boolean => marks.some((m) => m.type === t);
-  // code 会吃掉内部的 markdown 语义，必须最贴近文本
-  if (has("code_inline") || has("code")) out = `\`${out}\``;
+  if (!text) return text;
+  const has = (t: string): boolean => !!marks?.some((m) => m.type === t);
+  const isCode = has("code_inline") || has("code");
+  // 行内代码里 markdown 语义本就失效，转义反而会显示出多余的反斜杠
+  let out = isCode ? `\`${text}\`` : escapeMarkdown(text);
+  if (!marks?.length) return out;
   if (has("strong") || has("bold")) out = `**${out}**`;
   if (has("em") || has("italic")) out = `*${out}*`;
   if (has("strikethrough") || has("strike")) out = `~~${out}~~`;
@@ -59,7 +92,8 @@ function applyMarks(text: string, marks: ProseNode["marks"]): string {
   const link = marks.find((m) => m.type === "link");
   if (link) {
     const href = String(link.attrs?.href ?? "");
-    if (href) out = `[${out}](${href})`;
+    // 含空格/括号的 href 会撑破 (…) 语法，用尖括号形式包住
+    if (href) out = `[${out}](${/[\s()<>]/.test(href) ? `<${href}>` : href})`;
   }
   return out;
 }
@@ -189,7 +223,9 @@ export function proseToMarkdown(doc: unknown): string {
   const n = asNode(doc);
   if (!n) return "";
   const nodes = Array.isArray(doc) ? (doc as unknown[]) : childrenOf(n);
-  return blocksToMarkdown(nodes).replace(/\n{3,}/g, "\n\n").trim();
+  // 不做 /\n{3,}/ 的全局折叠：每个块本就只补一个 "\n\n"，多余空行只可能来自
+  // 代码块**内部**，全局折叠会把代码里的空行吃掉。
+  return blocksToMarkdown(nodes).trim();
 }
 
 /* ---------------- 引用行拆分 ---------------- */
@@ -210,7 +246,8 @@ export function splitQuoteLead(markdown: string): {
   // proseToMarkdown 会把带 em 的引用行输出成 *「…」*
   const m = /^\*?「(.+)」\*?$/.exec(first);
   if (!m) return { quote: null, body: markdown };
-  return { quote: m[1], body: lines.slice(1).join("\n").trim() };
+  // 引用块是按纯文本渲染的，得把 escapeMarkdown 加的反斜杠还原，否则会显示出来
+  return { quote: unescapeMarkdown(m[1]), body: lines.slice(1).join("\n").trim() };
 }
 
 /* ---------------- 编辑安全性 ---------------- */

@@ -2,32 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useElectronAPI } from "./useElectronAPI";
 import { unwrapIpc } from "../lib/ipc";
 import { useUserInfo } from "./useOutline";
+import {
+  mergeById,
+  purgeExpired,
+  resolveRemoteSnapshot,
+  type StoreItem,
+} from "./webdavMerge";
 
-/** Minimum shape every stored item must satisfy for merge/soft-delete. */
-export interface StoreItem {
-  id: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-
-/** Union by id; on the same id keep the newer updatedAt. */
-export function mergeById<T extends StoreItem>(local: T[], remote: T[]): T[] {
-  const byId = new Map<string, T>();
-  for (const n of remote) byId.set(n.id, n);
-  for (const n of local) {
-    const prev = byId.get(n.id);
-    if (!prev || n.updatedAt >= prev.updatedAt) byId.set(n.id, n);
-  }
-  return [...byId.values()];
-}
-
-export function purgeExpired<T extends StoreItem>(items: T[], nowMs: number): T[] {
-  return items.filter(
-    (n) => !n.deletedAt || nowMs - new Date(n.deletedAt).getTime() < THIRTY_DAYS,
-  );
-}
+// 纯合并逻辑在 webdavMerge.ts（不依赖 React，便于单测）；此处透传以免调用方改导入。
+export {
+  mergeById,
+  purgeExpired,
+  resolveRemoteSnapshot,
+  type StoreItem,
+} from "./webdavMerge";
 
 export interface WebdavStore<T> {
   items: T[];
@@ -58,6 +46,8 @@ export function useWebdavStore<T extends StoreItem>(opts: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const chainRef = useRef<Promise<unknown>>(Promise.resolve());
+  // commit 计数：拉取期间若发生过本地变更，远端结果不能直接覆盖（详见首次加载处）。
+  const commitSeqRef = useRef(0);
   // 始终反映最新 items 的镜像：乐观更新时同步读写，避免快速连续 commit 读到过期 state。
   const itemsRef = useRef<T[]>([]);
   const applyItems = useCallback((next: T[]) => {
@@ -109,11 +99,17 @@ export function useWebdavStore<T extends StoreItem>(opts: {
     let cancelled = false;
     void (async () => {
       try {
+        const seqAtStart = commitSeqRef.current;
         const remote = await fetchRemote();
-        const purged = purgeExpired(remote, Date.now());
         if (cancelled) return;
-        applyItems(purged);
-        writeCache(userId, purged);
+        const next = resolveRemoteSnapshot(
+          itemsRef.current,
+          remote,
+          commitSeqRef.current !== seqAtStart,
+          Date.now(),
+        );
+        applyItems(next);
+        writeCache(userId, next);
         setError(null);
       } catch (e) {
         if (!cancelled) setError(e);
@@ -129,6 +125,7 @@ export function useWebdavStore<T extends StoreItem>(opts: {
   const commit = useCallback(
     (mutate: (base: T[]) => T[]): Promise<void> => {
       if (!userId) return Promise.resolve();
+      commitSeqRef.current += 1;
       // 1) 乐观更新：立即把变更反映到本地 state + cache。mutate 只调用一次
       //    （add 类会在 mutate 内生成 id/时间戳，重复调用会产生重复条目）。
       const prev = itemsRef.current;
@@ -174,10 +171,17 @@ export function useWebdavStore<T extends StoreItem>(opts: {
 
   const reload = useCallback(() => {
     if (!userId) return;
+    const seqAtStart = commitSeqRef.current;
     void fetchRemote().then((r) => {
-      const p = purgeExpired(r, Date.now());
-      applyItems(p);
-      writeCache(userId, p);
+      // 同首次加载：刷新期间的本地变更不能被远端旧快照覆盖
+      const next = resolveRemoteSnapshot(
+        itemsRef.current,
+        r,
+        commitSeqRef.current !== seqAtStart,
+        Date.now(),
+      );
+      applyItems(next);
+      writeCache(userId, next);
     });
   }, [userId, fetchRemote, writeCache, applyItems]);
 

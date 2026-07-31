@@ -763,8 +763,10 @@
 .comments-panel {
   position: sticky;
   top: 16px;
-  /* 300px 下 14px 正文一行放不下几个字，读长评论极碎；网页版评论栏约 380–420 */
-  width: 380px;
+  /* 300px 下 14px 正文一行放不下几个字，读长评论极碎；网页版评论栏约 380–420。
+     用 clamp 而非定宽：正文列是 minmax(0,…) 可被压到 0，定宽面板会在窄窗口里
+     纹丝不动、把正文挤扁。 */
+  width: clamp(280px, 30vw, 400px);
   flex-shrink: 0;
   max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   display: flex;

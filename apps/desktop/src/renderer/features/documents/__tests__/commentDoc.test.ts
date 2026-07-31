@@ -119,6 +119,59 @@ describe("proseToPlainText", () => {
   });
 });
 
+// PM 的 text 是纯文本，转 markdown 时若不转义会被重新解释成格式（review 发现）
+describe("markdown 转义", () => {
+  it("字面量星号不会变成加粗", () => {
+    expect(proseToMarkdown(doc(p(t("这里 **不该加粗** 才对"))))).toBe(
+      "这里 \\*\\*不该加粗\\*\\* 才对",
+    );
+  });
+
+  it("行首 - / # / > 不会变成列表、标题、引用", () => {
+    expect(proseToMarkdown(doc(p(t("- 这不是列表"))))).toBe("\\- 这不是列表");
+    expect(proseToMarkdown(doc(p(t("# 这不是标题"))))).toBe("\\# 这不是标题");
+    expect(proseToMarkdown(doc(p(t("> 这不是引用"))))).toBe("\\> 这不是引用");
+    expect(proseToMarkdown(doc(p(t("1. 这不是有序列表"))))).toBe(
+      "1\\. 这不是有序列表",
+    );
+  });
+
+  it("字面量反引号不会变成行内代码", () => {
+    expect(proseToMarkdown(doc(p(t("用 `code` 表示"))))).toBe(
+      "用 \\`code\\` 表示",
+    );
+  });
+
+  it("带 code mark 的文本不转义，避免显示出反斜杠", () => {
+    expect(proseToMarkdown(doc(p(t("a*b", "code_inline"))))).toBe("`a*b`");
+  });
+
+  it("不转义句点，保住裸链接的 linkify", () => {
+    expect(proseToMarkdown(doc(p(t("见 https://example.com/a_b 页"))))).toContain(
+      "example.com",
+    );
+    expect(proseToMarkdown(doc(p(t("见 example.com"))))).toBe("见 example.com");
+  });
+
+  it("含空格/括号的链接地址用尖括号包住，不撑破语法", () => {
+    const d = doc(
+      p({
+        type: "text",
+        text: "链",
+        marks: [{ type: "link", attrs: { href: "https://x/a (b).pdf" } }],
+      }),
+    );
+    expect(proseToMarkdown(d)).toBe("[链](<https://x/a (b).pdf>)");
+  });
+});
+
+describe("代码块内容保真", () => {
+  it("代码块里的空行不被折叠吃掉", () => {
+    const d = doc({ type: "code_block", content: [t("a\n\n\nb")] });
+    expect(proseToMarkdown(d)).toBe("```\na\n\n\nb\n```");
+  });
+});
+
 describe("splitQuoteLead", () => {
   it("线上那条评论：引用行与正文拆开（真实数据形状）", () => {
     const d = doc(
@@ -147,6 +200,17 @@ describe("splitQuoteLead", () => {
     const r = splitQuoteLead("*「只引用」*");
     expect(r.quote).toBe("只引用");
     expect(r.body).toBe("");
+  });
+
+  it("引用块按纯文本显示，转义反斜杠要还原掉", () => {
+    const d = doc(p(t("「含 *星号* 的原文」", "em")), p(t("正文")));
+    const md = proseToMarkdown(d);
+    // markdown 源码里星号是转义的
+    expect(md).toContain("\\*");
+    // 但引用块是纯文本渲染，显示时不能带反斜杠
+    const { quote, body } = splitQuoteLead(md);
+    expect(quote).toBe("含 *星号* 的原文");
+    expect(body).toBe("正文");
   });
 });
 
