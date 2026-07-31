@@ -313,8 +313,16 @@ export function useMarkdownEditor(
 
   // Override the fragile built-in table serializer + add <br>/<u> parser rules
   // once the editor (and its markdown serializer/parser) exist.
+  //
+  // 这个重新解析**必须只做一次**。initialMarkdown 是 `doc.text`，而每次自动保存
+  // 成功后 DocumentView 都会 setQueryData 把新正文写回缓存 —— 于是 prop 变化、
+  // effect 重跑。若此时再 setContent，会整篇替换文档、选区随之丢失：表现就是
+  // 「打字打到一半光标乱跳」，且只在含 ==高亮== / <u> 的文档里出现（所以看着
+  // 像是随机不稳定）。用 ref 锁成一次性，后续 initialMarkdown 变化一律忽略。
+  const reparsedRef = useRef(false);
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || reparsedRef.current) return;
+    reparsedRef.current = true;
     patchTableSerializer(editor);
     // The initial content was parsed before the <u> / ==highlight== rules were
     // installed, so those came through as literal text. Re-parse once with the
