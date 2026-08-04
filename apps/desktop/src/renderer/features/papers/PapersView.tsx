@@ -142,7 +142,11 @@ function PaperRow({
           )}
           {!paper.year && paper.topic && (
             <span className="paper-when">
-              {paper.topic === "组内工作" ? "组内工作" : `精选 · ${paper.topic}`}
+              {paper.source === "internal"
+                ? "组内工作"
+                : paper.source === "peer"
+                  ? `同行成果 · ${paper.topic}`
+                  : `精选 · ${paper.topic}`}
             </span>
           )}
           {meta?.venue && <span className="paper-venue">{meta.venue}</span>}

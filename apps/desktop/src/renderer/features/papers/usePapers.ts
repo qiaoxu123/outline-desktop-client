@@ -9,6 +9,18 @@ import type {
   OutlineCollectionDocument,
   OutlineDocument,
 } from "@outline/shared-types";
+// 树形约定与遍历在 paperTree.ts（纯函数，可单测）；此处透传导出以免调用方改导入。
+import {
+  collectPapers,
+  collectFeatured,
+  collectInternalWork,
+  FEATURED_TITLE,
+  FEATURED_COLLECTION_TITLE,
+  PEER_TITLE,
+  INTERNAL_WORK_TITLE,
+  type PaperEntry,
+} from "./paperTree";
+export type { PaperEntry } from "./paperTree";
 
 /**
  * Paper library — same philosophy as 讨论区/个人笔记: the server keeps its
@@ -87,109 +99,6 @@ export function usePapersRoot(): {
   }, [api, activeProfileId, root]);
 
   return { root, status };
-}
-
-export interface PaperEntry {
-  id: string;
-  title: string;
-  emoji: string | null;
-  /** From the ancestor folder titles, e.g. 2026 / 7. */
-  year: number | null;
-  month: number | null;
-  /** For 精选论文 papers: the top-level专题 they live under. */
-  topic?: string | null;
-}
-
-const YEAR_RE = /(\d{4})\s*年/;
-const MONTH_RE = /^(\d{1,2})\s*月/;
-const FEATURED_TITLE = "精选论文";
-/** 精选专题 was split out of 扩展学习 into its own top-level collection; its
- * tree is topic folders (专题) containing 📖 papers — same shape as the old
- * 精选论文 subtree, so collectFeatured handles it. */
-const FEATURED_COLLECTION_TITLE = "精选专题";
-
-/** Walk the 推荐阅读 subtree: 年/月 folders are containers, everything else
- * is a paper entry (its own children, if any, are appendices — not papers). */
-function collectPapers(
-  nodes: OutlineCollectionDocument[],
-  year: number | null,
-  month: number | null,
-  out: PaperEntry[],
-): void {
-  for (const n of nodes) {
-    const title = (n.title ?? "").trim();
-    const y = YEAR_RE.exec(title);
-    const m = MONTH_RE.exec(title);
-    if (y) {
-      collectPapers(n.children ?? [], parseInt(y[1], 10), month, out);
-    } else if (m) {
-      collectPapers(n.children ?? [], year, parseInt(m[1], 10), out);
-    } else {
-      out.push({ id: n.id, title, emoji: n.emoji ?? null, year, month });
-    }
-  }
-}
-
-/**
- * Walk the 精选论文 subtree: topic folders are containers, only 📖-prefixed
- * docs are papers (topic overview pages are not). Without this, papers filed
- * under 精选论文 were invisible to the library (only findable via global
- * search). `topic` = the first-level 专题 title.
- *
- * NB: a 📖 paper's descendants are STILL walked, because users often file a
- * new paper directly under another 📖 paper — those nested 📖 docs are real
- * papers, not appendices, and must be collected too (only 📖-prefixed nodes
- * are ever pushed, so genuine non-📖 appendices are naturally ignored). The
- * topic carried into a paper's subtree stays the nearest non-📖 folder.
- */
-function collectFeatured(
-  nodes: OutlineCollectionDocument[],
-  topic: string | null,
-  out: PaperEntry[],
-): void {
-  for (const n of nodes) {
-    const title = (n.title ?? "").trim();
-    if (title.startsWith("📖")) {
-      out.push({
-        id: n.id,
-        title,
-        emoji: n.emoji ?? null,
-        year: null,
-        month: null,
-        topic,
-      });
-      // keep same topic — a paper nested here belongs to the same 专题
-      collectFeatured(n.children ?? [], topic, out);
-      continue;
-    }
-    collectFeatured(n.children ?? [], topic ?? title, out);
-  }
-}
-
-/** 组内工作 collection (separate from 扩展学习): collect every 📖-prefixed
- * doc anywhere in its tree as a paper, tagged with a fixed 组内工作 topic. */
-const INTERNAL_WORK_TITLE = "组内工作";
-function collectInternalWork(
-  nodes: OutlineCollectionDocument[],
-  out: PaperEntry[],
-): void {
-  for (const n of nodes) {
-    const title = (n.title ?? "").trim();
-    if (title.startsWith("📖")) {
-      out.push({
-        id: n.id,
-        title,
-        emoji: n.emoji ?? null,
-        year: null,
-        month: null,
-        topic: "组内工作",
-      });
-      // still descend: a paper filed under another 📖 is a real paper too
-      collectInternalWork(n.children ?? [], out);
-      continue;
-    }
-    collectInternalWork(n.children ?? [], out);
-  }
 }
 
 const TREE_CACHE_KEY = "papers.treeCache.v1";
@@ -299,6 +208,10 @@ export function usePaperEntries(root: PapersRoot | null): {
       }
       if ((node.title ?? "").trim() === FEATURED_TITLE) {
         collectFeatured(node.children ?? [], null, papers);
+        continue;
+      }
+      if ((node.title ?? "").trim() === PEER_TITLE) {
+        collectFeatured(node.children ?? [], null, papers, "peer");
         continue;
       }
       stack.push(...(node.children ?? []));
