@@ -28,6 +28,8 @@ const ALLOWED_METHODS = new Set([
   "shares.create",
   "shares.update",
   "shares.revoke",
+  // users
+  "users.list",
   // documents
   "documents.info",
   "documents.viewed",
@@ -42,6 +44,7 @@ const ALLOWED_METHODS = new Set([
   "documents.archive",
   "documents.delete",
   "documents.restore",
+  "documents.add_user",
   // revisions (history)
   "revisions.list",
   "revisions.info",

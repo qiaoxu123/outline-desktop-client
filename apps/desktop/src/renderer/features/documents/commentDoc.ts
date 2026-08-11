@@ -55,8 +55,15 @@ export function proseToPlainText(node: unknown): string {
  * 但不转义 `.`：URL 里的点一旦转义，linkify 就不再把裸链接变成可点链接。
  * 行首才有语义的字符（#、>、-、+、有序列表序号）只在行首转义，避免 `C#` 这类
  * 正常文字里出现多余反斜杠。
+ *
+ * **特意不转义 `$` `=` `~`**：它们不是标准 markdown 转义字符（CommonMark
+ * 只规定了 \`\` `*` `_` `[` `]` `(` `)` `{` `}` `#` `+` `-` `.` `!` `|`）。
+ *   - `$` 是 KaTeX 数学定界符，转义后公式无法渲染
+ *   - `=` 只在行首整行 `===` 下划线时有语义，`\=` 不是标准转义，被 markdown-it
+ *     渲染成字面量 `\=`（多出反斜杠）
+ *   - `~` 单个无标记语义，GFM 删除线需要成对 `~~`，且已在 marks 层处理
  */
-const ALWAYS_ESCAPE = /([\\`*_[\]<|~=$])/g;
+const ALWAYS_ESCAPE = /([\\`*_[\]<|])/g;
 const LINE_START_ESCAPE = /^(\s*)([#>\-+])/;
 const LINE_START_ORDERED = /^(\s*)(\d+)([.)])/;
 

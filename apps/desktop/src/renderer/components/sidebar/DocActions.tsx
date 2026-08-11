@@ -44,6 +44,9 @@ const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
   const [confirming, setConfirming] = useState<"archive" | "delete" | null>(
     null,
   );
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState(title);
+  const renameRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const openTab = useTabsStore((s) => s.openTab);
 
@@ -95,13 +98,20 @@ const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
     mutationFn: async (action: "rename" | "duplicate" | "archive" | "delete") => {
       switch (action) {
         case "rename": {
-          const next = window.prompt("重命名文档", title);
-          if (next === null || !next.trim() || next === title) return;
+          const next = renameDraft.trim();
+          if (!next || next === title) return;
           await unwrapIpc(
             api.call(activeProfileId!, "documents.update", {
               id: docId,
-              title: next.trim(),
+              title: next,
+              publish: true,
             }),
+          );
+          // Direct cache update so sidebar reflects rename immediately
+          queryClient.setQueryData(
+            ["profile", activeProfileId, "document", docId],
+            (old: { data?: { title?: string } } | undefined) =>
+              old?.data ? { ...old, data: { ...old.data, title: next } } : old,
           );
           break;
         }
@@ -134,21 +144,14 @@ const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
     setMenuOpen(true);
   };
 
-  // Close on outside click / Escape.
+  // Close on Escape.
   useEffect(() => {
     if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
   const item = (
@@ -185,7 +188,65 @@ const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
       <button className="sb-action-btn" title="更多操作" onClick={openMenu}>
         ⋯
       </button>
+      {/* rename modal */}
+      {renameOpen && (
+        <div className="sb-modal-backdrop" onClick={() => setRenameOpen(false)}>
+          <div
+            className="sb-modal sb-modal-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sb-modal-header">
+              <span>重命名</span>
+              <button
+                className="history-close"
+                onClick={() => setRenameOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="sb-modal-body" style={{ padding: "12px 14px" }}>
+              <input
+                ref={renameRef}
+                className="sb-menu-rename-input"
+                value={renameDraft}
+                onChange={(e) => setRenameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setRenameOpen(false);
+                    if (renameDraft.trim() && renameDraft.trim() !== title) {
+                      run.mutate("rename");
+                    }
+                  } else if (e.key === "Escape") {
+                    setRenameOpen(false);
+                  }
+                }}
+                placeholder={title}
+                style={{ width: "100%" }}
+              />
+              <div style={{ marginTop: 10, textAlign: "right" }}>
+                <button
+                  className="sb-personal-btn"
+                  style={{ width: "auto", padding: "5px 16px" }}
+                  disabled={!renameDraft.trim() || renameDraft.trim() === title}
+                  onClick={() => {
+                    setRenameOpen(false);
+                    run.mutate("rename");
+                  }}
+                >
+                  确认
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {menuOpen && (
+        <div
+          className="sb-menu-backdrop"
+          onClick={() => setMenuOpen(false)}
+          onContextMenu={(e) => { e.preventDefault(); setMenuOpen(false); }}
+        >
         <div
           ref={menuRef}
           className="sb-menu"
@@ -207,7 +268,9 @@ const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
           })}
           {item("重命名…", () => {
             setMenuOpen(false);
-            run.mutate("rename");
+            setRenameDraft(title);
+            setRenameOpen(true);
+            setTimeout(() => renameRef.current?.focus(), 50);
           })}
           {item("复制", () => {
             setMenuOpen(false);
@@ -234,6 +297,7 @@ const DocActions = forwardRef<DocActionsHandle, DocActionsProps>(
                 true,
               )
             : item("删除…", () => setConfirming("delete"))}
+        </div>
         </div>
       )}
     </span>

@@ -14,11 +14,13 @@ import {
 import { unwrapIpc } from "../../lib/ipc";
 import { sortDocsByTitle } from "../../lib/naturalSort";
 import { MarkdownRenderer } from "../../lib/markdown/renderer";
+import { renderMermaidInEditor } from "../../lib/markdown/mermaid";
 import {
   useMarkdownEditor,
   getMarkdown,
   MarkdownEditorContent,
 } from "./Editor";
+import { EditorContent } from "@tiptap/react";
 import { commentHighlightsKey } from "./extensions/commentHighlights";
 import { proseToMarkdown, isRichComment, splitQuoteLead } from "./commentDoc";
 import { ShareDialog } from "./ShareDialog";
@@ -27,7 +29,6 @@ import { OIcon } from "../../components/outlineIcons";
 import { discussCollectionId } from "../discuss/useDiscuss";
 import { usePaperInteractions } from "../papers/usePapers";
 import QuickNotePopover from "../notes/QuickNotePopover";
-import QuickTodoPopover from "../todos/QuickTodoPopover";
 import type { OutlineDocument } from "@outline/shared-types";
 import "./DocumentView.css";
 
@@ -476,6 +477,8 @@ interface Comment {
   data?: { content?: unknown };
   text?: string;
   createdAt: string;
+  updatedAt?: string;
+  editedAt?: string;
   parentCommentId?: string | null;
   /** Anchored comments carry the text they were attached to (web-created). */
   anchorText?: string | null;
@@ -610,6 +613,8 @@ function CommentItem({
   deleting,
   onEdit,
   saving,
+  onReply,
+  firstOfAuthor,
 }: {
   comment: Comment;
   ownUserId?: string;
@@ -617,13 +622,16 @@ function CommentItem({
   deleting: boolean;
   onEdit: (id: string, text: string) => void;
   saving: boolean;
+  onReply?: () => void;
+  /** 同一作者连续评论中仅第一条显示头像（web 行为） */
+  firstOfAuthor?: boolean;
 }): React.ReactElement {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const url = absoluteUrl(comment.createdBy?.avatarUrl);
   const own = !!ownUserId && comment.createdBy?.id === ownUserId;
-  // 富文本评论（多为 web 端写的）不能走纯文本编辑回存，否则格式被碾平
   const rich = useMemo(() => isRichComment(comment.data), [comment.data]);
   const lead = useMemo(
     () => splitQuoteLead(commentMarkdown(comment)),
@@ -633,6 +641,7 @@ function CommentItem({
   const startEdit = (): void => {
     setEditDraft(commentText(comment).replace(/\n+$/, ""));
     setConfirmDelete(false);
+    setMenuOpen(false);
     setEditing(true);
   };
   const saveEdit = (): void => {
@@ -643,50 +652,80 @@ function CommentItem({
 
   return (
     <div className="comment-item">
-      <div className="comment-avatar">
-        {url ? (
-          <img src={url} alt={comment.createdBy?.name} />
+      {/* 头像列：同一作者连续评论只第一条显示 */}
+      <div className="comment-avatar-col">
+        {firstOfAuthor !== false ? (
+          url ? (
+            <img className="comment-avatar-img" src={url} alt={comment.createdBy?.name} />
+          ) : (
+            <span className="comment-avatar-fallback">
+              {(comment.createdBy?.name || "?").slice(0, 1).toUpperCase()}
+            </span>
+          )
         ) : (
-          <span className="comment-avatar-fallback">
-            {(comment.createdBy?.name || "?").slice(0, 1).toUpperCase()}
-          </span>
+          <div className="comment-avatar-spacer" />
         )}
       </div>
-      <div className="comment-body">
+
+      {/* 正文气泡 */}
+      <div className="comment-bubble">
         <div className="comment-meta">
           <span className="comment-author">{comment.createdBy?.name}</span>
-          <span
-            className="comment-time"
-            title={new Date(comment.createdAt).toLocaleString()}
-          >
-            · {relativeTime(comment.createdAt)}
+          <span className="comment-time" title={new Date(comment.createdAt).toLocaleString()}>
+            {relativeTime(comment.createdAt)}
           </span>
-          {own && !editing && (
-            <>
+          {(comment.editedAt || (comment.updatedAt && comment.updatedAt !== comment.createdAt)) && !editing && (
+            <span className="comment-edited" title={`编辑于 ${new Date(comment.editedAt || comment.updatedAt!).toLocaleString()}`}>
+              (已编辑)
+            </span>
+          )}
+          {/* 右侧溢出菜单（⋮） */}
+          {(own || onReply) && !editing && (
+            <div className="comment-menu-wrap">
               <button
-                className="comment-op"
-                disabled={saving || deleting || rich}
-                title={
-                  rich
-                    ? "这条评论含列表 / 加粗 / 代码块等格式，客户端的纯文本编辑会把它们碾平，请到网页版修改"
-                    : undefined
-                }
-                onClick={startEdit}
+                className="comment-menu-btn"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+                title="更多操作"
               >
-                编辑
+                ⋮
               </button>
-              <button
-                className={`comment-op ${confirmDelete ? "danger" : ""}`}
-                disabled={deleting}
-                onClick={() =>
-                  confirmDelete ? onDelete(comment.id) : setConfirmDelete(true)
-                }
-              >
-                {confirmDelete ? "确认删除？" : "删除"}
-              </button>
-            </>
+              {menuOpen && (
+                <>
+                  <div className="sb-menu-backdrop" onClick={() => setMenuOpen(false)} />
+                  <div className="sb-menu comment-menu-drop">
+                    {onReply && (
+                      <button className="sb-menu-item" onClick={() => { setMenuOpen(false); onReply(); }}>
+                        回复
+                      </button>
+                    )}
+                    {own && (
+                      <>
+                        <button
+                          className="sb-menu-item"
+                          disabled={saving || deleting || rich}
+                          onClick={startEdit}
+                        >
+                          编辑
+                        </button>
+                        <button
+                          className={`sb-menu-item ${confirmDelete ? "danger" : ""}`}
+                          disabled={deleting}
+                          onClick={() => {
+                            if (confirmDelete) { setMenuOpen(false); onDelete(comment.id); }
+                            else setConfirmDelete(true);
+                          }}
+                        >
+                          {confirmDelete ? "确认删除？" : "删除"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
+
         {editing ? (
           <div className="comment-edit">
             <textarea
@@ -715,7 +754,6 @@ function CommentItem({
           </div>
         ) : (
           <>
-            {/* 客户端评论把锚定原文塞在正文首行，提出来单独成块，层次同网页版 */}
             {lead.quote && (
               <div className="comment-quote-lead" title="评论锚定的原文">
                 {lead.quote}
@@ -758,6 +796,7 @@ function CommentsPanel({
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
+  const replyRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // 论坛内联流里发帖回复是主要动作，输入框常驻；文档侧栏是「读」为主，点开再写。
   const [composerOpen, setComposerOpen] = useState(inline);
@@ -932,8 +971,10 @@ function CommentsPanel({
                 deleting={deleteMutation.isPending}
                 onEdit={(id, text) => editMutation.mutate({ id, text })}
                 saving={editingId === c.id}
+                onReply={() => { setReplyTo(c.id); setTimeout(() => replyRef.current?.focus(), 50); }}
+                firstOfAuthor
               />
-              {replies.map((r) => (
+              {replies.map((r, ri) => (
                 <div key={r.id} className="comment-reply">
                   <CommentItem
                     comment={r}
@@ -942,6 +983,7 @@ function CommentsPanel({
                     deleting={deleteMutation.isPending}
                     onEdit={(id, text) => editMutation.mutate({ id, text })}
                     saving={editingId === r.id}
+                    firstOfAuthor={ri === 0}
                   />
                 </div>
               ))}
@@ -969,6 +1011,7 @@ function CommentsPanel({
               {replyTo === c.id && (
                 <div className="comment-reply-composer">
                   <textarea
+                    ref={replyRef}
                     className="comments-input"
                     value={replyDraft}
                     onChange={(e) => setReplyDraft(e.target.value)}
@@ -1177,7 +1220,6 @@ function EditableDocument({
   >("none");
   const [shareOpen, setShareOpen] = useState(false);
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
-  const [quickTodoOpen, setQuickTodoOpen] = useState(false);
   const { comments } = useComments(doc.id);
   const commentCount = comments.length;
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
@@ -1531,13 +1573,6 @@ function EditableDocument({
           </button>
           <button
             className="document-icon-button"
-            onClick={() => setQuickTodoOpen(true)}
-            title="加一条待办（关联本文）"
-          >
-            <OIcon name="todoList" size={18} />
-          </button>
-          <button
-            className="document-icon-button"
             onClick={() => setShareOpen(true)}
             title="分享"
           >
@@ -1555,22 +1590,22 @@ function EditableDocument({
           onClose={() => setQuickNoteOpen(false)}
         />
       )}
-      {quickTodoOpen && (
-        <QuickTodoPopover
-          link={{
-            docId: doc.id,
-            urlId: (doc as { urlId?: string }).urlId,
-            title: doc.title || "无标题",
-          }}
-          onClose={() => setQuickTodoOpen(false)}
-        />
-      )}
       {shareOpen && (
-        <ShareDialog url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""} onClose={() => setShareOpen(false)} />
+        <ShareDialog
+          documentId={doc.id}
+          documentTitle={doc.title}
+          url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""}
+          onClose={() => setShareOpen(false)}
+        />
       )}
       <article className="document-article">
         <header className="document-header">
           <div className="document-header-row">
+            {doc.emoji && (
+              <span className="document-emoji" title="文档图标">
+                {doc.emoji}
+              </span>
+            )}
             <textarea
               className="document-title-input"
               value={title}
@@ -1579,6 +1614,14 @@ function EditableDocument({
                 if (el) {
                   el.style.height = "auto";
                   el.style.height = `${el.scrollHeight}px`;
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  // Focus the ProseMirror editor body
+                  const pm = document.querySelector(".doc-editor .ProseMirror") as HTMLElement | null;
+                  pm?.focus();
                 }
               }}
               onChange={(e) => {
@@ -1592,6 +1635,14 @@ function EditableDocument({
             />
           </div>
           {doc.title.startsWith("📖") && <PaperByline documentId={doc.id} />}
+          <div className="document-meta">
+            <span>更新于 {new Date(doc.updatedAt).toLocaleDateString()}</span>
+            {doc.updatedBy && <span>by {doc.updatedBy.name}</span>}
+            <span className="document-meta-hint">
+              {computeDocStats(tocSource).words} 字 · 约{" "}
+              {computeDocStats(tocSource).readMinutes} 分钟阅读
+            </span>
+          </div>
         </header>
 
         <div className="document-body">
@@ -1658,11 +1709,25 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
   const inlineCommentsRef = useRef<HTMLDivElement>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // Read-only ProseMirror editor — matches Outline web rendering exactly
+  const roEditor = useMarkdownEditor(doc.text, false);
+  const roBodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = roBodyRef.current;
+    if (!el) return;
+    const timer = setTimeout(() => { void renderMermaidInEditor(el); }, 100);
+    return () => clearTimeout(timer);
+  }, [roEditor]);
 
   return (
     <div className={`document-layout ${isDiscussTopic ? "discuss-topic" : ""}`}>
       {shareOpen && (
-        <ShareDialog url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""} onClose={() => setShareOpen(false)} />
+        <ShareDialog
+          documentId={doc.id}
+          documentTitle={doc.title}
+          url={absoluteUrl((doc as { url?: string }).url ?? `/doc/${doc.id}`) ?? ""}
+          onClose={() => setShareOpen(false)}
+        />
       )}
       <TopRightActions>
         <div className="document-actions">
@@ -1724,7 +1789,9 @@ function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement
         </header>
         <div className="document-body">
           {doc.text.trim() ? (
-            <MarkdownRenderer content={doc.text} />
+            <div ref={roBodyRef}>
+              <EditorContent editor={roEditor} className="doc-editor" />
+            </div>
           ) : (
             <p className="document-blank">此文档暂无内容</p>
           )}

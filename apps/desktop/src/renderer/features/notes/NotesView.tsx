@@ -1,12 +1,9 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useNotes } from "./useNotes";
-import NotesRail from "./NotesRail";
 import NoteComposer from "./NoteComposer";
 import MemoCard from "./MemoCard";
 import {
-  dayCounts,
-  computeStreak,
   sortNotes,
   dayKeyOf,
   todayKey,
@@ -39,8 +36,25 @@ function loadWidthKey(): WidthKey {
 export default function NotesView(): React.ReactElement {
   const nav = useNavigate();
   const n = useNotes();
-  const [tag, setTag] = useState<string | null>(null);
-  const [day, setDay] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tag = searchParams.get("tag");
+  const day = searchParams.get("day");
+  const setTag = (t: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (t) next.set("tag", t);
+      else next.delete("tag");
+      return next;
+    });
+  };
+  const setDay = (d: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (d) next.set("day", d);
+      else next.delete("day");
+      return next;
+    });
+  };
   const [q, setQ] = useState("");
   const [manage, setManage] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -52,18 +66,6 @@ export default function NotesView(): React.ReactElement {
     setWidthKey(k);
     localStorage.setItem(WIDTH_KEY, k);
   };
-
-  const counts = useMemo(() => dayCounts(n.liveNotes), [n.liveNotes]);
-  const allTags = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const note of n.liveNotes)
-      for (const t of note.tags) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [n.liveNotes]);
-  const streak = useMemo(
-    () => computeStreak(new Set(counts.keys()), todayKey()),
-    [counts],
-  );
 
   const filtered = useMemo(() => {
     let rows = n.liveNotes;
@@ -114,20 +116,6 @@ export default function NotesView(): React.ReactElement {
   return (
     <div className="notes-view">
       <div className="nt-cols">
-        <NotesRail
-          noteCount={n.liveNotes.length}
-          tagCount={allTags.length}
-          activeDays={counts.size}
-          streak={streak}
-          counts={counts}
-          selectedDay={day}
-          onSelectDay={setDay}
-          tags={allTags}
-          activeTag={tag}
-          onSelectTag={(t) => setTag(tag === t ? null : t)}
-          onClearTag={() => setTag(null)}
-        />
-
         <main
           className="nt-main"
           style={{ "--nt-card-w": widthCss } as React.CSSProperties}

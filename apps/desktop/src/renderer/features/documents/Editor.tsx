@@ -28,6 +28,7 @@ import { normalizeOutlineMarkdown } from "../../lib/markdown/normalize";
 import { TableControls } from "./extensions/tableControls";
 import { KeymapFixes } from "./extensions/keymapFixes";
 import { OIcon } from "../../components/outlineIcons";
+import { renderMermaidInEditor } from "../../lib/markdown/mermaid";
 import "katex/dist/katex.min.css";
 import "./Editor.css";
 
@@ -703,11 +704,22 @@ export function MarkdownEditorContent({
   editor: TiptapEditor | null;
   onComment?: (selectedText: string) => void;
 }): React.ReactElement {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Render Mermaid diagrams after TipTap content is mounted
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // Small delay to let TipTap finish rendering
+    const timer = setTimeout(() => { void renderMermaidInEditor(el); }, 100);
+    return () => clearTimeout(timer);
+  }, [editor]);
+
   return (
-    <>
+    <div ref={containerRef}>
       {editor && <SelectionToolbar editor={editor} onComment={onComment} />}
       {editor && <TableMenu editor={editor} />}
       <EditorContent editor={editor} className="doc-editor" />
-    </>
+    </div>
   );
 }

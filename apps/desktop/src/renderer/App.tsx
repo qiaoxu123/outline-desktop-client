@@ -7,10 +7,7 @@ import HomeView from "./features/home/HomeView";
 import SharesView from "./features/shares/SharesView";
 import DiscussView from "./features/discuss/DiscussView";
 import NotesView from "./features/notes/NotesView";
-import OutlineView from "./features/outline/OutlineView";
-import TodosView from "./features/todos/TodosView";
 import PapersView from "./features/papers/PapersView";
-import PaperGraphView from "./features/papers/PaperGraphView";
 import QuizView from "./features/quiz/QuizView";
 import SearchView from "./features/search/SearchView";
 import SettingsView from "./features/profiles/SettingsView";
@@ -212,10 +209,7 @@ export default function App(): React.ReactElement {
               <Route path="/shares" element={<SharesView />} />
               <Route path="/discuss" element={<DiscussView />} />
               <Route path="/notes" element={<NotesView />} />
-              <Route path="/outline" element={<OutlineView />} />
-              <Route path="/todos" element={<TodosView />} />
               <Route path="/papers" element={<PapersView />} />
-              <Route path="/papers/graph" element={<PaperGraphView />} />
               <Route path="/quiz" element={<QuizView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/settings" element={<SettingsView />} />

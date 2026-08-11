@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
@@ -164,6 +164,8 @@ function DocNode({
   const hasChildren = doc.children && doc.children.length > 0;
   const isOpen = expanded.has(doc.id);
   const actionsRef = useRef<DocActionsHandle>(null);
+  // Track mousedown origin to suppress click after a drag
+  const mouseOrigin = useRef<{ x: number; y: number } | null>(null);
 
   const dropClass =
     dnd?.over?.id === doc.id ? `drop-${dnd.over.pos}` : "";
@@ -173,29 +175,13 @@ function DocNode({
     <div className="sb-node">
       <div
         className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""} ${dropClass} ${dragging}`}
-        draggable={!!dnd}
-        onDragStart={(e) => {
-          if (!dnd) return;
-          e.stopPropagation();
-          e.dataTransfer.effectAllowed = "move";
-          dnd.onDragStart(doc.id);
-        }}
-        onDragOver={(e) => {
+        onMouseMove={(e) => {
           if (!dnd || !dnd.dragId || dnd.dragId === doc.id) return;
-          e.preventDefault();
-          e.stopPropagation();
           const r = e.currentTarget.getBoundingClientRect();
           const y = (e.clientY - r.top) / r.height;
           const pos: DropPos = y < 0.3 ? "before" : y > 0.7 ? "after" : "inside";
           dnd.onDragOver(doc.id, pos);
         }}
-        onDrop={(e) => {
-          if (!dnd || !dnd.over) return;
-          e.preventDefault();
-          e.stopPropagation();
-          dnd.onDrop(dnd.over.id, dnd.over.pos);
-        }}
-        onDragEnd={() => dnd?.onDragEnd()}
         onContextMenu={(e) => {
           e.preventDefault();
           actionsRef.current?.openMenu(e.clientX, e.clientY);
@@ -215,8 +201,20 @@ function DocNode({
         <a
           href={`#/document/${doc.id}`}
           className="sb-link"
-          draggable={false}
+          onMouseDown={(e) => {
+            if (!dnd || e.button !== 0) return;
+            if ((e.target as HTMLElement).closest(".sb-emoji")) return;
+            mouseOrigin.current = { x: e.clientX, y: e.clientY };
+            e.preventDefault();
+            dnd.onDragStart(doc.id);
+          }}
           onClick={(e) => {
+            if (mouseOrigin.current) {
+              const dx = e.clientX - mouseOrigin.current.x;
+              const dy = e.clientY - mouseOrigin.current.y;
+              mouseOrigin.current = null;
+              if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return;
+            }
             e.preventDefault();
             selectDocument(doc.id);
             navigate(`/document/${doc.id}`);
@@ -266,6 +264,8 @@ function CollectionTree({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; pos: DropPos } | null>(null);
+  const overRef = useRef(over);
+  overRef.current = over;
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -346,7 +346,6 @@ function CollectionTree({
     })();
   };
 
-  const manualSortable = sort?.field !== "title";
   const dnd: TreeDnd = {
     dragId,
     over,
@@ -363,6 +362,19 @@ function CollectionTree({
       setOver(null);
     },
   };
+
+  // Global mouseup: complete the drag when the user releases anywhere
+  useEffect(() => {
+    if (!dragId) return;
+    const onUp = () => {
+      const cur = overRef.current;
+      if (cur) performMove(dragId, cur.id, cur.pos);
+      setDragId(null);
+      setOver(null);
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+  }, [dragId]);
 
   if (isLoading) return <div className="sb-note">加载中…</div>;
   if (error) return <div className="sb-note">加载失败</div>;
@@ -384,7 +396,7 @@ function CollectionTree({
           expanded={expanded}
           toggle={toggle}
           collectionId={collectionId}
-          dnd={manualSortable ? dnd : undefined}
+          dnd={dnd}
         />
       ))}
     </div>
@@ -455,9 +467,11 @@ function ChildDocs({
 }): React.ReactElement {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const queryClient = useQueryClient();
 
+  const queryKey = ["profile", activeProfileId, "children", parentDocumentId];
   const { data, isLoading } = useQuery({
-    queryKey: ["profile", activeProfileId, "children", parentDocumentId],
+    queryKey,
     queryFn: () =>
       unwrapIpc<{ data: ChildDoc[] }>(
         api.call(activeProfileId!, "documents.list", {
@@ -468,6 +482,68 @@ function ChildDocs({
     enabled: !!activeProfileId,
   });
 
+  // Drag-and-drop reorder (same pattern as CollectionTree but for a flat list)
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [over, setOver] = useState<{ id: string; pos: DropPos } | null>(null);
+  const overRef = useRef(over);
+  overRef.current = over;
+
+  const performMove = (sourceId: string, targetId: string, pos: DropPos) => {
+    if (sourceId === targetId) return;
+    const snapshot = queryClient.getQueryData<{ data: ChildDoc[] }>(queryKey);
+    if (!snapshot?.data) return;
+    const children = snapshot.data;
+    const srcIdx = children.findIndex((c) => c.id === sourceId);
+    const tgtIdx = children.findIndex((c) => c.id === targetId);
+    if (srcIdx === -1 || tgtIdx === -1) return;
+    // Use original index for API (server expects pre-removal position)
+    const apiIndex = pos === "before" ? tgtIdx : tgtIdx + 1;
+
+    // Optimistic update
+    const next = [...children];
+    const [src] = next.splice(srcIdx, 1);
+    const newTgtIdx = next.findIndex((c) => c.id === targetId);
+    next.splice(pos === "before" ? newTgtIdx : newTgtIdx + 1, 0, src);
+    queryClient.setQueryData(queryKey, { ...snapshot, data: next });
+
+    void (async () => {
+      try {
+        await unwrapIpc(
+          api.call(activeProfileId!, "documents.move", {
+            id: sourceId,
+            parentDocumentId,
+            index: apiIndex,
+          }),
+        );
+      } catch {
+        /* revert below via invalidate */
+      } finally {
+        void queryClient.invalidateQueries({ queryKey });
+      }
+    })();
+  };
+
+  // Global mouseup: complete the drag when the user releases anywhere
+  useEffect(() => {
+    if (!dragId) return;
+    const onUp = () => {
+      const cur = overRef.current;
+      if (cur) performMove(dragId, cur.id, cur.pos);
+      setDragId(null);
+      setOver(null);
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+  }, [dragId]);
+
+  const dnd = {
+    dragId,
+    over,
+    onDragStart: setDragId,
+    onDragOver: (id: string, pos: DropPos) =>
+      setOver((o) => (o?.id === id && o.pos === pos ? o : { id, pos })),
+  };
+
   if (isLoading) return <div className="sb-note">加载中…</div>;
   const children = data?.data ?? [];
   if (children.length === 0) return <div className="sb-note">（无子文档）</div>;
@@ -475,23 +551,48 @@ function ChildDocs({
   return (
     <div className="sb-children">
       {sortDocsByTitle(children).map((child) => (
-        <ChildNode key={child.id} doc={child} />
+        <ChildNode key={child.id} doc={child} dnd={dnd} />
       ))}
     </div>
   );
 }
 
-function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
+function ChildNode({
+  doc,
+  dnd,
+}: {
+  doc: ChildDoc;
+  dnd?: {
+    dragId: string | null;
+    over: { id: string; pos: DropPos } | null;
+    onDragStart: (id: string) => void;
+    onDragOver: (id: string, pos: DropPos) => void;
+  };
+}): React.ReactElement {
   const navigate = useNavigate();
   const selectDocument = useUIStore((s) => s.selectDocument);
   const selectedDocumentId = useUIStore((s) => s.selectedDocumentId);
   const [open, setOpen] = useState(false);
   const actionsRef = useRef<DocActionsHandle>(null);
+  // Track mousedown origin to suppress click after a drag
+  const mouseOrigin = useRef<{ x: number; y: number } | null>(null);
+
+  const dropClass =
+    dnd?.over?.id === doc.id ? `drop-${dnd.over.pos}` : "";
+  const dragging = dnd?.dragId === doc.id ? "dragging" : "";
 
   return (
     <div className="sb-node">
       <div
-        className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""}`}
+        className={`sb-item ${selectedDocumentId === doc.id ? "active" : ""} ${dropClass} ${dragging}`}
+        onMouseMove={(ev) => {
+          if (!dnd || !dnd.dragId || dnd.dragId === doc.id) return;
+          const r = ev.currentTarget.getBoundingClientRect();
+          const y = (ev.clientY - r.top) / r.height;
+          const pos: DropPos =
+            y < 0.3 ? "before" : y > 0.7 ? "after" : "inside";
+          dnd.onDragOver(doc.id, pos);
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           actionsRef.current?.openMenu(e.clientX, e.clientY);
@@ -504,7 +605,20 @@ function ChildNode({ doc }: { doc: ChildDoc }): React.ReactElement {
           href={`#/document/${doc.id}`}
           className="sb-link"
           draggable={false}
+          onMouseDown={(ev) => {
+            if (!dnd || ev.button !== 0) return;
+            if ((ev.target as HTMLElement).closest(".sb-emoji")) return;
+            mouseOrigin.current = { x: ev.clientX, y: ev.clientY };
+            ev.preventDefault();
+            dnd.onDragStart(doc.id);
+          }}
           onClick={(e) => {
+            if (mouseOrigin.current) {
+              const dx = e.clientX - mouseOrigin.current.x;
+              const dy = e.clientY - mouseOrigin.current.y;
+              mouseOrigin.current = null;
+              if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return;
+            }
             e.preventDefault();
             selectDocument(doc.id);
             navigate(`/document/${doc.id}`);
@@ -827,7 +941,6 @@ export default function Sidebar(): React.ReactElement {
   const selectCollection = useUIStore((s) => s.selectCollection);
   const { user, team } = useUserInfo();
   const { starred } = useStars();
-  const discussNew = useDiscussNewTopicCount();
   // Expand state survives restarts (previously component state, reset on
   // every remount/navigation).
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
@@ -869,32 +982,6 @@ export default function Sidebar(): React.ReactElement {
   );
   const avatar = absoluteUrl(user?.avatarUrl);
 
-  const navItem = (
-    path: string,
-    label: string,
-    icon: React.ReactElement,
-    iconOnly = false,
-    badge = 0,
-  ): React.ReactElement => (
-    <a
-      href={`#${path}`}
-      aria-label={iconOnly ? label : undefined}
-      title={iconOnly ? label : undefined}
-      className={`sb-nav-item ${iconOnly ? "icon-only" : ""} ${location.pathname === path ? "active" : ""}`}
-      onClick={(e) => {
-        e.preventDefault();
-        navigate(path);
-      }}
-    >
-      {icon}
-      {!iconOnly && <span>{label}</span>}
-      {badge > 0 && (
-        <span className="sb-badge" title={`${badge} 条新动态`}>
-          {badge > 99 ? "99+" : badge}
-        </span>
-      )}
-    </a>
-  );
 
   return (
     <div className="sidebar">
@@ -905,30 +992,6 @@ export default function Sidebar(): React.ReactElement {
         <span className="sb-team-name">{team?.name ?? "Outline"}</span>
       </div>
 
-      <nav className="sb-quick-nav">
-        {navItem("/search", "搜索", <OIcon name="search" size={20} />, true)}
-        {navItem("/", "主页", <OIcon name="home" size={20} />, true)}
-        {navItem(
-          "/settings",
-          "设置",
-          <OIcon name="settings" size={20} />,
-          true,
-        )}
-        <span className="sb-nav-divider" aria-hidden="true">｜</span>
-        {navItem(
-          "/discuss",
-          "讨论区",
-          <OIcon name="comment" size={20} />,
-          true,
-          discussNew,
-        )}
-        {navItem("/papers", "论文库", <OIcon name="academicCap" size={20} />, true)}
-        {navItem("/notes", "随记", <OIcon name="note" size={20} />, true)}
-        {navItem("/outline", "大纲", <OIcon name="toc" size={20} />, true)}
-        {navItem("/todos", "待办", <OIcon name="todoList" size={20} />, true)}
-        {navItem("/quiz", "自测题库", <OIcon name="checkbox" size={20} />, true)}
-        {navItem("/shares", "共享链接", <OIcon name="globe" size={20} />, true)}
-      </nav>
 
       <div className="sb-scroll">
 
@@ -1035,18 +1098,6 @@ export default function Sidebar(): React.ReactElement {
             <div className="sb-account-name">{user?.name ?? "…"}</div>
             {user?.email && <div className="sb-account-email">{user.email}</div>}
           </div>
-        </a>
-        <a
-          href="#/papers/graph"
-          className={`sb-footer-graph ${location.pathname === "/papers/graph" ? "active" : ""}`}
-          title="关系图"
-          aria-label="关系图"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("/papers/graph");
-          }}
-        >
-          <OIcon name="graph" size={20} />
         </a>
       </div>
     </div>

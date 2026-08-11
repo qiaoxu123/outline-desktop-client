@@ -130,3 +130,40 @@
   font-size: 12px;
   color: var(--color-text-muted);
 }
+
+/* 集合筛选下拉 */
+.search-filters {
+  margin-top: 12px;
+}
+
+.search-filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  cursor: pointer;
+  outline: none;
+  max-width: 340px;
+  transition: border-color 0.15s;
+}
+
+.search-filter-select:focus {
+  border-color: var(--color-primary);
+}
+
+/* 结果项元信息行 */
+.search-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.search-result-collection {
+  color: var(--color-primary);
+}

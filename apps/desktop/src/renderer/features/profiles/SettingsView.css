@@ -181,3 +181,95 @@
   color: var(--color-text-muted);
   background: var(--color-bg-tertiary);
 }
+
+/* activity bar drag-to-reorder list */
+.settings-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 6px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.settings-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text);
+  transition: background 0.08s;
+  position: relative;
+}
+
+.settings-activity-row:hover {
+  background: var(--sidebar-hover);
+}
+
+/* drag handle */
+.act-row-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  letter-spacing: -2px;
+  cursor: grab;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.act-row-grip:hover {
+  background: var(--sidebar-active);
+  color: var(--color-text);
+}
+
+.act-row-grip:active {
+  cursor: grabbing;
+}
+
+.act-row-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.act-row-label input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  width: 15px;
+  height: 15px;
+}
+
+/* drag visual feedback */
+.act-row-dragging {
+  opacity: 0.4;
+}
+
+.settings-activity-row.act-row-drop-before::before,
+.settings-activity-row.act-row-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.settings-activity-row.act-row-drop-before::before {
+  top: -2px;
+}
+
+.settings-activity-row.act-row-drop-after::after {
+  bottom: -2px;
+}

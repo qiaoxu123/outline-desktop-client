@@ -1,0 +1,156 @@
+/* VSCode-style Activity Bar: narrow vertical icon strip on the far left */
+
+.activity-bar {
+  width: 44px;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--color-border);
+  height: 100%;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+.act-top {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 6px;
+  overflow: hidden;
+}
+
+.act-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 6px;
+}
+
+/* divider between sidebar toggle and nav entries */
+.act-divider {
+  width: 28px;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0 6px;
+  opacity: 0.6;
+}
+
+/* icon button */
+.act-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  transition: background 0.08s, color 0.08s;
+}
+
+.act-btn:hover {
+  background: var(--sidebar-hover);
+  color: var(--color-text);
+}
+
+.act-btn.act-active {
+  color: var(--color-text);
+}
+
+/* left-edge active indicator like VSCode */
+.act-btn.act-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 18px;
+  background: var(--color-primary);
+  border-radius: 1px;
+}
+
+/* badge (discuss unread count) */
+.act-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* context menu label */
+.sb-menu-label {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: none;
+}
+
+.act-check {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  margin-right: 2px;
+}
+
+/* Sidebar panel (to the right of the activity bar) gets a subtle top border
+   to visually separate it from the activity bar when they're side by side */
+.activity-bar + .app-sidebar {
+  border-left: none;
+}
+
+/* drag-to-reorder */
+.act-btn.act-dragging {
+  opacity: 0.4;
+}
+
+.act-btn.act-drop-before::before,
+.act-btn.act-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.act-btn.act-drop-before::before {
+  top: -2px;
+}
+
+.act-btn.act-drop-after::after {
+  bottom: -2px;
+}
+
+/* Windows density */
+:root[data-os="win"] .act-btn {
+  width: 32px;
+  height: 32px;
+}
+
+:root[data-os="win"] .activity-bar {
+  width: 40px;
+  min-width: 40px;
+}

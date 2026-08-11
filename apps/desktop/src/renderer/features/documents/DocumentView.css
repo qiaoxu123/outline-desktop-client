@@ -384,6 +384,12 @@
   line-height: 1;
 }
 
+/* 编辑模式：emoji 与 32px 标题首行视觉居中对齐 */
+.document-header-row .document-emoji {
+  padding-top: 6px;
+  align-self: flex-start;
+}
+
 .document-meta {
   margin-top: 10px;
   font-size: 13px;
@@ -392,14 +398,34 @@
   gap: 16px;
 }
 
-/* Markdown body styling to match Outline web */
+/* Markdown body styling to match Outline web (shared/styles/globals.ts) */
 .document-body {
-  font-size: var(--text-md);
+  font-size: var(--text-md);   /* 16px */
   color: var(--color-text);
   text-rendering: optimizeLegibility;
-  /* Comfortable but compact for CJK long-form (1.5 too tight, 1.8 too airy). */
-  line-height: 1.6;
+  line-height: 1.5;            /* web: --line-height-body */
   letter-spacing: 0.01em;
+}
+
+/* ProseMirror paragraph spacing */
+.document-body .ProseMirror p {
+  min-height: 1.6em;
+}
+
+/* Top-level paragraphs in editor */
+.document-body .ProseMirror > p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  text-indent: 2em;
+}
+
+/* Nested paragraphs (lists, blockquotes, tables) — compact */
+.document-body .ProseMirror li p,
+.document-body .ProseMirror blockquote p,
+.document-body .ProseMirror td p,
+.document-body .ProseMirror th p {
+  margin: 0;
+  text-indent: 0;
 }
 
 /* code stays monospace-tight, no added letter-spacing */
@@ -408,45 +434,50 @@
   letter-spacing: normal;
 }
 
+/* Heading sizes match Outline web (shared/editor/components/Styles.ts) */
 .document-body h1 {
-  font-size: 1.75em;
-  margin: 1.2em 0 0.5em;
-  font-weight: 700;
-  line-height: var(--leading-tight);
+  font-size: 28px;
+  margin: 1.5em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .document-body h2 {
-  font-size: 1.4em;
-  margin: 1.1em 0 0.4em;
+  font-size: 22px;
+  margin: 1.5em 0 0.5em;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.25;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--color-border);
 }
 
 .document-body h3 {
-  font-size: 1.15em;
-  margin: 1em 0 0.3em;
+  font-size: 18px;
+  margin: 1.2em 0 0.4em;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .document-body h4 {
-  font-size: 1em;
-  margin: 0.8em 0 0.3em;
+  font-size: 16px;
+  margin: 1em 0 0.35em;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .document-body h5 {
-  font-size: 0.95em;
-  margin: 0.7em 0 0.3em;
+  font-size: 15px;
+  margin: 1em 0 0.35em;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .document-body h6 {
-  font-size: 0.9em;
-  margin: 0.7em 0 0.3em;
+  font-size: 15px;
+  margin: 1em 0 0.35em;
   font-weight: 600;
   color: var(--color-text-secondary);
+  line-height: 1.25;
 }
 
 /* Heading-level marker: a small gray H1/H2/… tag pinned in the left gutter so
@@ -493,7 +524,18 @@
 }
 
 .document-body p {
-  margin: 0.55em 0;
+  margin: 1em 0;
+  text-indent: 2em;
+}
+
+/* Reset text-indent for contexts where it's inappropriate */
+.document-body li p,
+.document-body blockquote p,
+.document-body td p,
+.document-body th p,
+.document-body .markdown-body > ul p,
+.document-body .markdown-body > ol p {
+  text-indent: 0;
 }
 
 .document-body a {
@@ -510,15 +552,15 @@
 .document-body ul,
 .document-body ol {
   padding-left: 1.5em;
-  margin: 0.4em 0;
+  margin: 0.6em 0;
 }
 
 .document-body li {
-  margin: 0.15em 0;
+  margin: 0.3em 0;
 }
 
 .document-body blockquote {
-  margin: 0.8em 0;
+  margin: 1em 0;
   padding: 12px 16px;
   border-left: 3px solid var(--color-primary);
   background: var(--color-bg-secondary);
@@ -527,7 +569,7 @@
 }
 
 .document-body pre {
-  margin: 0.8em 0;
+  margin: 1em 0;
   padding: 16px 20px;
   background: var(--color-codeblock-bg);
   color: var(--color-codeblock-text);
@@ -795,10 +837,19 @@
 .comment-item {
   display: flex;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 6px 12px;
 }
 
-.comment-avatar img,
+/* avatar column: fixed width so bubble text always aligns */
+.comment-avatar-col {
+  width: 26px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.comment-avatar-img,
 .comment-avatar-fallback {
   width: 22px;
   height: 22px;
@@ -817,9 +868,23 @@
   font-weight: 600;
 }
 
-.comment-body {
-  min-width: 0;
+.comment-avatar-spacer {
+  width: 22px;
+}
+
+/* bubble card — web-style container with bg + border */
+.comment-bubble {
   flex: 1;
+  min-width: 0;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+/* thread reply indentation */
+.comment-reply .comment-bubble {
+  margin-left: 0;
 }
 
 .comment-meta {
@@ -827,6 +892,7 @@
   gap: 6px;
   align-items: baseline;
   flex-wrap: nowrap;
+  margin-bottom: 2px;
 }
 
 .comment-author {
@@ -841,25 +907,52 @@
   font-size: 11px;
   color: var(--color-text-muted);
   white-space: nowrap;
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* 编辑/删除靠右，且平时隐藏、悬停才出现（网页版同款）——常驻会把姓名行挤没 */
-.comment-meta button:first-of-type {
-  margin-left: auto;
+.comment-edited {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
-.comment-meta .comment-op {
-  flex-shrink: 0;
-  white-space: nowrap;
+
+/* overflow menu (⋮) — right-aligned, hover visible */
+.comment-menu-wrap {
+  margin-left: auto;
+  position: relative;
+}
+
+.comment-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
 }
-.comment-item:hover .comment-meta .comment-op,
-.comment-meta .comment-op:focus-visible {
+
+.comment-item:hover .comment-menu-btn,
+.comment-menu-btn:focus-visible {
   opacity: 1;
+}
+
+.comment-menu-btn:hover {
+  background: var(--sidebar-hover);
+  color: var(--color-text);
+}
+
+.comment-menu-drop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 120px;
+  z-index: 101;
 }
 
 /* 锚定原文：正文之上单独一条引用，字号比正文小一档、左侧竖条 */

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useSearchParams } from "react-router-dom";
 import Sidebar from "../sidebar/Sidebar";
+import NotesSidebar from "../sidebar/NotesSidebar";
+import ActivityBar from "../sidebar/ActivityBar";
 import TitleBar from "./TitleBar";
 import Breadcrumb from "./Breadcrumb";
 import { useUIStore } from "../../state/uiStore";
@@ -21,6 +23,9 @@ export default function AppShell(): React.ReactElement {
   const contentRef = useRef<HTMLElement>(null);
   const [showTop, setShowTop] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+  const location = useLocation();
+  const isNotesRoute = location.pathname.startsWith("/notes");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Drag the sidebar's right edge to resize (persisted).
   const startResize = useCallback((e: React.MouseEvent) => {
@@ -61,7 +66,6 @@ export default function AppShell(): React.ReactElement {
   // without this, leaving a long document and returning to a list view kept
   // the document's scroll offset (list appeared scrolled mid-way). Each
   // route's offset is saved on leave and restored (or reset to top) on entry.
-  const location = useLocation();
   const scrollMemory = useRef(new Map<string, number>());
   const prevPathRef = useRef(location.pathname);
   useLayoutEffect(() => {
@@ -78,17 +82,51 @@ export default function AppShell(): React.ReactElement {
     <div className="app-shell">
       <TitleBar />
       <div className="app-body">
+        <ActivityBar />
         {!sidebarCollapsed && (
           <aside
-            className="app-sidebar"
+            className={`app-sidebar${isNotesRoute ? " notes-sidebar" : ""}`}
             style={{ width: sidebarWidth, minWidth: sidebarWidth }}
           >
-            <Sidebar />
-            <div
-              className="sidebar-resizer"
-              onMouseDown={startResize}
-              title="拖拽调整侧边栏宽度"
-            />
+            {isNotesRoute ? (
+              <NotesSidebar
+                activeTag={searchParams.get("tag")}
+                selectedDay={searchParams.get("day")}
+                onSelectTag={(t) =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    if (t) next.set("tag", t);
+                    else next.delete("tag");
+                    return next;
+                  })
+                }
+                onSelectDay={(d) =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    if (d) next.set("day", d);
+                    else next.delete("day");
+                    return next;
+                  })
+                }
+                onClearTag={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("tag");
+                    next.delete("day");
+                    return next;
+                  })
+                }
+              />
+            ) : (
+              <Sidebar />
+            )}
+            {!isNotesRoute && (
+              <div
+                className="sidebar-resizer"
+                onMouseDown={startResize}
+                title="拖拽调整侧边栏宽度"
+              />
+            )}
           </aside>
         )}
         <div className="app-main">

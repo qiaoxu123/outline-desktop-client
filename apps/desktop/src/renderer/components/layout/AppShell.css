@@ -155,21 +155,37 @@ body {
   position: relative;
 }
 
-/* drag handle on the sidebar's right edge */
+/* drag handle on the sidebar's right edge — invisible until hovered */
 .sidebar-resizer {
   position: absolute;
   top: 0;
   right: -3px;
   width: 6px;
   height: 100%;
-  cursor: col-resize;
   z-index: 30;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-border);
+  transform: translateX(-50%);
 }
 
 .sidebar-resizer:hover,
 body.sidebar-resizing .sidebar-resizer {
+  opacity: 1;
+  cursor: col-resize;
+}
+.sidebar-resizer:hover::after,
+body.sidebar-resizing .sidebar-resizer::after {
   background: var(--color-primary);
-  opacity: 0.35;
 }
 
 body.sidebar-resizing {
@@ -191,10 +207,11 @@ body.sidebar-resizing {
   align-items: center;
   height: var(--breadcrumb-height);
   min-height: var(--breadcrumb-height);
-  padding: 0 16px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg);
   overflow: hidden;
+  gap: 8px;
 }
 
 /* right-aligned slot the document views portal their actions into */
@@ -302,4 +319,26 @@ body.sidebar-resizing {
 .app-content.full-width .document-layout > .history-panel,
 .app-content.full-width .document-layout > .comments-panel {
   grid-column: 2;
+}
+
+/* Notes sidebar: fills the sidebar area when /notes route is active */
+.notes-sidebar-slot {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Override NotesRail's inline-layout styles when portaled into the sidebar */
+.notes-sidebar-slot .nt-rail {
+  width: 100%;
+  flex: 1;
+  position: static;
+  max-height: none;
+  padding: 16px 12px;
+}
+
+/* Remove the resizer handle on notes route */
+.app-sidebar.notes-sidebar {
+  border-right: 1px solid var(--color-border);
 }

@@ -30,10 +30,39 @@ export async function renderMermaidIn(container: HTMLElement): Promise<void> {
   if (pres.length === 0) return;
   const mermaid = await getMermaid();
   for (const pre of pres) {
-    // 已被上一轮替换/正在处理的跳过
     if (!pre.isConnected) continue;
     const src = pre.textContent ?? "";
     if (!src.trim()) continue;
+    const id = `mmd-${seq++}`;
+    try {
+      const { svg } = await mermaid.render(id, src);
+      const wrap = document.createElement("div");
+      wrap.className = "mermaid-diagram";
+      wrap.innerHTML = svg;
+      pre.replaceWith(wrap);
+    } catch (err) {
+      pre.setAttribute("data-mermaid-error", String(err).slice(0, 160));
+    }
+  }
+}
+
+/**
+ * Render Mermaid diagrams in TipTap/ProseMirror output.
+ * TipTap renders ```mermaid as <pre><code class="language-mermaid">.
+ * We find these blocks, render SVG, and replace.
+ */
+export async function renderMermaidInEditor(container: HTMLElement): Promise<void> {
+  const codes = Array.from(
+    container.querySelectorAll<HTMLElement>("code.language-mermaid"),
+  );
+  if (codes.length === 0) return;
+  const mermaid = await getMermaid();
+  for (const code of codes) {
+    if (!code.isConnected) continue;
+    const src = code.textContent ?? "";
+    if (!src.trim()) continue;
+    const pre = code.closest("pre");
+    if (!pre) continue;
     const id = `mmd-${seq++}`;
     try {
       const { svg } = await mermaid.render(id, src);

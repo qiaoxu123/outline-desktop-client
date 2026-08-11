@@ -36,7 +36,9 @@ function createMd(breaks: boolean): MarkdownIt {
       if (lang && hljs.getLanguage(lang)) {
         try {
           return (
-            '<pre class="hljs"><code>' +
+            '<pre class="hljs" data-lang="' +
+            inst.utils.escapeHtml(lang) +
+            '"><code>' +
             hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
             "</code></pre>"
           );
@@ -184,6 +186,37 @@ export function MarkdownRenderer({
   // 渲染后把 ```mermaid 代码块替换成 SVG 流程图（内容变化时重跑）。
   useEffect(() => {
     if (bodyRef.current) void renderMermaidIn(bodyRef.current);
+  }, [html]);
+
+  // 给代码块注入右上角复制按钮（内容变化时重跑，幂等）。
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.querySelectorAll("pre.hljs").forEach((pre) => {
+      if (pre.querySelector(":scope > .code-block-copy")) return;
+      const btn = document.createElement("button");
+      btn.className = "code-block-copy";
+      btn.type = "button";
+      btn.title = "复制代码";
+      btn.setAttribute("aria-label", "复制代码");
+      btn.innerHTML =
+        '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-1A1.5 1.5 0 0 0 9 1H3a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 3 11h1"/></svg>';
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const code = pre.querySelector("code")?.textContent ?? "";
+        void navigator.clipboard.writeText(code).then(() => {
+          const icon = btn.innerHTML;
+          btn.innerHTML = "✓";
+          btn.classList.add("copied");
+          setTimeout(() => {
+            btn.innerHTML = icon;
+            btn.classList.remove("copied");
+          }, 1200);
+        });
+      });
+      pre.appendChild(btn);
+    });
   }, [html]);
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
