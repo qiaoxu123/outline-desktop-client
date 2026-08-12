@@ -71,7 +71,7 @@ export default function AIAssistantPanel({
           const searchResult = await unwrapIpc<{
             data: { id: string; document?: { title?: string }; title?: string; context?: string }[];
           }>(
-            api.call(activeProfileId, "documents.search", {
+            api.call(activeProfileId!, "documents.search", {
               query: q,
               limit: 5,
             }),
