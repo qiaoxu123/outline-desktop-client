@@ -224,6 +224,14 @@ export default function DiscussView(): React.ReactElement {
     navigate(`/document/${id}`);
   };
 
+  // Category-filtered lists for rendering: pinned posts first, then the rest.
+  const visiblePinned = pinnedRows.filter(
+    (row) => !categoryFilter || row.category?.id === categoryFilter,
+  );
+  const visibleRegular = unpinnedRows.filter(
+    (row) => !categoryFilter || row.category?.id === categoryFilter,
+  );
+
   return (
     <div className="discuss-view">
       <header className="discuss-header">
@@ -333,11 +341,8 @@ export default function DiscussView(): React.ReactElement {
       )}
 
       <div className="topic-list">
-        {/* Pinned posts */}
-        {pinnedRows.length > 0 &&
-          pinnedRows
-            .filter((row) => !categoryFilter || row.category?.id === categoryFilter)
-            .map((row) => (
+        {/* Pinned posts at the very top, each row keeps its 📌 marker */}
+        {visiblePinned.map((row) => (
           <TopicRow
             key={row.topic.id}
             row={row}
@@ -360,13 +365,10 @@ export default function DiscussView(): React.ReactElement {
             pinned
           />
         ))}
-        {pinnedRows.length > 0 && (
-          <div className="topic-divider">—— 以下为普通帖子 ——</div>
-        )}
+        {/* A blank line separates the pinned group from the rest */}
+        {visiblePinned.length > 0 && <div className="topic-pinned-spacer" />}
         {/* Regular posts */}
-        {unpinnedRows
-          .filter((row) => !categoryFilter || row.category?.id === categoryFilter)
-          .map((row) => (
+        {visibleRegular.map((row) => (
           <TopicRow
             key={row.topic.id}
             row={row}
