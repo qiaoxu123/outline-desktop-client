@@ -415,8 +415,8 @@
 
 /* Top-level paragraphs in editor */
 .document-body .ProseMirror > p {
-  margin-top: 1em;
-  margin-bottom: 1em;
+  margin-top: 0.6em;
+  margin-bottom: 0.6em;
 }
 
 /* Nested paragraphs (lists, blockquotes, tables) — compact */
@@ -436,14 +436,14 @@
 /* Heading sizes match Outline web (shared/editor/components/Styles.ts) */
 .document-body h1 {
   font-size: 28px;
-  margin: 1.5em 0 0.5em;
+  margin: 1.2em 0 0.4em;
   font-weight: 600;
   line-height: 1.25;
 }
 
 .document-body h2 {
   font-size: 22px;
-  margin: 1.5em 0 0.5em;
+  margin: 1.2em 0 0.4em;
   font-weight: 600;
   line-height: 1.25;
   padding-bottom: 0.3em;
@@ -452,28 +452,28 @@
 
 .document-body h3 {
   font-size: 18px;
-  margin: 1.2em 0 0.4em;
+  margin: 0.9em 0 0.3em;
   font-weight: 600;
   line-height: 1.25;
 }
 
 .document-body h4 {
   font-size: 16px;
-  margin: 1em 0 0.35em;
+  margin: 0.7em 0 0.25em;
   font-weight: 600;
   line-height: 1.25;
 }
 
 .document-body h5 {
   font-size: 15px;
-  margin: 1em 0 0.35em;
+  margin: 0.7em 0 0.25em;
   font-weight: 600;
   line-height: 1.25;
 }
 
 .document-body h6 {
   font-size: 15px;
-  margin: 1em 0 0.35em;
+  margin: 0.7em 0 0.25em;
   font-weight: 600;
   color: var(--color-text-secondary);
   line-height: 1.25;
@@ -523,7 +523,7 @@
 }
 
 .document-body p {
-  margin: 1em 0;
+  margin: 0.6em 0;
 }
 
 .document-body a {
