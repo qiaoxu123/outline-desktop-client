@@ -229,9 +229,55 @@ body.sidebar-resizing {
   min-height: 0;
 }
 
+/* Right-side docked panel wrapper (TOC / AI assistant) — resizable left edge */
+.right-panel {
+  position: relative;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Hide the TOC panel when the slot is empty (no portal content) */
+.right-panel.toc-panel:has(.toc-slot:empty) {
+  display: none;
+}
+
+/* Drag handle on the left edge of a right-side panel */
+.right-panel-resizer {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: col-resize;
+}
+.right-panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-border);
+  transform: translateX(-50%);
+}
+.right-panel-resizer:hover,
+body.sidebar-resizing .right-panel-resizer {
+  opacity: 1;
+}
+.right-panel-resizer:hover::after,
+body.sidebar-resizing .right-panel-resizer::after {
+  background: var(--color-primary);
+}
+
 /* slot the document TOC portals into; collapses when no TOC is rendered */
 .toc-slot {
-  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
 }
 .toc-slot:empty {
   display: none;

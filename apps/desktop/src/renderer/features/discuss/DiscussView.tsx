@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
@@ -44,6 +44,7 @@ function TopicRow({
   canInteract,
   onToggleLike,
   viewCount,
+  pinned,
 }: {
   row: TopicWithActivity;
   ownUserId?: string;
@@ -57,6 +58,7 @@ function TopicRow({
   canInteract: boolean;
   onToggleLike: () => void;
   viewCount: number | undefined;
+  pinned?: boolean;
 }): React.ReactElement {
   const { topic, replyCount, lastActivity } = row;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -71,6 +73,7 @@ function TopicRow({
       onContextMenu={onContextMenu}
     >
       <span className={`topic-dot ${unread ? "unread" : ""}`} />
+      {pinned && <span className="topic-pin" title="已置顶">📌</span>}
       <span className="topic-avatar">
         {avatar ? (
           <img src={avatar} alt={topic.createdBy?.name} />
@@ -148,6 +151,29 @@ export default function DiscussView(): React.ReactElement {
   const { likeInfo, toggleLike, canInteract } = useDiscussLikes();
   const topicIds = useMemo(() => rows.map((r) => r.topic.id), [rows]);
   const views = useDiscussViews(topicIds);
+
+  // Fetch pinned posts
+  const { data: pinsData } = useQuery({
+    queryKey: ["profile", activeProfileId, "discuss", collectionId, "pins"],
+    queryFn: () =>
+      unwrapIpc<{ data: { pins: { documentId: string }[] } }>(
+        api.call(activeProfileId!, "pins.list", { limit: 50 }),
+      ),
+    enabled: !!activeProfileId && status === "ready",
+  });
+  const pinnedIds = useMemo(
+    () => new Set((pinsData?.data?.pins ?? []).map((p) => p.documentId)),
+    [pinsData],
+  );
+  const pinnedRows = useMemo(
+    () => rows.filter((r) => pinnedIds.has(r.topic.id)),
+    [rows, pinnedIds],
+  );
+  const unpinnedRows = useMemo(
+    () => rows.filter((r) => !pinnedIds.has(r.topic.id)),
+    [rows, pinnedIds],
+  );
+
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState("");
   const [composeCategory, setComposeCategory] = useState<string>(UNCATEGORIZED);
@@ -307,7 +333,38 @@ export default function DiscussView(): React.ReactElement {
       )}
 
       <div className="topic-list">
-        {rows
+        {/* Pinned posts */}
+        {pinnedRows.length > 0 &&
+          pinnedRows
+            .filter((row) => !categoryFilter || row.category?.id === categoryFilter)
+            .map((row) => (
+          <TopicRow
+            key={row.topic.id}
+            row={row}
+            ownUserId={user?.id}
+            onOpen={openTopic}
+            onDelete={(id) => deleteTopic.mutate(id)}
+            deleting={deleteTopic.isPending}
+            isUnread={isUnread}
+            onContextMenu={(e) =>
+              onContextMenu(e, {
+                documentId: row.topic.id,
+                title: row.topic.title || "无标题",
+              })
+            }
+            likeCount={likeInfo(row.topic.id).count}
+            liked={likeInfo(row.topic.id).mine}
+            canInteract={canInteract}
+            onToggleLike={() => toggleLike(row.topic.id)}
+            viewCount={views.get(row.topic.id)}
+            pinned
+          />
+        ))}
+        {pinnedRows.length > 0 && (
+          <div className="topic-divider">—— 以下为普通帖子 ——</div>
+        )}
+        {/* Regular posts */}
+        {unpinnedRows
           .filter((row) => !categoryFilter || row.category?.id === categoryFilter)
           .map((row) => (
           <TopicRow

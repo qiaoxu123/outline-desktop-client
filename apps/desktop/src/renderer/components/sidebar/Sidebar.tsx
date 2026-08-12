@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { OIcon } from "../outlineIcons";
+import SidebarNav from "./SidebarNav";
+import { useSidebarMode } from "./activityBarOrder";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import {
   useUserInfo,
@@ -941,6 +943,7 @@ export default function Sidebar(): React.ReactElement {
   const selectCollection = useUIStore((s) => s.selectCollection);
   const { user, team } = useUserInfo();
   const { starred } = useStars();
+  const [sidebarMode] = useSidebarMode();
   // Expand state survives restarts (previously component state, reset on
   // every remount/navigation).
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
@@ -992,6 +995,7 @@ export default function Sidebar(): React.ReactElement {
         <span className="sb-team-name">{team?.name ?? "Outline"}</span>
       </div>
 
+      {sidebarMode === "integrated" && <SidebarNav />}
 
       <div className="sb-scroll">
 

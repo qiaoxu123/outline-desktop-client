@@ -68,7 +68,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: 180px;
+  max-width: 140px;
   padding: 2px 5px;
   border: none;
   background: transparent;
@@ -93,7 +93,7 @@
 .crumb-current {
   color: var(--color-text);
   font-weight: 600;
-  max-width: 320px;
+  max-width: 240px;
 }
 
 .crumb-text {
@@ -114,6 +114,16 @@
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 300;
+}
+
+.crumb-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: default;
+  flex-shrink: 0;
 }
 
 .titlebar-button {

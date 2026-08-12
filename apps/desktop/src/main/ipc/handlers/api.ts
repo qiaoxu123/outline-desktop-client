@@ -45,6 +45,9 @@ const ALLOWED_METHODS = new Set([
   "documents.delete",
   "documents.restore",
   "documents.add_user",
+  "pins.create",
+  "pins.list",
+  "pins.delete",
   // revisions (history)
   "revisions.list",
   "revisions.info",

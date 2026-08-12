@@ -3,18 +3,27 @@ import { Outlet, useLocation, useSearchParams } from "react-router-dom";
 import Sidebar from "../sidebar/Sidebar";
 import NotesSidebar from "../sidebar/NotesSidebar";
 import ActivityBar from "../sidebar/ActivityBar";
+import { useSidebarMode } from "../sidebar/activityBarOrder";
 import TitleBar from "./TitleBar";
 import Breadcrumb from "./Breadcrumb";
 import { useUIStore } from "../../state/uiStore";
 import { OIcon } from "../outlineIcons";
+import AIAssistantPanel from "../../features/ai/AIAssistantPanel";
 import "./AppShell.css";
 
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 420;
+const RIGHT_PANEL_MIN = 180;
+const RIGHT_PANEL_MAX = 560;
 
 function loadSidebarWidth(): number {
   const v = Number(localStorage.getItem("ui.sidebarWidth"));
   return v >= SIDEBAR_MIN && v <= SIDEBAR_MAX ? v : 260;
+}
+
+function loadPanelWidth(key: string, fallback: number): number {
+  const v = Number(localStorage.getItem(key));
+  return v >= RIGHT_PANEL_MIN && v <= RIGHT_PANEL_MAX ? v : fallback;
 }
 
 export default function AppShell(): React.ReactElement {
@@ -26,6 +35,11 @@ export default function AppShell(): React.ReactElement {
   const location = useLocation();
   const isNotesRoute = location.pathname.startsWith("/notes");
   const [searchParams, setSearchParams] = useSearchParams();
+  const [sidebarMode] = useSidebarMode();
+  const aiPanelOpen = useUIStore((s) => s.aiPanelOpen);
+  const setAiPanelOpen = useUIStore((s) => s.setAiPanelOpen);
+  const [tocWidth, setTocWidth] = useState(() => loadPanelWidth("ui.tocWidth", 248));
+  const [aiPanelWidth, setAiPanelWidth] = useState(() => loadPanelWidth("ui.aiPanelWidth", 400));
 
   // Drag the sidebar's right edge to resize (persisted).
   const startResize = useCallback((e: React.MouseEvent) => {
@@ -53,6 +67,38 @@ export default function AppShell(): React.ReactElement {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }, []);
+
+  // Drag a right-side panel's left edge to resize (TOC / AI panel).
+  // deltaX > 0 = drag right → panel shrinks; deltaX < 0 → panel grows.
+  const startRightResize = useCallback(
+    (storageKey: string, setter: (w: number) => void, currentWidth: number) =>
+      (e: React.MouseEvent) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startWidth = currentWidth;
+        document.body.classList.add("sidebar-resizing");
+        const onMove = (ev: MouseEvent) => {
+          const w = Math.min(
+            RIGHT_PANEL_MAX,
+            Math.max(RIGHT_PANEL_MIN, startWidth - (ev.clientX - startX)),
+          );
+          setter(w);
+        };
+        const onUp = (ev: MouseEvent) => {
+          const w = Math.min(
+            RIGHT_PANEL_MAX,
+            Math.max(RIGHT_PANEL_MIN, startWidth - (ev.clientX - startX)),
+          );
+          localStorage.setItem(storageKey, String(w));
+          document.body.classList.remove("sidebar-resizing");
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+      },
+    [],
+  );
 
   useEffect(() => {
     const el = contentRef.current;
@@ -82,7 +128,7 @@ export default function AppShell(): React.ReactElement {
     <div className="app-shell">
       <TitleBar />
       <div className="app-body">
-        <ActivityBar />
+        {sidebarMode === "separate" && <ActivityBar />}
         {!sidebarCollapsed && (
           <aside
             className={`app-sidebar${isNotesRoute ? " notes-sidebar" : ""}`}
@@ -155,9 +201,26 @@ export default function AppShell(): React.ReactElement {
                 </button>
               )}
             </main>
-            {/* document views portal the TOC here — a docked, independently
-                scrolling rail at the far right, outside the content scroller */}
-            <div className="toc-slot" id="toc-slot" />
+            {/* TOC — docked rail, always present for portal; CSS hides when empty */}
+            <div className="right-panel toc-panel" style={{ width: tocWidth, minWidth: tocWidth }}>
+              <div
+                className="right-panel-resizer"
+                onMouseDown={startRightResize("ui.tocWidth", setTocWidth, tocWidth)}
+                title="拖拽调整宽度"
+              />
+              <div className="toc-slot" id="toc-slot" />
+            </div>
+            {/* AI assistant — docked rail, resizable left-edge drag handle */}
+            {aiPanelOpen && (
+              <div className="right-panel" style={{ width: aiPanelWidth, minWidth: aiPanelWidth }}>
+                <div
+                  className="right-panel-resizer"
+                  onMouseDown={startRightResize("ui.aiPanelWidth", setAiPanelWidth, aiPanelWidth)}
+                  title="拖拽调整宽度"
+                />
+                <AIAssistantPanel onClose={() => setAiPanelOpen(false)} />
+              </div>
+            )}
           </div>
         </div>
       </div>

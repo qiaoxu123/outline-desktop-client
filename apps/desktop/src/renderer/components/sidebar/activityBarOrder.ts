@@ -81,3 +81,34 @@ export function useActivityBarOrder(): [
 
   return [order, setOrder];
 }
+
+/* ── sidebar mode: separate ActivityBar vs integrated nav ── */
+
+const SIDEBAR_MODE_KEY = "ui.sidebarMode";
+export type SidebarMode = "separate" | "integrated";
+
+function readMode(): SidebarMode {
+  try {
+    const v = localStorage.getItem(SIDEBAR_MODE_KEY);
+    if (v === "integrated") return "integrated";
+  } catch { /* */ }
+  return "separate";
+}
+
+let _mode = readMode();
+const modeListeners = new Set<() => void>();
+
+export function useSidebarMode(): [SidebarMode, (m: SidebarMode) => void] {
+  const mode = useSyncExternalStore(
+    (cb) => { modeListeners.add(cb); return () => { modeListeners.delete(cb); }; },
+    () => _mode,
+  );
+
+  const setMode = (m: SidebarMode) => {
+    _mode = m;
+    localStorage.setItem(SIDEBAR_MODE_KEY, m);
+    for (const cb of modeListeners) cb();
+  };
+
+  return [mode, setMode];
+}

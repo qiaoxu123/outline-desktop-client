@@ -33,7 +33,7 @@
    against the window's right edge, full height, scrolls independently of the
    document */
 .document-toc {
-  width: 248px;
+  width: 100%;
   height: 100%;
   overflow-y: auto;
   padding: 14px 10px 24px 14px;
@@ -405,6 +405,7 @@
   text-rendering: optimizeLegibility;
   line-height: 1.5;            /* web: --line-height-body */
   letter-spacing: 0.01em;
+  padding-bottom: 60vh;        /* extra scroll room so short docs can be centered */
 }
 
 /* ProseMirror paragraph spacing */
@@ -416,7 +417,6 @@
 .document-body .ProseMirror > p {
   margin-top: 1em;
   margin-bottom: 1em;
-  text-indent: 2em;
 }
 
 /* Nested paragraphs (lists, blockquotes, tables) — compact */
@@ -425,7 +425,6 @@
 .document-body .ProseMirror td p,
 .document-body .ProseMirror th p {
   margin: 0;
-  text-indent: 0;
 }
 
 /* code stays monospace-tight, no added letter-spacing */
@@ -525,17 +524,6 @@
 
 .document-body p {
   margin: 1em 0;
-  text-indent: 2em;
-}
-
-/* Reset text-indent for contexts where it's inappropriate */
-.document-body li p,
-.document-body blockquote p,
-.document-body td p,
-.document-body th p,
-.document-body .markdown-body > ul p,
-.document-body .markdown-body > ol p {
-  text-indent: 0;
 }
 
 .document-body a {

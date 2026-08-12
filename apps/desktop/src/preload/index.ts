@@ -67,6 +67,11 @@ export interface ElectronAPI {
     ) => Promise<unknown>;
     clearRoot: (profileId: string) => Promise<unknown>;
   };
+  ai: {
+    getConfig: () => Promise<unknown>;
+    setConfig: (payload: unknown) => Promise<unknown>;
+    chat: (payload: unknown) => Promise<unknown>;
+  };
   platform: string;
 }
 
@@ -123,6 +128,11 @@ const api: ElectronAPI = {
       ipcRenderer.invoke("personalNotes:setRoot", { profileId, ...root }),
     clearRoot: (profileId) =>
       ipcRenderer.invoke("personalNotes:clearRoot", { profileId }),
+  },
+  ai: {
+    getConfig: () => ipcRenderer.invoke("ai:getConfig"),
+    setConfig: (payload) => ipcRenderer.invoke("ai:setConfig", payload),
+    chat: (payload) => ipcRenderer.invoke("ai:chat", payload),
   },
   platform: process.platform,
 };

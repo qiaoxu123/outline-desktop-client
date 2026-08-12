@@ -140,7 +140,7 @@ export default function ActivityBar(): React.ReactElement {
           onClick={toggleSidebar}
           title={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
         >
-          <OIcon name="sidebar" size={22} />
+          <OIcon name="sidebar" size={18} />
         </button>
 
         <div className="act-divider" />
@@ -176,7 +176,7 @@ export default function ActivityBar(): React.ReactElement {
               }}
               title={e.label}
             >
-              <OIcon name={e.icon} size={22} />
+              <OIcon name={e.icon} size={18} />
               {b > 0 && (
                 <span className="act-badge" title={`${b} 条新动态`}>
                   {b > 99 ? "99+" : b}
@@ -194,7 +194,7 @@ export default function ActivityBar(): React.ReactElement {
           onClick={() => navigate("/settings")}
           title="设置"
         >
-          <OIcon name="settings" size={22} />
+          <OIcon name="settings" size={18} />
         </button>
       </div>
 

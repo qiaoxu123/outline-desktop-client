@@ -1,6 +1,6 @@
 .hljs {
-  color: #cdd6f4;
-  background: #1e1e2e;
+  color: inherit;
+  background: transparent;
 }
 
 .hljs-keyword,
@@ -82,12 +82,13 @@
   display: block; color: #e03131; font-size: 12px; margin-top: 4px;
 }
 
-/* 阅读模式代码块：圆角容器，承载语言标签 + 复制按钮（不影响编辑器内代码块） */
+/* 阅读模式代码块：语言标签 + 复制按钮（pre 负责背景和圆角，hljs 透传） */
 .markdown-body .hljs {
   position: relative;
-  border-radius: 8px;
-  padding: 16px 16px 14px;
-  margin: 8px 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
 }
 
 /* 语言标签（左上角） */

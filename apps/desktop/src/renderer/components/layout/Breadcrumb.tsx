@@ -143,24 +143,43 @@ export default function Breadcrumb(): React.ReactElement {
     crumbs.push({ label: "主页" });
   }
 
+  // Collapse middle crumbs when too many (keep first + last 2)
+  const visible: (Crumb | "ellipsis")[] =
+    crumbs.length <= 4
+      ? crumbs
+      : [crumbs[0], "ellipsis", ...crumbs.slice(-2)];
+
   return (
     <nav className="breadcrumb">
-      {crumbs.map((c, i) => (
-        <span className="crumb-group" key={i}>
-          {i > 0 && <span className="crumb-sep">›</span>}
-          {c.onClick && i < crumbs.length - 1 ? (
-            <button className="crumb crumb-link" onClick={c.onClick} title={c.label}>
-              <CrumbIcon emoji={c.emoji} />
-              <span className="crumb-text">{c.label}</span>
-            </button>
-          ) : (
-            <span className={`crumb ${i === crumbs.length - 1 ? "crumb-current" : ""}`}>
-              <CrumbIcon emoji={c.emoji} />
-              <span className="crumb-text">{c.label}</span>
+      {visible.map((c, i) => {
+        if (c === "ellipsis") {
+          return (
+            <span className="crumb-group" key="ellipsis">
+              <span className="crumb-sep">›</span>
+              <span className="crumb crumb-ellipsis" title="中间路径已折叠">…</span>
+              <span className="crumb-sep">›</span>
             </span>
-          )}
-        </span>
-      ))}
+          );
+        }
+        const origIdx = c === crumbs[0] ? 0 : crumbs.indexOf(c as Crumb);
+        const isLastInFull = crumbs.indexOf(c as Crumb) === crumbs.length - 1;
+        return (
+          <span className="crumb-group" key={origIdx}>
+            {origIdx > 0 && <span className="crumb-sep">›</span>}
+            {(c as Crumb).onClick && !isLastInFull ? (
+              <button className="crumb crumb-link" onClick={(c as Crumb).onClick} title={(c as Crumb).label}>
+                <CrumbIcon emoji={(c as Crumb).emoji} />
+                <span className="crumb-text">{(c as Crumb).label}</span>
+              </button>
+            ) : (
+              <span className={`crumb ${isLastInFull ? "crumb-current" : ""}`}>
+                <CrumbIcon emoji={(c as Crumb).emoji} />
+                <span className="crumb-text">{(c as Crumb).label}</span>
+              </span>
+            )}
+          </span>
+        );
+      })}
     </nav>
   );
 }

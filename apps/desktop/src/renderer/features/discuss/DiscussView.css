@@ -60,6 +60,15 @@
   flex-direction: column;
 }
 
+.topic-divider {
+  padding: 16px 8px 8px;
+  margin: 12px 0 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
 .topic-row {
   display: flex;
   align-items: center;
@@ -89,6 +98,13 @@
 
 .topic-dot.unread {
   background: var(--color-primary);
+}
+
+.topic-pin {
+  font-size: 13px;
+  flex-shrink: 0;
+  margin-right: -2px;
+  opacity: 0.7;
 }
 
 .topic-avatar img,

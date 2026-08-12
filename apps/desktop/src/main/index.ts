@@ -19,6 +19,7 @@ import { registerApiHandlers } from "./ipc/handlers/api";
 import { registerPersonalNotesHandlers } from "./ipc/handlers/personalNotes";
 import { registerWebdavHandlers } from "./ipc/handlers/webdav";
 import { registerAttachmentHandlers } from "./ipc/handlers/attachments";
+import { registerAiHandlers } from "./ipc/handlers/ai";
 
 // The Outline server (notes.jlu-mcns.site) is a domestic host reachable
 // directly — it must NOT be routed through a general-purpose proxy. We only
@@ -42,6 +43,7 @@ function registerAllIpcHandlers(): void {
   registerPersonalNotesHandlers();
   registerWebdavHandlers();
   registerAttachmentHandlers();
+  registerAiHandlers();
 
   // Windows: recolor the native window-controls overlay when the app theme
   // changes so min/max/close blend with the (custom) titlebar background.

@@ -10,6 +10,8 @@ import {
 import {
   ACTIVITY_ENTRIES,
   useActivityBarOrder,
+  useSidebarMode,
+  type SidebarMode,
   type ActivityEntry,
 } from "../../components/sidebar/activityBarOrder";
 import pkg from "../../../../package.json";
@@ -125,12 +127,65 @@ export default function SettingsView(): React.ReactElement {
 
   const [activityVisible, setActivityVisible] = useState<Set<string>>(loadActivityVisible);
   const [order, setOrder] = useActivityBarOrder();
+  const [sidebarMode, setSidebarMode] = useSidebarMode();
 
   // DnD state
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [over, setOver] = useState<{ key: string; pos: DropPos } | null>(null);
   const overRef = useRef(over);
   overRef.current = over;
+
+  /* ---------- AI assistant settings ---------- */
+
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiModel, setAiModel] = useState("deepseek-chat");
+  const [aiBaseUrl, setAiBaseUrl] = useState("https://api.deepseek.com/v1");
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiSaveMsg, setAiSaveMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    api.ai
+      .getConfig()
+      .then((raw) => {
+        const r = raw as
+          | { ok: boolean; data?: { model?: string; baseUrl?: string } }
+          | undefined;
+        if (r?.ok && r.data) {
+          setAiModel(r.data.model ?? "deepseek-chat");
+          setAiBaseUrl(r.data.baseUrl ?? "https://api.deepseek.com/v1");
+        }
+      })
+      .catch(() => {});
+  }, [api]);
+
+  const handleSaveAiConfig = async () => {
+    setAiSaving(true);
+    setAiSaveMsg(null);
+    try {
+      const result = (await api.ai.setConfig({
+        apiKey: aiApiKey || undefined,
+        model: aiModel,
+        baseUrl: aiBaseUrl,
+      })) as { ok: boolean; error?: { message?: string } };
+      if (result.ok) {
+        setAiApiKey("");
+        setAiSaveMsg({ type: "success", text: "已保存" });
+        setTimeout(() => setAiSaveMsg(null), 2000);
+      } else {
+        setAiSaveMsg({
+          type: "error",
+          text: result.error?.message ?? "保存失败",
+        });
+      }
+    } catch {
+      setAiSaveMsg({ type: "error", text: "保存失败" });
+    } finally {
+      setAiSaving(false);
+    }
+  };
 
   // Build ordered entries
   const entryMap = new Map(ACTIVITY_ENTRIES.map((e) => [e.key, e]));
@@ -249,10 +304,75 @@ export default function SettingsView(): React.ReactElement {
       </section>
 
       <section className="settings-section">
+        <h3>AI 助手</h3>
+        <p className="settings-description">
+          使用 DeepSeek API 为文档问答提供智能支持。密钥仅保存在本地。
+        </p>
+        <div className="settings-field-label">API Key</div>
+        <input
+          type="password"
+          className="share-search"
+          placeholder="sk-..."
+          value={aiApiKey}
+          onChange={(e) => setAiApiKey(e.target.value)}
+          style={{ marginBottom: 12 }}
+        />
+        <div className="settings-field-label">模型</div>
+        <input
+          type="text"
+          className="share-search"
+          placeholder="deepseek-chat"
+          value={aiModel}
+          onChange={(e) => setAiModel(e.target.value)}
+          style={{ marginBottom: 12 }}
+        />
+        <div className="settings-field-label">API 地址</div>
+        <input
+          type="text"
+          className="share-search"
+          placeholder="https://api.deepseek.com/v1"
+          value={aiBaseUrl}
+          onChange={(e) => setAiBaseUrl(e.target.value)}
+          style={{ marginBottom: 12 }}
+        />
+        <button
+          className="share-copy"
+          onClick={handleSaveAiConfig}
+          disabled={aiSaving}
+        >
+          {aiSaving ? "保存中…" : "保存"}
+        </button>
+        {aiSaveMsg && (
+          <p
+            className={
+              aiSaveMsg.type === "error" ? "share-error" : "share-feedback"
+            }
+          >
+            {aiSaveMsg.text}
+          </p>
+        )}
+      </section>
+
+      <section className="settings-section">
         <h3>侧栏快捷入口</h3>
         <p className="settings-description">
           拖拽手柄（⋮⋮）调整排列顺序，勾选框控制显示/隐藏。
         </p>
+        <div className="settings-field-label">显示模式</div>
+        <div className="settings-theme-toggle">
+          <button
+            className={`settings-theme-option ${sidebarMode === "integrated" ? "active" : ""}`}
+            onClick={() => setSidebarMode("integrated")}
+          >
+            融入侧栏
+          </button>
+          <button
+            className={`settings-theme-option ${sidebarMode === "separate" ? "active" : ""}`}
+            onClick={() => setSidebarMode("separate")}
+          >
+            独立图标栏
+          </button>
+        </div>
         <div className="settings-activity-list">
           {orderedEntries.map((e) => {
             const isDragSource = dragKey === e.key;

@@ -1821,6 +1821,7 @@ export default function DocumentView(): React.ReactElement {
   const api = useElectronAPI();
   const { documentId } = useParams<{ documentId: string }>();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const setCurrentDoc = useUIStore((s) => s.setCurrentDoc);
   const { user } = useUserInfo();
   const openTab = useTabsStore((s) => s.openTab);
   const updateTab = useTabsStore((s) => s.updateTab);
@@ -1866,6 +1867,14 @@ export default function DocumentView(): React.ReactElement {
       });
     }
   }, [documentId, data, updateTab]);
+
+  // Expose current document content for AI assistant context
+  useEffect(() => {
+    if (data?.data) {
+      setCurrentDoc(data.data.title ?? null, data.data.text ?? null);
+    }
+    return () => setCurrentDoc(null, null);
+  }, [data, setCurrentDoc]);
 
   if (!documentId) {
     return (

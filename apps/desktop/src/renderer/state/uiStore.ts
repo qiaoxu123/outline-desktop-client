@@ -12,6 +12,12 @@ export interface UIState {
   theme: "light" | "dark" | "system";
   /** Reading column width level 1 (narrowest) → 5 (full width). Persisted. */
   contentWidth: 1 | 2 | 3 | 4 | 5;
+  /** Whether the AI assistant chat panel is open. */
+  aiPanelOpen: boolean;
+  /** Current document title (for AI context in "current doc" mode). */
+  currentDocTitle: string | null;
+  /** Current document content (for AI context in "current doc" mode). */
+  currentDocContent: string | null;
 
   setActiveProfileId: (id: string | null) => void;
   toggleSidebar: () => void;
@@ -21,6 +27,8 @@ export interface UIState {
   selectCollection: (id: string | null) => void;
   selectDocument: (id: string | null) => void;
   setGlobalSearchOpen: (open: boolean) => void;
+  setAiPanelOpen: (open: boolean) => void;
+  setCurrentDoc: (title: string | null, content: string | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -45,6 +53,9 @@ export const useUIStore = create<UIState>((set) => ({
     const v = Number(localStorage.getItem("ui.contentWidth"));
     return v >= 1 && v <= 5 ? (v as 1 | 2 | 3 | 4 | 5) : 3;
   })(),
+  aiPanelOpen: false,
+  currentDocTitle: null,
+  currentDocContent: null,
 
   setActiveProfileId: (id) => set({ activeProfileId: id }),
   toggleSidebar: () =>
@@ -66,6 +77,9 @@ export const useUIStore = create<UIState>((set) => ({
   selectCollection: (id) => set({ selectedCollectionId: id }),
   selectDocument: (id) => set({ selectedDocumentId: id }),
   setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
+  setAiPanelOpen: (open) => set({ aiPanelOpen: open }),
+  setCurrentDoc: (title, content) =>
+    set({ currentDocTitle: title, currentDocContent: content }),
 }));
 
 /* ---------- open document tabs ---------- */

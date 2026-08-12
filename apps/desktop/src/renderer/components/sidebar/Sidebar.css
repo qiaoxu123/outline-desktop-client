@@ -38,38 +38,43 @@
   white-space: nowrap;
 }
 
-/* icon-only quick nav (under team header) */
+/* integrated nav row under team header — same style as document-icon-button */
 .sb-quick-nav {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  padding: 0 10px 6px;
+  padding: 0 8px 8px;
 }
 
-.sb-nav-item.icon-only {
+.sb-nav-icon {
   position: relative;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 6px;
-  gap: 0;
-}
-
-.sb-nav-item.icon-only svg {
-  opacity: 0.75;
-}
-
-/* divider between the content-space icons and 设置 */
-.sb-nav-divider {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: var(--color-text-muted);
-  opacity: 0.45;
-  font-size: 14px;
-  user-select: none;
-  margin: 0 1px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
 }
 
-/* unread badge shrinks to a corner dot when the entry is icon-only */
-.sb-nav-item.icon-only .sb-badge {
+.sb-nav-icon:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.sb-nav-icon.active {
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+}
+
+/* unread badge corner dot */
+.sb-nav-icon .sb-badge {
   position: absolute;
   top: 0;
   right: 0;
@@ -80,6 +85,14 @@
   margin-left: 0;
 }
 
+/* divider between the content-space icons and 设置 */
+.sb-nav-divider {
+  color: var(--color-text-muted);
+  opacity: 0.45;
+  font-size: 14px;
+  user-select: none;
+  margin: 0 1px;
+}
 
 /* primary nav */
 .sb-nav {

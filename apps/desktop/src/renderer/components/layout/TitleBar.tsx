@@ -15,6 +15,8 @@ export default function TitleBar(): React.ReactElement {
   const toggleToc = useUIStore((s) => s.toggleToc);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+  const aiPanelOpen = useUIStore((s) => s.aiPanelOpen);
+  const setAiPanelOpen = useUIStore((s) => s.setAiPanelOpen);
   const [refreshing, setRefreshing] = useState(false);
 
   // Reload server data (collections, document trees, papers, comments…) —
@@ -94,6 +96,13 @@ export default function TitleBar(): React.ReactElement {
           title={isDark ? "切换到浅色" : "切换到深色"}
         >
           <OIcon name={isDark ? "sun" : "moon"} size={18} />
+        </button>
+        <button
+          className={`titlebar-button ${aiPanelOpen ? "active" : ""}`}
+          onClick={() => setAiPanelOpen(!aiPanelOpen)}
+          title="AI 助手"
+        >
+          <OIcon name="sparkle" size={18} />
         </button>
         <a href="#/search" className="titlebar-button" title="Search">
           <OIcon name="search" size={18} />
