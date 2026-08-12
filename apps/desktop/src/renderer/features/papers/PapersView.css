@@ -214,6 +214,26 @@
   color: var(--color-warning);
 }
 
+/* open-source code badge — always tinted so papers with a public repo are
+ * spotted at a glance; links to the repo on click */
+.paper-code-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.paper-code-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+
 .paper-link-btn {
   flex-shrink: 0;
   display: flex;

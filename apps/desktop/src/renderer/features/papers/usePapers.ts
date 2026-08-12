@@ -233,6 +233,8 @@ export interface PaperMeta {
   tags: string[];
   venue: string | null;
   link: string | null;
+  /** Open-source repo URL (parsed from the 代码仓库 row) — shown as a code badge. */
+  code: string | null;
   authors: string | null;
   org: string | null;
   /** English paper title (from the 论文标题 row) — titles in the library are
@@ -276,6 +278,8 @@ export function parsePaperMeta(text: string): PaperMeta {
   const rawTags = pick("领域", "方向", "标签");
   const rawLink = pick("论文链接", "链接");
   const linkMatch = rawLink ? /\((https?:\/\/[^)]+)\)/.exec(rawLink) : null;
+  const rawCode = pick("代码仓库", "代码", "源码", "GitHub");
+  const codeMatch = rawCode ? /\((https?:\/\/[^)]+)\)/.exec(rawCode) : null;
   return {
     tags: rawTags
       ? rawTags
@@ -285,6 +289,7 @@ export function parsePaperMeta(text: string): PaperMeta {
       : [],
     venue: pick("发表时间", "发表", "venue"),
     link: linkMatch?.[1] ?? (rawLink && /^https?:/.test(rawLink) ? rawLink : null),
+    code: codeMatch?.[1] ?? (rawCode && /^https?:/.test(rawCode) ? rawCode : null),
     authors: pick("作者"),
     org: pick("机构"),
     enTitle: normalizeEnTitle(

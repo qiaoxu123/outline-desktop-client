@@ -215,6 +215,18 @@ function PaperRow({
         )}
       </div>
 
+      {meta?.code && (
+        <button
+          className="paper-code-btn"
+          title="开源代码仓库"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(meta.code!);
+          }}
+        >
+          <OIcon name="code" size={16} />
+        </button>
+      )}
       {meta?.link && (
         <button
           className="paper-link-btn"
