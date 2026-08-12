@@ -1,3 +1,16 @@
+## [1.19.0] - 2026-08-12
+
+### Features
+- **论文库开源代码标记**：元信息表新增「代码仓库」行解析（`parsePaperMeta` → `PaperMeta.code`），论文库每行对有公开仓库的论文渲染 `</>` 徽标（主色高亮、点击跳 GitHub）。示例：UA-NWM（arXiv:2608.05597）已标记。
+
+### Fixes
+- **讨论区置顶帖重复下划线**：分隔条的 `border-top` 叠加最后一条置顶帖的 `border-bottom` 造成视觉重影，且「—— 以下为普通帖子 ——」文案别扭。改为置顶区与普通帖之间空一行（纯空白间隔），移除文案。
+- **AI 助手 typecheck 错误（发布阻断）**：`AIAssistantPanel` 知识库搜索调用 `api.call(activeProfileId, …)` 未收窄 null，导致 `npm run typecheck` 失败，Release 流水线（release.yml 的 Type check 步骤）三平台全挂、v1.18.0 未产出安装包。补非空断言修复。
+- **文档段落间距微调**：正文段落 `1em → 0.6em`、标题外边距收紧，阅读更紧凑。
+
+### Notes & Caveats
+- 自动发版机制：push `v*` tag 即触发 `.github/workflows/release.yml`，三平台（mac/win/linux，x64+arm64）并行构建安装包并单次上传 GitHub Release。以后发版只需 `git push origin vX.Y.Z`。
+
 ## [1.17.0] - 2026-07-28
 
 ### Fixes
