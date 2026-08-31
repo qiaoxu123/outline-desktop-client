@@ -1,0 +1,72 @@
+# Official Web 全量融合设计
+
+## 目标
+
+将 `vendor/outline-web` 作为唯一产品实现，完整迁移原桌面端中论文库与讨论区的业务能力，并使桌面壳层、认证、profile、API 代理和构建流程与官方 Web 运行时连通。`apps/desktop/src/renderer` 不再作为产品入口或并行实现，仅在迁移期间作为能力参考，完成后删除已迁移的旧实现。
+
+## 设计原则
+
+- 视觉和交互优先复用 Outline Web 现有的 `Scene`、布局、列表、按钮、菜单、弹窗、主题变量和响应式约定。
+- 业务数据统一走官方 Web 的 `ApiClient`；桌面专属能力统一通过一个兼容官方 `DesktopBridge` 的 preload bridge 提供。
+- profile 是运行时上下文，不使用固定的第一个 profile；切换 profile 时同步更新 API 代理、认证状态和本地扩展数据。
+- 论文库和讨论区是 Outline 文档/集合之上的扩展视图，不复制文档编辑器和评论系统。
+- 所有网络安全策略保持最小权限：不通过全局证书放宽绕过 TLS 校验，不把 API key 暴露给 renderer。
+
+## 运行时架构
+
+### 桌面壳层
+
+Electron 主进程继续负责窗口、协议和 API 代理。`outline://app` 提供官方 Web 静态资源；API 请求根据当前 profile 转发到对应 Outline server，并注入 Bearer token。preload 同时提供官方 Web 需要的 `DesktopBridge` 能力和桌面端必要的安全操作，内部实现复用现有 IPC，不暴露 token。
+
+需要覆盖的 bridge 能力包括：当前平台和版本、退出登录、外部链接/路由跳转、窗口焦点、标题栏双击、通知、拼写语言、profile/host 配置、更新相关的兼容 no-op，以及官方 Web 当前实际调用到的其他方法。
+
+### Profile 上下文
+
+主进程维护一个明确的 active profile 状态。协议 handler 和 API 代理不能再调用 `readProfiles()[0]`，而应使用由 renderer 选择并通过受控 IPC 设置的 profile id；若没有有效 profile，官方 Web 进入登录流程。切换 profile 后应清理或隔离对应的 Web session 数据，避免不同服务器的 cookie、缓存和 WebSocket 状态串线。
+
+### 构建链路
+
+根目录恢复桌面 monorepo 的 scripts/workspaces；官方 Web 作为本地 source workspace 或明确的构建依赖参与构建。桌面构建必须能在干净 checkout 中先构建官方 Web，再复制并注入桌面运行时环境，不能依赖被 `.gitignore` 忽略且预先存在的 `vendor/outline-web/build`。
+
+## 论文库
+
+在 `vendor/outline-web/app/scenes/Papers` 中重建原能力，但使用官方 Web 组件和数据模式：
+
+- 解析推荐阅读目录、精选专题、组内工作等既有集合/文档树；支持分页和缓存，避免一次性 fan-out 请求。
+- 保留论文标题、作者、机构、发表时间、领域标签、论文链接、代码仓库等元数据解析。
+- 提供搜索、标签/年份/专题筛选、排序、最近阅读和已读状态。
+- 提供代码仓库快捷入口和论文文档跳转。
+- 迁移论文点赞、评分、浏览量和关系图；共享数据继续使用现有 WebDAV/API 约定，并隔离到 profile。
+- 所有列表、筛选条、统计卡片和空状态遵循 Outline Web 的主题与响应式布局，不创建与官方 shell 风格冲突的独立卡片系统。
+
+纯函数解析和树遍历逻辑拆成可测试模块；网络 hook 只负责请求和缓存，scene 只负责组合 UI。
+
+## 讨论区
+
+在 `vendor/outline-web/app/scenes/Discuss` 中迁移原讨论能力：
+
+- 自动解析或创建论坛集合，兼容“论坛空间”和“讨论区”两个历史名称。
+- 支持版块树、主题列表、搜索、按发布时间排序和真实回复活动提示。
+- 支持创建主题、删除主题、打开主题文档、官方评论回复、置顶/取消置顶。
+- 迁移点赞、浏览数、已读/未读和侧栏数量提示。
+- 主题详情复用官方文档页和评论面板，不另造一套评论编辑器。
+- 发帖和回复权限以官方用户角色和 collection permission 为准；错误状态使用官方 toast/notice 组件。
+
+## 旧实现处理
+
+迁移期间可以参考 `apps/desktop/src/renderer/features/papers`、`discuss` 和相关共享解析代码，但不再把它们挂载到 Electron 主窗口。每完成一项能力，添加对应官方 Web 单测或组件测试；验证通过后删除重复入口、重复样式和仅服务旧 renderer 的代码，避免两套实现继续漂移。
+
+## 错误处理与安全
+
+- API 代理只允许 `outline://app` 内部请求，目标 server 必须来自当前 profile。
+- API key 只存在主进程和受控存储中；renderer 只得到结果，不得到 token。
+- 证书校验保持系统默认行为；如确有私有 CA 需求，提供明确的受控配置，不使用 session 级 `cb(0)`。
+- 网络错误、权限错误、空数据和 profile 切换失败都使用官方 Web 的可见错误反馈，不静默显示空页面。
+
+## 验证标准
+
+- 干净环境可完成官方 Web 构建、桌面构建和打包。
+- `apps/desktop` typecheck、lint、单测通过；官方 Web 的相关 typecheck/test 通过。
+- 手工验证登录、退出、多 profile 切换、重启恢复、论文库主要筛选/跳转/互动、讨论区发帖/置顶/回复/未读。
+- macOS 优先验证标题栏、窗口拖拽、外部链接、附件和认证；Windows/Linux 至少完成构建与基本启动验证。
+- 视觉验收以 Outline Web 默认主题和暗色主题为基线，检查窄窗口下的列表、筛选、空状态和详情联动。
