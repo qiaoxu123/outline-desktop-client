@@ -11,16 +11,18 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build:official-web": "npm run vite:build --prefix ../../vendor/outline-web",
+    "build": "npm run build:official-web && electron-vite build && npm run prepare-official-web",
+    "prepare-official-web": "node scripts/prepare-official-web.mjs",
     "preview": "electron-vite preview",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dist": "electron-vite build && electron-builder",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win",
-    "dist:linux": "electron-vite build && electron-builder --linux"
+    "dist": "electron-vite build && npm run prepare-official-web && electron-builder",
+    "dist:mac": "electron-vite build && npm run prepare-official-web && electron-builder --mac",
+    "dist:win": "electron-vite build && npm run prepare-official-web && electron-builder --win",
+    "dist:linux": "electron-vite build && npm run prepare-official-web && electron-builder --linux"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
