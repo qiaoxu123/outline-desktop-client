@@ -1,11 +1,14 @@
 import { ipcMain, BrowserWindow, session, type Session } from "electron";
 import { z } from "zod";
 
-const OUTLINE_URL = "https://notes.jlu-mcns.site";
-
 // Outline CSRF double-submit constants (shared/constants.ts in outline/outline)
 const CSRF_COOKIE = "csrfToken";
 const CSRF_HEADER = "x-csrf-token";
+
+/** Strip a trailing slash and whitespace so serverUrl variants normalize. */
+function normalizeBase(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
 
 function ok<T>(data: T) {
   return { ok: true as const, data };
@@ -35,13 +38,39 @@ function fail(code: string, message: string) {
 
 function authSession(): Session {
   const ses = session.defaultSession;
-  // Accept the server cert (chain root may be absent from the bundled CA store)
-  ses.setCertificateVerifyProc((_request, cb) => cb(0));
   return ses;
 }
 
-async function getCookieValue(ses: Session, name: string): Promise<string | null> {
-  const cookies = await ses.cookies.get({ url: OUTLINE_URL, name });
+/**
+ * Public login endpoints occasionally reset a TLS connection while the
+ * server/proxy is rotating an upstream connection. Retry only transport
+ * failures; HTTP responses (including auth errors) must be handled normally.
+ */
+async function fetchWithRetry(
+  ses: Session,
+  url: string,
+  init: Parameters<Session["fetch"]>[1],
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await ses.fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 350 : 900));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("网络连接失败");
+}
+
+async function getCookieValue(
+  ses: Session,
+  base: string,
+  name: string,
+): Promise<string | null> {
+  const cookies = await ses.cookies.get({ url: base, name });
   return cookies[0]?.value ?? null;
 }
 
@@ -74,8 +103,12 @@ const NOTICE_MESSAGES: Record<string, string> = {
   "suspended": "该账号已被停用，请联系管理员。",
 };
 
-const EmailSchema = z.object({ email: z.string().email() });
+const EmailSchema = z.object({
+  serverUrl: z.string().min(1),
+  email: z.string().email(),
+});
 const CompleteSchema = z.object({
+  serverUrl: z.string().min(1),
   input: z.string().min(1),
   email: z.string().email().optional(),
 });
@@ -86,23 +119,24 @@ export function registerAuthHandlers(): void {
   ipcMain.handle("auth:requestEmailLogin", async (_event, payload: unknown) => {
     const parsed = EmailSchema.safeParse(payload);
     if (!parsed.success) {
-      return fail("VALIDATION", "请输入有效的邮箱地址");
+      return fail("VALIDATION", "请输入有效的服务器地址和邮箱地址");
     }
 
+    const base = normalizeBase(parsed.data.serverUrl);
     const ses = authSession();
 
     try {
       // GET the site root so the server issues a csrfToken cookie into the jar
-      await ses.fetch(`${OUTLINE_URL}/`, {
+      await fetchWithRetry(ses, `${base}/`, {
         credentials: "include",
         cache: "no-store",
         headers: { Accept: "text/html" },
         signal: AbortSignal.timeout(15_000),
       });
-      const csrf = await getCookieValue(ses, CSRF_COOKIE);
+      const csrf = await getCookieValue(ses, base, CSRF_COOKIE);
 
       // POST with the cookie jar (sends csrfToken) + header echo (double-submit)
-      const response = await ses.fetch(`${OUTLINE_URL}/auth/email`, {
+      const response = await fetchWithRetry(ses, `${base}/auth/email`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -155,6 +189,7 @@ export function registerAuthHandlers(): void {
       return fail("VALIDATION", "请输入邮件中的验证码或登录链接");
     }
 
+    const base = normalizeBase(parsed.data.serverUrl);
     const input = parsed.data.input.trim();
     let qs: URLSearchParams | null = null;
 
@@ -183,20 +218,20 @@ export function registerAuthHandlers(): void {
 
     try {
       // Drop any stale session cookie so the jar reflects only this attempt
-      await ses.cookies.remove(OUTLINE_URL, "accessToken").catch(() => {});
+      await ses.cookies.remove(base, "accessToken").catch(() => {});
 
       // Electron's session.fetch rejects redirect:"manual" responses with
       // "Redirect was cancelled" (the net stack cancels instead of returning
       // the 302), so follow redirects and treat the cookie jar as the source
       // of truth: Set-Cookie is recorded on every hop, and the abort signal
       // bounds the case where the post-login redirect target is unreachable.
-      const url = `${OUTLINE_URL}/auth/email.callback?${qs.toString()}`;
+      const url = `${base}/auth/email.callback?${qs.toString()}`;
       console.log(`[auth] callback: GET ${url}`);
 
       let response: Response | null = null;
       let finalUrl = "";
       try {
-        response = await ses.fetch(url, {
+        response = await fetchWithRetry(ses, url, {
           credentials: "include",
           redirect: "follow",
           cache: "no-store",
@@ -211,10 +246,10 @@ export function registerAuthHandlers(): void {
         console.warn("[auth] callback fetch error (checking jar):", fetchErr);
       }
 
-      const token = await getCookieValue(ses, "accessToken");
-      if (token) {
+      const accessToken = await getCookieValue(ses, base, "accessToken");
+      if (accessToken) {
         console.log("[auth] accessToken acquired");
-        return ok({ token, cookieName: "accessToken" });
+        return ok({ token: accessToken, cookieName: "accessToken" });
       }
 
       // No session — the server redirects failures to /?notice=…
@@ -261,7 +296,15 @@ export function registerAuthHandlers(): void {
   // Fallback: interactive sign-in inside a BrowserWindow. Succeeds only when
   // a real `accessToken` session cookie appears — merely loading the login
   // page must NOT count as success.
-  ipcMain.handle("auth:loginWithBrowser", async () => {
+  ipcMain.handle("auth:loginWithBrowser", async (_event, payload: unknown) => {
+    const parsed = z
+      .object({ serverUrl: z.string().min(1) })
+      .safeParse(payload);
+    if (!parsed.success) {
+      return fail("VALIDATION", "请输入服务器地址");
+    }
+
+    const base = normalizeBase(parsed.data.serverUrl);
     const ses = authSession();
 
     let authWindow: BrowserWindow | null = new BrowserWindow({
@@ -306,7 +349,7 @@ export function registerAuthHandlers(): void {
       const checkSession = async () => {
         if (settled) return;
         try {
-          const token = await getCookieValue(ses, "accessToken");
+          const token = await getCookieValue(ses, base, "accessToken");
           if (token) {
             finish(ok({ token, cookieName: "accessToken" }));
           }
@@ -317,7 +360,7 @@ export function registerAuthHandlers(): void {
 
       w.webContents.on("did-fail-load", (_e, code, desc, url) => {
         console.error("[auth] load fail:", code, desc, url);
-        if (url === OUTLINE_URL || url === OUTLINE_URL + "/") {
+        if (url === base || url === base + "/") {
           finish(fail("LOAD_ERROR", `页面加载失败: ${desc} (${code})`));
         }
       });
@@ -339,7 +382,7 @@ export function registerAuthHandlers(): void {
         }
       });
 
-      w.loadURL(OUTLINE_URL);
+      w.loadURL(base);
     });
   });
 }

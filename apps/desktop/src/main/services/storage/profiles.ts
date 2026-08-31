@@ -47,6 +47,25 @@ export function findProfile(id: string): StoredProfile | undefined {
   return profiles.find((p) => p.id === id);
 }
 
+function activeProfilePath(): string {
+  return join(app.getPath("userData"), "active-profile.json");
+}
+
+export function readActiveProfileId(): string | null {
+  try {
+    const raw = JSON.parse(readFileSync(activeProfilePath(), "utf8")) as { id?: unknown };
+    return typeof raw.id === "string" && findProfile(raw.id) ? raw.id : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeActiveProfileId(id: string | null): void {
+  ensureDir();
+  if (id) writeFileSync(activeProfilePath(), JSON.stringify({ id }), "utf8");
+  else writeFileSync(activeProfilePath(), JSON.stringify({ id: null }), "utf8");
+}
+
 /** Network config for API calls from the main process */
 export interface NetworkConfig {
   caCertPath: string;

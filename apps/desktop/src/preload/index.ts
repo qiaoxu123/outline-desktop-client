@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+type DesktopCallback = (...args: any[]) => void;
+
 export interface ElectronAPI {
   profiles: {
     list: () => Promise<unknown>;
@@ -27,9 +29,13 @@ export interface ElectronAPI {
     ) => Promise<unknown>;
   };
   auth: {
-    loginWithBrowser: () => Promise<unknown>;
-    requestEmailLogin: (email: string) => Promise<unknown>;
-    completeEmailLogin: (input: string, email?: string) => Promise<unknown>;
+    loginWithBrowser: (serverUrl: string) => Promise<unknown>;
+    requestEmailLogin: (serverUrl: string, email: string) => Promise<unknown>;
+    completeEmailLogin: (
+      serverUrl: string,
+      input: string,
+      email?: string,
+    ) => Promise<unknown>;
   };
   /** WebDAV storage for the self-test quiz (paths under the shared quiz dir). */
   webdav: {
@@ -102,11 +108,12 @@ const api: ElectronAPI = {
       ipcRenderer.invoke("documents:search", { profileId, ...params }),
   },
   auth: {
-    loginWithBrowser: () => ipcRenderer.invoke("auth:loginWithBrowser"),
-    requestEmailLogin: (email) =>
-      ipcRenderer.invoke("auth:requestEmailLogin", { email }),
-    completeEmailLogin: (input, email) =>
-      ipcRenderer.invoke("auth:completeEmailLogin", { input, email }),
+    loginWithBrowser: (serverUrl) =>
+      ipcRenderer.invoke("auth:loginWithBrowser", { serverUrl }),
+    requestEmailLogin: (serverUrl, email) =>
+      ipcRenderer.invoke("auth:requestEmailLogin", { serverUrl, email }),
+    completeEmailLogin: (serverUrl, input, email) =>
+      ipcRenderer.invoke("auth:completeEmailLogin", { serverUrl, input, email }),
   },
   webdav: {
     get: (path) => ipcRenderer.invoke("webdav:get", { path }),
@@ -138,3 +145,32 @@ const api: ElectronAPI = {
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);
+
+// Compatibility bridge consumed by the official Outline Web runtime. The
+// bridge intentionally contains no credentials; sensitive work stays in IPC.
+contextBridge.exposeInMainWorld("DesktopBridge", {
+  platform: process.platform,
+  version: () => "desktop",
+  restart: async () => undefined,
+  restartAndInstall: async () => undefined,
+  checkForUpdates: async () => undefined,
+  onTitlebarDoubleClick: async () => undefined,
+  onLogout: async () => { await ipcRenderer.invoke("desktop:logout"); },
+  addCustomHost: async (host: string) => {
+    // Official Web uses this hook before navigating to a host. The desktop
+    // profile remains the source of truth; select a matching configured host
+    // when one exists and otherwise let the Web route handle the navigation.
+    await ipcRenderer.invoke("desktop:setActiveProfileByHost", host);
+  },
+  loadAuthConfig: (host: string) => ipcRenderer.invoke("desktop:loadAuthConfig", host),
+  clearConfig: async () => { await ipcRenderer.invoke("desktop:logout"); },
+  setSpellCheckerLanguages: async (_languages: string[]) => undefined,
+  setNotificationCount: async (_count: number | string) => undefined,
+  focus: (callback: DesktopCallback) => ipcRenderer.on("desktop:focus", callback),
+  blur: (callback: DesktopCallback) => ipcRenderer.on("desktop:blur", callback),
+  redirect: (callback: DesktopCallback) => ipcRenderer.on("desktop:redirect", callback),
+  updateDownloaded: (callback: DesktopCallback) => ipcRenderer.on("desktop:update-downloaded", callback),
+  openKeyboardShortcuts: (callback: DesktopCallback) => ipcRenderer.on("desktop:keyboard-shortcuts", callback),
+  goBack: () => ipcRenderer.send("desktop:history", "back"),
+  goForward: () => ipcRenderer.send("desktop:history", "forward"),
+});
