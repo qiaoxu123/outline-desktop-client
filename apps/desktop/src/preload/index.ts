@@ -156,12 +156,14 @@ contextBridge.exposeInMainWorld("DesktopBridge", {
   checkForUpdates: async () => undefined,
   onTitlebarDoubleClick: async () => undefined,
   onLogout: async () => { await ipcRenderer.invoke("desktop:logout"); },
-  addCustomHost: async (host: string) => {
+      addCustomHost: async (host: string) => {
     // Official Web uses this hook before navigating to a host. The desktop
     // profile remains the source of truth; select a matching configured host
     // when one exists and otherwise let the Web route handle the navigation.
     await ipcRenderer.invoke("desktop:setActiveProfileByHost", host);
-  },
+      },
+      webdavGet: (path: string) => ipcRenderer.invoke("webdav:get", { path }),
+      webdavPut: (path: string, content: string) => ipcRenderer.invoke("webdav:put", { path, content }),
   loadAuthConfig: (host: string) => ipcRenderer.invoke("desktop:loadAuthConfig", host),
   clearConfig: async () => { await ipcRenderer.invoke("desktop:logout"); },
   setSpellCheckerLanguages: async (_languages: string[]) => undefined,
