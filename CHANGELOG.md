@@ -1,5 +1,13 @@
 ## [1.19.0] - 2026-08-12
 
+### Unreleased
+
+- **表格编辑能力完善**：启用列宽拖拽，补齐单元格/行/列的插入、删除、表头切换、合并拆分和整表操作菜单；表格列宽及全宽状态通过兼容 markdown 阅读器的注释元数据持久化。
+- **官方 Web 单一界面迁移**：论文库、讨论区和多标签页统一接入 Outline Web 的 Router、MobX Store、ApiClient 与视觉组件，移除旧 renderer 的论文/讨论路由入口。
+- **论文库与讨论区补齐基础工作流**：论文库支持树形目录识别、元信息解析、搜索、标签/阅读状态筛选、点赞、原文与代码入口；讨论区支持版块筛选、搜索、发帖、刷新、点赞和主题多标签打开。
+- **讨论区置顶**：主题列表接入官方 `pins.list/create/delete` API，置顶主题稳定显示在列表顶部。
+- **桌面共享存储桥接**：官方 Web 的 `DesktopBridge` 增加 WebDAV 读写接口，为论文互动数据从旧 renderer 迁移到统一 Web 场景提供安全通道。
+
 ### Features
 - **论文库开源代码标记**：元信息表新增「代码仓库」行解析（`parsePaperMeta` → `PaperMeta.code`），论文库每行对有公开仓库的论文渲染 `</>` 徽标（主色高亮、点击跳 GitHub）。示例：UA-NWM（arXiv:2608.05597）已标记。
 
@@ -711,3 +719,18 @@ First tagged release. Cross-platform (macOS / Windows / Linux) Outline desktop c
 - API keys are stored in a JSON file in userData (not keychain yet). Keychain integration planned for Phase 2.
 - Offline caching, editing, tray, and mini-window are Phase 2-3 features.
 - Windows/Linux support deferred to Phase 3.
+## [1.19.0] - 2026-08-31
+### Features
+- 将 Electron renderer 切换为官方 Outline Web 源码，保留官方文档编辑器、标题编辑、表格与评论流程。
+- 在官方 Web 侧边栏内增加个人笔记、论文库、讨论区入口，入口页面与文档打开均保持在同一套 Outline 路由和 API 体系中。
+- 增加官方 Web 静态资源打包、`outline://` 本地协议和当前 Outline profile API 代理，支持桌面安装包离线加载前端资源并访问配置的远程服务。
+- 修正论文库改为读取“推荐阅读”目录树并合并论文文档，修正讨论区只读取“论坛空间/讨论区”集合并排除版块容器。
+- 导航入口改为图标模式，保留无障碍标签与悬停提示；论文库和讨论区恢复标题、说明、数量、搜索和卡片列表布局。
+
+### Design Rationale
+- 不再通过第二套 React renderer、页面跳转或 Electron business bridge 复刻文档能力，避免标题、表格和编辑器状态分裂。
+- 自定义入口只扩展官方 Router/Sidebar/ApiClient；笔记、论文和讨论主题最终仍打开官方文档编辑器。
+
+### Notes & Caveats
+- 入口列表目前基于 Outline 文档 API：个人笔记按当前用户创建的文档展示，论文库按“论文”检索，讨论区按“论坛空间”集合展示。
+- 构建桌面包时必须在 `apps/desktop` 子工程目录执行其 `dist:*` 脚本。
