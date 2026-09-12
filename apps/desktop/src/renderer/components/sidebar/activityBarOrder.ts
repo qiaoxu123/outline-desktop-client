@@ -15,7 +15,7 @@ export interface ActivityEntry {
 
 /** Canonical list — single source of truth for all Activity Bar entries. */
 export const ACTIVITY_ENTRIES: ActivityEntry[] = [
-  { key: "home", label: "主页", icon: "home", route: "/", navigate: true },
+  { key: "home", label: "官方文档", icon: "home", route: "/official", navigate: true },
   { key: "search", label: "搜索", icon: "search", route: "/search", navigate: true },
   { key: "papers", label: "论文库", icon: "academicCap", route: "/papers", navigate: true },
   { key: "notes", label: "随记", icon: "note", route: "/notes", navigate: true },

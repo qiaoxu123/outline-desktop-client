@@ -1,4 +1,4 @@
-import { SERVER_URL } from "../hooks/useOutline";
+import { getServerUrl } from "./server";
 import { unwrapIpc } from "./ipc";
 import type { ElectronAPI } from "../../preload/index";
 
@@ -16,14 +16,15 @@ interface InternalTarget {
  */
 export function parseInternalLink(href: string): InternalTarget | null {
   if (!href) return null;
+  const serverUrl = getServerUrl();
   let url: URL;
   try {
     // relative hrefs resolve against the server origin
-    url = new URL(href, SERVER_URL);
+    url = new URL(href, serverUrl);
   } catch {
     return null;
   }
-  if (url.origin !== new URL(SERVER_URL).origin) return null;
+  if (url.origin !== new URL(serverUrl).origin) return null;
 
   const doc = /^\/doc\/([^/?#]+)/.exec(url.pathname);
   if (doc) {

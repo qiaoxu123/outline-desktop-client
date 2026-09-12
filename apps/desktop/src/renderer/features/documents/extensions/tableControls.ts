@@ -261,6 +261,28 @@ export const TableControls = Extension.create({
             editor.view?.editable ? buildDecorations(state) : null,
           handleDOMEvents: { mousedown: handleGrip },
         },
+        view: () => ({
+          update: (view: EditorView) => {
+            // Tiptap's resizable TableView owns the wrapper DOM and does not
+            // copy custom table attrs. Mirror the layout attr here so the
+            // full-width command is immediately visible while editing.
+            view.state.doc.descendants((node, pos) => {
+              if (node.type.name !== "table") return;
+              const dom = view.nodeDOM(pos);
+              const table =
+                dom instanceof HTMLTableElement
+                  ? dom
+                  : dom instanceof HTMLElement
+                    ? dom.querySelector("table")
+                    : null;
+              if (!(table instanceof HTMLTableElement)) return;
+              const full = node.attrs.tableWidth === "full";
+              table.classList.toggle("table-full-width", full);
+              if (full) table.setAttribute("data-table-width", "full");
+              else table.removeAttribute("data-table-width");
+            });
+          },
+        }),
         // NB: do NOT mutate the table DOM (e.g. set CSS vars on .tableWrapper)
         // from a plugin view — that element lives inside the contenteditable, so
         // ProseMirror's MutationObserver would see the attribute change, re-run

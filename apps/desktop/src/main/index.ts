@@ -114,6 +114,17 @@ function registerAllIpcHandlers(): void {
     if (direction === "forward") win?.webContents.goForward();
   });
 
+  ipcMain.handle("desktop:titlebarDoubleClick", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return;
+
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  });
+
 }
 
 const officialScheme = "outline";

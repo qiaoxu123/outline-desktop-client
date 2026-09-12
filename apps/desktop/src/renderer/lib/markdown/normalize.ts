@@ -23,8 +23,19 @@
  */
 export function normalizeOutlineMarkdown(src: string): string {
   if (!src) return src;
-  return (
-    src
+  let inFence = false;
+  const normalizedLines = src.split("\n").map((line) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      return line;
+    }
+    // Some imported/API content contains an escaped newline in ordinary
+    // Markdown. Render it as a real line break, but do not rewrite code.
+    return inFence ? line : line.replace(/\\n/g, "\n");
+  });
+
+  return normalizedLines
+    .join("\n")
       .replace(/(!\[[^\]]*\]\([^\n)]*\))>/g, "$1\n\n>")
       // Two adjacent highlights serialize with their delimiters merged into a
       // bare inline `====` run (`==a====b==`). When the left highlight ends in
@@ -33,6 +44,5 @@ export function normalizeOutlineMarkdown(src: string): string {
       // A bare inline `====` only ever means "one highlight ends, next begins",
       // so splitting it into `== ==` lets both sides flank cleanly. Setext `===`
       // underlines sit on their own line (newline-flanked) and never match.
-      .replace(/([^\n=])====([^\n=])/g, "$1== ==$2")
-  );
+      .replace(/([^\n=])====([^\n=])/g, "$1== ==$2");
 }

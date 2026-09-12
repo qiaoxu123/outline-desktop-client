@@ -100,7 +100,7 @@ export default function Breadcrumb(): React.ReactElement {
     if (col) {
       // Forum topics navigate back to the 讨论区 board, not the raw
       // collection view — that's where the user came from.
-      const isDiscuss = col.id === discussCollectionId();
+      const isDiscuss = col.id === discussCollectionId(activeProfileId);
       crumbs.push({
         label: col.name,
         emoji: col.icon,
@@ -151,7 +151,7 @@ export default function Breadcrumb(): React.ReactElement {
 
   return (
     <nav className="breadcrumb">
-      {visible.map((c, i) => {
+      {visible.map((c) => {
         if (c === "ellipsis") {
           return (
             <span className="crumb-group" key="ellipsis">

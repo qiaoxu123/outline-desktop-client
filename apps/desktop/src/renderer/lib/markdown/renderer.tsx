@@ -193,6 +193,19 @@ export function MarkdownRenderer({
     const el = bodyRef.current;
     if (!el) return;
     el.querySelectorAll("pre.hljs").forEach((pre) => {
+      const code = pre.querySelector("code");
+      if (code && !pre.querySelector(":scope > .code-block-line-numbers")) {
+        const gutter = document.createElement("div");
+        gutter.className = "code-block-line-numbers";
+        gutter.setAttribute("aria-hidden", "true");
+        const lineCount = Math.max(1, (code.textContent ?? "").split("\n").length);
+        gutter.textContent = Array.from(
+          { length: lineCount },
+          (_item, index) => String(index + 1),
+        ).join("\n");
+        pre.classList.add("has-line-numbers");
+        pre.insertBefore(gutter, pre.firstChild);
+      }
       if (pre.querySelector(":scope > .code-block-copy")) return;
       const btn = document.createElement("button");
       btn.className = "code-block-copy";

@@ -2,7 +2,11 @@
 
 .doc-editor .ProseMirror {
   outline: none;
-  min-height: 50vh;
+  /* Scroll room for short docs lives here (was 50vh + a dead 60vh padding on
+     .document-body): the extra space is part of the contenteditable, so clicks
+     in the blank area below the last block place the cursor instead of doing
+     nothing. */
+  min-height: 60vh;
   caret-color: var(--color-text);
 }
 
@@ -35,24 +39,152 @@
 
 /* Code blocks — match Outline web (Styles.ts): border-radius 4px, 90% font-size */
 .doc-editor .ProseMirror pre {
-  background: var(--color-code-bg);
+  position: relative;
+  background: var(--color-codeblock-bg);
   border: 1px solid var(--color-code-border);
-  color: var(--color-text);
+  color: var(--color-codeblock-text);
   border-radius: 4px;
   padding: 12px 16px;
   font-family: var(--font-mono);
   font-size: 0.9em;
   line-height: 1.5;
   overflow-x: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "liga", "calt";
 }
 
-.doc-editor .ProseMirror code {
-  background: var(--color-code-bg);
-  border: 1px solid var(--color-code-border);
+/* Markdown-style language selector: always anchored inside the block instead
+   of appearing as a selection-dependent bubble menu. */
+.doc-editor .ProseMirror .code-block-node {
+  position: relative;
+  display: flow-root;
+}
+
+.code-block-language-control {
+  position: absolute;
+  bottom: 7px;
+  right: 9px;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.doc-editor .ProseMirror .code-block-node:hover .code-block-language-control,
+.doc-editor .ProseMirror .code-block-node:focus-within .code-block-language-control {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.code-block-line-number {
+  display: inline-block;
+  margin-right: 0.9ch;
+  color: var(--color-codeblock-text);
+  opacity: 0.78;
+  font-size: 0.88em;
+  line-height: inherit;
+  text-align: right;
+  user-select: none;
+  pointer-events: none;
+}
+
+.code-block-language-button {
+  min-width: 92px;
+  padding: 3px 20px 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--color-codeblock-text) 20%, transparent);
   border-radius: 4px;
-  padding: 1px 4px;
+  color: var(--color-codeblock-text);
+  background: color-mix(in srgb, var(--color-codeblock-bg) 88%, var(--color-codeblock-text));
+  font: 12px var(--font-sans);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.code-block-language-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: grid;
+  min-width: 150px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-background);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.code-block-language-option {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--color-text);
+  background: transparent;
+  font: 12px var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.code-block-language-option:hover {
+  background: var(--color-primary-light);
+}
+
+.code-block-copy {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  z-index: 1;
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--color-codeblock-text);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.code-block-copy svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.doc-editor .ProseMirror .code-block-node:hover .code-block-copy,
+.doc-editor .ProseMirror .code-block-node:focus-within .code-block-copy,
+.code-block-copy.copied {
+  opacity: 0.75;
+}
+
+.code-block-copy:hover {
+  background: color-mix(in srgb, var(--color-codeblock-text) 12%, transparent);
+  opacity: 1;
+}
+
+.doc-editor .ProseMirror :not(pre) > code {
+  background: var(--color-code-bg);
+  border: 0;
+  border-radius: 4px;
+  padding: 0.15em 0.3em;
+  color: #c44545;
   font-family: var(--font-mono);
   font-size: 0.9em;
+}
+
+:root[data-theme="dark"] .doc-editor .ProseMirror :not(pre) > code {
+  color: #ff9b9b;
 }
 
 /* Don't leak inline-code border+background into code-block content */
@@ -61,7 +193,10 @@
   border: none;
   border-radius: 0;
   padding: 0;
+  color: inherit;
   font-size: inherit;
+  white-space: inherit;
+  overflow-wrap: inherit;
 }
 
 .doc-editor .ProseMirror pre code {
@@ -425,22 +560,37 @@ body.image-resizing {
   background: rgba(255, 212, 0, 0.32);
 }
 
-/* compact tables (match Outline web) */
+/* compact tables (match Outline web)
+   垂直 margin 0.8em→0.5em：表格上方净间距从 12.8px 收到与正文段落节奏一致
+   （段落间距 0.6em=9.6px），避免表格比正文「多出一截」。 */
 .doc-editor .tableWrapper,
 .markdown-body .tableWrapper {
   overflow-x: auto;
   max-width: 100%;
-  margin: 0.8em 0;
+  margin: 0.5em 0;
 }
 
 /* Editing surface leaves room on the top/left for the grip bars + ⊕ buttons
    (which sit at negative offsets); without the padding overflow-x would clip
-   them. Read view (.markdown-body) has no grips, so no padding there. */
+   them. Read view (.markdown-body) has no grips, so no padding there.
+   编辑态 wrapper 的顶部 16px padding 已构成可见空隙，自身 margin 再留 0.5em
+   会与 grip 预留叠加——收成 0.15em（与正上方段落的收紧一致）。 */
 .doc-editor .tableWrapper {
-  padding: 18px 2px 2px 18px;
+  margin: 0.15em 0;
+  padding: 16px 2px 2px 18px;
 }
 
-.doc-editor .tableWrapper table,
+/* 表格正上方的段落/引用：底部 margin 收紧（0.15em），避免与 grip 预留的
+   16px 顶部 padding 叠加成「表格上文字空隙很大」的观感。用 :has() 只命中
+   紧跟 .tableWrapper 的前一个兄弟，其余段落间距不受影响。 */
+.doc-editor .ProseMirror > :is(p, blockquote):has(+ .tableWrapper) {
+  margin-bottom: 0.15em;
+}
+
+/* 必须让「wrapper 里的表格 margin:0」胜过 `.ProseMirror table { margin:0.8em 0 }`：
+   后者特异性相同（2 类＋1 元素）但写在后面，会把 12.8px 上边距塞回 wrapper 内
+   的表格，让编辑态表格上方凭空多出一截。加一层 .ProseMirror 提高特异性压住它。 */
+.doc-editor .ProseMirror .tableWrapper table,
 .markdown-body .tableWrapper table {
   margin: 0;
 }
@@ -467,6 +617,28 @@ body.image-resizing {
 .doc-editor .ProseMirror th {
   background: var(--color-bg-secondary);
   font-weight: 600;
+}
+
+/* Tiptap's columnResizing plugin adds this handle while the pointer is over a
+   column boundary. Keep it visible and blue so it does not get confused with
+   the row/column selection grips outside the table. */
+.doc-editor .ProseMirror .column-resize-handle {
+  right: -3px;
+  width: 6px;
+  background: var(--color-primary);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 30;
+}
+.doc-editor .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+.doc-editor .ProseMirror table.table-full-width {
+  width: 100%;
+}
+
+.doc-editor .ProseMirror tr:hover td {
+  background: color-mix(in srgb, var(--color-bg-secondary) 45%, transparent);
 }
 
 .doc-editor .ProseMirror td > p,
@@ -503,6 +675,35 @@ body.image-resizing {
   white-space: nowrap;
   text-align: left;
   transition: background 0.08s, color 0.08s;
+}
+.table-menu-toggle {
+  font-weight: 500;
+}
+.table-menu-section-label {
+  padding: 7px 10px 3px 38px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.table-menu-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 28px;
+  height: 18px;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--color-primary);
+}
+.table-menu-switch span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 .table-menu-item:hover {
   background: var(--color-bg-secondary);

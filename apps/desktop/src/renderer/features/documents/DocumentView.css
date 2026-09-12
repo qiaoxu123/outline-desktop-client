@@ -6,9 +6,10 @@
   min-height: 100%;
 }
 
-/* 3-column grid: flexible gutter | centered article | right rail pinned to
-   the edge (TOC / history / comments). Keeps the article centered while the
-   side panel sits flush against the right side. */
+/* Keep the article aligned to the reading area's left edge. The old
+   gutter|article|gutter grid created a large empty block before the document
+   on wide windows. The article now uses about 80% of the available width and
+   an optional history/comments rail uses the remainder only when present. */
 .document-layout {
   display: grid;
   grid-template-columns: 1fr minmax(0, var(--reading-col, 920px)) 1fr;
@@ -303,7 +304,7 @@
   cursor: not-allowed;
 }
 
-/* in-place title editing — looks like the title, not a form field */
+/* Active title editor */
 .document-title-input {
   flex: 1;
   min-width: 0;
@@ -317,11 +318,9 @@
   line-height: 1.3;
   color: var(--color-text);
   padding: 0;
-  /* textarea: long titles wrap instead of clipping on the right */
-  resize: none;
   overflow: hidden;
-  white-space: pre-wrap;
-  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-title-input::placeholder {
@@ -368,7 +367,8 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.document-title {
+.document-title,
+.document-title-control {
   font-size: 32px;
   font-weight: 800;
   color: var(--color-text);
@@ -377,6 +377,49 @@
   gap: 12px;
   line-height: 1.3;
   letter-spacing: -0.5px;
+}
+
+.document-title-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.document-title-trigger {
+  min-width: 0;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: text;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-title-edit-button {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 19px;
+  line-height: 1;
+  opacity: 0;
+  padding: 5px 7px;
+}
+
+.document-title-control:hover .document-title-edit-button,
+.document-title-edit-button:focus-visible {
+  opacity: 1;
+}
+
+.document-title-edit-button:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
 }
 
 .document-emoji {
@@ -398,14 +441,17 @@
   gap: 16px;
 }
 
-/* Markdown body styling to match Outline web (shared/styles/globals.ts) */
+/* Markdown body styling to match Outline web (shared/styles/globals.ts).
+   The bottom scroll room now lives on the editor's own min-height (Editor.css
+   .doc-editor .ProseMirror), so the blank space below the content stays inside
+   the contenteditable and clicks there place the cursor — a padding-bottom
+   here would make that whole strip dead (click lands outside ProseMirror). */
 .document-body {
-  font-size: var(--text-md);   /* 16px */
+  font-size: 16px;
   color: var(--color-text);
   text-rendering: optimizeLegibility;
-  line-height: 1.5;            /* web: --line-height-body */
+  line-height: 1.65;
   letter-spacing: 0.01em;
-  padding-bottom: 60vh;        /* extra scroll room so short docs can be centered */
 }
 
 /* ProseMirror paragraph spacing */
@@ -577,12 +623,17 @@
 }
 
 .document-body :not(pre) > code {
-  padding: 2px 6px;
-  background: var(--color-bg-tertiary);
+  padding: 0.15em 0.3em;
+  background: var(--color-code-bg);
   border-radius: 4px;
-  color: #d63384;
+  color: #c44545;
+  border: 0;
   font-size: 0.875em;
   font-family: var(--font-mono);
+}
+
+:root[data-theme="dark"] .document-body :not(pre) > code {
+  color: #ff9b9b;
 }
 
 /* tables: full document width like Outline web, compact cell padding.
@@ -590,15 +641,20 @@
    surrounding prose instead of looking like a smaller, separate font. */
 .document-body table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
   margin: 0.8em 0;
   font-size: inherit;
 }
 
 .document-body th,
 .document-body td {
-  padding: 5px 10px;
-  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   text-align: left;
   vertical-align: top;
   line-height: 1.6;
@@ -608,6 +664,10 @@
   background: var(--color-bg-secondary);
   font-weight: 600;
   color: var(--color-text);
+}
+
+.document-body tr:hover td {
+  background: color-mix(in srgb, var(--color-bg-secondary) 45%, transparent);
 }
 
 /* paragraphs inside cells shouldn't add vertical gaps */
@@ -793,10 +853,10 @@
 .comments-panel {
   position: sticky;
   top: 16px;
-  /* 300px 下 14px 正文一行放不下几个字，读长评论极碎；网页版评论栏约 380–420。
-     用 clamp 而非定宽：正文列是 minmax(0,…) 可被压到 0，定宽面板会在窄窗口里
-     纹丝不动、把正文挤扁。 */
-  width: clamp(280px, 30vw, 400px);
+  /* 400px 上限对 1440 窗口来说占掉太多正文空间。头像内联后单条评论不再
+     需要 26px 头像列，面板可收到 360px 而不牺牲可读性；仍用 clamp 兜底，
+     窄窗口里正文列是 minmax(0,…) 可被压到 0，定宽面板会把正文挤扁。 */
+  width: clamp(260px, 28vw, 360px);
   flex-shrink: 0;
   max-height: calc(100vh - var(--titlebar-height) - var(--breadcrumb-height) - 64px);
   display: flex;
@@ -823,18 +883,40 @@
 }
 
 .comment-item {
-  display: flex;
-  gap: 8px;
-  padding: 6px 12px;
+  padding: 6px 10px;
 }
 
-/* avatar column: fixed width so bubble text always aligns */
-.comment-avatar-col {
-  width: 26px;
+/* avatar inline with the author meta — 18px round chip, no separate column,
+   so the comment text gets the full row width */
+.comment-meta-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  overflow: hidden;
   flex-shrink: 0;
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  padding-top: 2px;
+  align-self: center;
+}
+
+.comment-meta-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.comment-meta-avatar .comment-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  font-size: 9px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
 }
 
 .comment-avatar-img,
@@ -856,8 +938,24 @@
   font-weight: 600;
 }
 
-.comment-avatar-spacer {
+/* collapsed composer stub (「写下评论…」) avatar — the <img> sits bare inside
+   a `.comment-avatar` span with no size rule, so without this it renders at
+   its natural (huge) size. Constrain it to match the comment-item avatars. */
+.comment-avatar {
   width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.comment-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* bubble card — web-style container with bg + border */
@@ -867,7 +965,7 @@
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 7px 10px;
 }
 
 /* thread reply indentation */
@@ -878,7 +976,7 @@
 .comment-meta {
   display: flex;
   gap: 6px;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: nowrap;
   margin-bottom: 2px;
 }
@@ -1084,7 +1182,7 @@
 }
 
 .comment-reply {
-  margin-left: 24px;
+  margin-left: 16px;
   border-left: 2px solid var(--color-border);
 }
 

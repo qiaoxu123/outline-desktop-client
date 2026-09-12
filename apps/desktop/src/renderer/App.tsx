@@ -1,19 +1,18 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import AppShell from "./components/layout/AppShell";
 import CollectionsView from "./features/collections/CollectionsView";
 import DocumentView from "./features/documents/DocumentView";
 import HomeView from "./features/home/HomeView";
 import SharesView from "./features/shares/SharesView";
-import DiscussView from "./features/discuss/DiscussView";
 import NotesView from "./features/notes/NotesView";
-import PapersView from "./features/papers/PapersView";
 import QuizView from "./features/quiz/QuizView";
 import SearchView from "./features/search/SearchView";
 import SettingsView from "./features/profiles/SettingsView";
 import LoginScreen from "./features/auth/LoginScreen";
 import { useUIStore, useProfileStore } from "./state/uiStore";
 import { useElectronAPI } from "./hooks/useElectronAPI";
+import { setServerUrl } from "./lib/server";
 import { Component, useEffect, useState, type ReactNode } from "react";
 
 /**
@@ -94,11 +93,48 @@ const queryClient = new QueryClient({
 
 function AppInit({ children }: { children: React.ReactNode }): React.ReactElement {
   const api = useElectronAPI();
+  const queryClient = useQueryClient();
+  const profiles = useProfileStore((s) => s.profiles);
   const setProfiles = useProfileStore((s) => s.setProfiles);
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
   const [loading, setLoading] = useState(true);
   const [loginNotice, setLoginNotice] = useState("");
+  const activeProfile = profiles.find((p) => p.id === activeProfileId);
+
+  // Changes made in Outline Web (or another client) must become visible when
+  // this desktop window returns to the foreground. The paper library uses a
+  // longer staleTime and a persisted local snapshot for instant paint, so
+  // relying on mount-time refetch alone can leave externally-created papers
+  // hidden until the user manually presses the title-bar refresh button.
+  useEffect(() => {
+    if (!activeProfileId) return;
+    let lastRefresh = 0;
+    const refreshFromServer = () => {
+      const now = Date.now();
+      if (now - lastRefresh < 15_000) return;
+      lastRefresh = now;
+      void queryClient.invalidateQueries({
+        queryKey: ["profile", activeProfileId],
+      });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshFromServer();
+    };
+    window.addEventListener("focus", refreshFromServer);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", refreshFromServer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [activeProfileId, queryClient]);
+
+  // Keep the module-level server URL (read by non-React code such as the TipTap
+  // image extension and the markdown renderer) in sync with the active
+  // profile's workspace address — covering login, profile switch and edits.
+  useEffect(() => {
+    if (activeProfile?.serverUrl) setServerUrl(activeProfile.serverUrl);
+  }, [activeProfile?.serverUrl]);
 
   // Tag the root with the OS so platform-specific CSS can adjust (e.g. Windows
   // renders text heavier than macOS antialiasing — the sidebar tightens there).
@@ -112,10 +148,17 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
 
   useEffect(() => {
     const init = async () => {
-      const r = (await api.profiles.list()) as {
+      let r: {
         ok: boolean;
         data?: { id: string; name: string; serverUrl: string; createdAt: string }[];
       };
+      try {
+        r = (await api.profiles.list()) as typeof r;
+      } catch {
+        setLoginNotice("无法加载 Outline 连接配置，请重试。");
+        setLoading(false);
+        return;
+      }
 
       if (!r.ok || !r.data || r.data.length === 0) {
         setLoading(false);
@@ -154,7 +197,7 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
         height: "100vh", fontFamily: "var(--font-sans)",
         color: "#6c757d", background: "#f5f7fa",
       }}>
-        正在连接 JLUMCNS-MEC…
+        正在连接服务器…
       </div>
     );
   }
@@ -169,6 +212,7 @@ function AppInit({ children }: { children: React.ReactNode }): React.ReactElemen
 /** Applies the chosen theme to <html data-theme>, following the OS in "system". */
 function useApplyTheme(): void {
   const theme = useUIStore((s) => s.theme);
+  const codeBlockTheme = useUIStore((s) => s.codeBlockTheme);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -177,6 +221,8 @@ function useApplyTheme(): void {
     const apply = () => {
       const dark = theme === "dark" || (theme === "system" && mq.matches);
       root.setAttribute("data-theme", dark ? "dark" : "light");
+      if (codeBlockTheme === "system") root.removeAttribute("data-code-block-theme");
+      else root.setAttribute("data-code-block-theme", codeBlockTheme);
       // Windows: match the native window-controls overlay to the titlebar bg.
       if (window.electronAPI?.platform === "win32") {
         const cs = getComputedStyle(root);
@@ -191,7 +237,7 @@ function useApplyTheme(): void {
       mq.addEventListener("change", apply);
       return () => mq.removeEventListener("change", apply);
     }
-  }, [theme]);
+  }, [theme, codeBlockTheme]);
 }
 
 export default function App(): React.ReactElement {
@@ -207,9 +253,7 @@ export default function App(): React.ReactElement {
               <Route path="/collection/:collectionId" element={<CollectionsView />} />
               <Route path="/document/:documentId" element={<DocumentView />} />
               <Route path="/shares" element={<SharesView />} />
-              <Route path="/discuss" element={<DiscussView />} />
               <Route path="/notes" element={<NotesView />} />
-              <Route path="/papers" element={<PapersView />} />
               <Route path="/quiz" element={<QuizView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/settings" element={<SettingsView />} />

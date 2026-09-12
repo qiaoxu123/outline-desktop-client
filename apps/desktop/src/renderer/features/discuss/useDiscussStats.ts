@@ -3,6 +3,7 @@ import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUIStore } from "../../state/uiStore";
 import { useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
+import { readProfileStorage, writeProfileStorage } from "../../lib/profileStorage";
 
 /**
  * Discuss-board topic likes + view counts — the forum-list counterparts of the
@@ -39,16 +40,16 @@ function parse(content: string | null | undefined): LikeData {
     return EMPTY;
   }
 }
-function readCache(): LikeData {
+function readCache(profileId: string | null): LikeData {
   try {
-    return parse(localStorage.getItem(IX_CACHE));
+    return parse(readProfileStorage(profileId, IX_CACHE));
   } catch {
     return EMPTY;
   }
 }
-function writeCache(v: LikeData): void {
+function writeCache(profileId: string | null, v: LikeData): void {
   try {
-    localStorage.setItem(IX_CACHE, JSON.stringify(v));
+    writeProfileStorage(profileId, IX_CACHE, JSON.stringify(v));
   } catch {
     /* best-effort */
   }
@@ -80,10 +81,16 @@ export function useDiscussLikes(): {
   canInteract: boolean;
 } {
   const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { user } = useUserInfo();
-  const [data, setData] = useState<LikeData>(() => readCache());
+  const [data, setData] = useState<LikeData>(() => readCache(activeProfileId));
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   const loaded = useRef(false);
+
+  useEffect(() => {
+    loaded.current = false;
+    setData(readCache(activeProfileId));
+  }, [activeProfileId]);
 
   useEffect(() => {
     if (loaded.current) return;
@@ -93,15 +100,15 @@ export function useDiscussLikes(): {
       if (res.ok && res.data?.found) {
         const remote = parse(res.data.content);
         setData(remote);
-        writeCache(remote);
+      writeCache(activeProfileId, remote);
       }
     })();
-  }, [api]);
+  }, [api, activeProfileId]);
 
   const commit = (mutate: (cur: LikeData) => LikeData) => {
     setData((prev) => {
       const next = mutate(prev);
-      writeCache(next);
+      writeCache(activeProfileId, next);
       return next;
     });
     chainRef.current = chainRef.current.then(async () => {
@@ -111,7 +118,7 @@ export function useDiscussLikes(): {
         const merged = mutate(latest);
         await api.webdav.put(IX_FILE, JSON.stringify(merged, null, 2));
         setData(merged);
-        writeCache(merged);
+        writeCache(activeProfileId, merged);
       } catch (err) {
         console.error("[discuss] like write failed:", err);
       }
@@ -145,9 +152,9 @@ interface ViewsCache {
   views: Record<string, number>;
 }
 
-function readViewsCache(): ViewsCache | null {
+function readViewsCache(profileId: string | null): ViewsCache | null {
   try {
-    const raw = localStorage.getItem(VIEWS_CACHE_KEY);
+    const raw = readProfileStorage(profileId, VIEWS_CACHE_KEY);
     return raw ? (JSON.parse(raw) as ViewsCache) : null;
   } catch {
     return null;
@@ -158,20 +165,21 @@ export function useDiscussViews(topicIds: string[]): Map<string, number> {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const [views, setViews] = useState<Record<string, number>>(
-    () => readViewsCache()?.views ?? {},
+    () => readViewsCache(activeProfileId)?.views ?? {},
   );
-  const startedRef = useRef(false);
+  const requestedIdsRef = useRef(new Set<string>());
   const key = topicIds.join(",");
 
   useEffect(() => {
-    if (!activeProfileId || topicIds.length === 0 || startedRef.current) return;
-    const cache = readViewsCache();
+    if (!activeProfileId || topicIds.length === 0) return;
+    const cache = readViewsCache(activeProfileId);
     if (cache && Date.now() - new Date(cache.savedAt).getTime() < VIEWS_REFRESH_MS) {
       return;
     }
-    startedRef.current = true;
     let cancelled = false;
-    const ids = [...topicIds];
+    const ids = topicIds.filter((id) => !requestedIdsRef.current.has(id));
+    if (ids.length === 0) return;
+    ids.forEach((id) => requestedIdsRef.current.add(id));
     void (async () => {
       const acc: Record<string, number> = { ...(cache?.views ?? {}) };
       const CONCURRENCY = 8;
@@ -196,7 +204,8 @@ export function useDiscussViews(topicIds: string[]): Map<string, number> {
         if (!cancelled) setViews({ ...acc });
       }
       try {
-        localStorage.setItem(
+        writeProfileStorage(
+          activeProfileId,
           VIEWS_CACHE_KEY,
           JSON.stringify({
             savedAt: new Date().toISOString(),
@@ -210,8 +219,12 @@ export function useDiscussViews(topicIds: string[]): Map<string, number> {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, activeProfileId, key]);
+
+  useEffect(() => {
+    requestedIdsRef.current.clear();
+    setViews(readViewsCache(activeProfileId)?.views ?? {});
+  }, [activeProfileId]);
 
   return useMemo(() => new Map(Object.entries(views)), [views]);
 }

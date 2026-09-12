@@ -27,6 +27,7 @@ import { AttachmentImage } from "./extensions/image";
 import { normalizeOutlineMarkdown } from "../../lib/markdown/normalize";
 import { TableControls } from "./extensions/tableControls";
 import { KeymapFixes } from "./extensions/keymapFixes";
+import { CodeBlockWithLanguage } from "./extensions/codeBlock";
 import { OIcon } from "../../components/outlineIcons";
 import { renderMermaidInEditor } from "../../lib/markdown/mermaid";
 import "katex/dist/katex.min.css";
@@ -110,6 +111,18 @@ function serializeTable(state: TableSerState, node: PMNode): void {
   // Emit the pending block separator (e.g. after a preceding heading) BEFORE we
   // start writing the table, otherwise the first row swallows it.
   state.flushClose?.(2);
+  // GFM has no column-width syntax. Keep widths in an HTML comment that is
+  // ignored by other markdown readers and restored by this editor on load.
+  const firstRow = node.firstChild;
+  const widths: number[] = [];
+  firstRow?.forEach((cell) => {
+    const colwidth = cell.attrs.colwidth as number[] | null | undefined;
+    for (const width of colwidth ?? []) widths.push(width);
+    if (!colwidth?.length) widths.push(0);
+  });
+  const layout = node.attrs.tableWidth === "full" ? "; layout=full" : "";
+  state.write(`<!-- outline-table: widths=${widths.join(",")}${layout} -->`);
+  state.ensureNewLine();
   node.forEach((row, _rp, rowIdx) => {
     const cells: string[] = [];
     row.forEach((cell) => {
@@ -192,6 +205,45 @@ function patchTableSerializer(editor: TiptapEditor): void {
   }
 }
 
+/** Restore column widths emitted by serializeTable. HTML comments are ignored
+ * by markdown-it, so this small post-parse pass keeps the storage format
+ * portable while retaining the editor-specific layout metadata. */
+function restoreTableWidths(editor: TiptapEditor, markdown: string): void {
+  const metadata = [...markdown.matchAll(
+    /<!--\s*outline-table:\s*widths=([0-9,\s]+)(?:;\s*layout=(full))?\s*-->/gi,
+  )].map((match) => ({
+    widths: match[1].split(",").map((value) => Number(value.trim())).filter(Number.isFinite),
+    full: match[2] === "full",
+  }));
+  if (!metadata.length) return;
+
+  let tableIndex = 0;
+  const tr = editor.state.tr;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name !== "table") return;
+    const info = metadata[tableIndex++];
+    if (!info || !node.firstChild) return;
+    const widths = info.widths;
+    if (info.full && node.attrs.tableWidth !== "full") {
+      tr.setNodeMarkup(pos, node.type, { ...node.attrs, tableWidth: "full" });
+    }
+    if (!widths.some(Boolean)) return;
+    let column = 0;
+    node.firstChild.forEach((cell, cellPos) => {
+      const colspan = cell.attrs.colspan ?? 1;
+      const cellWidths = widths.slice(column, column + colspan);
+      column += colspan;
+      if (!cellWidths.some(Boolean)) return;
+      tr.setNodeMarkup(
+        pos + 1 + cellPos,
+        cell.type,
+        { ...cell.attrs, colwidth: cellWidths },
+      );
+    });
+  });
+  if (tr.docChanged) editor.view.dispatch(tr);
+}
+
 /**
  * Underline round-trips as <u>…</u> (no standard markdown syntax; Outline
  * stores it verbatim). The read renderer + editor parser get matching <u>
@@ -222,7 +274,26 @@ const ScrollableTable = Table.extend({
       ["table", HTMLAttributes, ["tbody", 0]],
     ];
   },
-}).configure({ resizable: false });
+  addAttributes() {
+    return {
+      tableWidth: {
+        default: "content",
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute("data-table-width") || "content",
+        renderHTML: (attributes: { tableWidth?: string }) =>
+          attributes.tableWidth === "full"
+            ? { "data-table-width": "full", class: "table-full-width" }
+            : {},
+      },
+    };
+  },
+}).configure({
+  resizable: true,
+  renderWrapper: true,
+  handleWidth: 6,
+  cellMinWidth: 80,
+  lastColumnResizable: true,
+});
 
 /**
  * In-place rich text editor — TipTap (ProseMirror, the same engine Outline
@@ -249,6 +320,13 @@ export function useMarkdownEditor(
     {
       editable,
       editorProps: {
+        // Disable browser spell/grammar decorations in the writing surface;
+        // they are especially noisy for code, CJK and technical terms.
+        attributes: {
+          spellcheck: "false",
+          autocorrect: "off",
+          autocapitalize: "off",
+        },
         handlePaste: (view, event) => {
           const files = Array.from(event.clipboardData?.files ?? []);
           if (!files.length || !filesRef.current) return false;
@@ -281,7 +359,8 @@ export function useMarkdownEditor(
         },
       },
       extensions: [
-        StarterKit,
+        StarterKit.configure({ codeBlock: false }),
+        CodeBlockWithLanguage,
         // openOnClick off — handleClick above routes internal links to an in-app
         // tab and external links to the system browser.
         Link.configure({ openOnClick: false }),
@@ -335,6 +414,7 @@ export function useMarkdownEditor(
     ) {
       editor.commands.setContent(normalizeOutlineMarkdown(initialMarkdown), false);
     }
+    restoreTableWidths(editor, initialMarkdown);
   }, [editor, initialMarkdown]);
 
   return editor;
@@ -637,6 +717,7 @@ function TableMenu({ editor }: { editor: TiptapEditor }): React.ReactElement {
   }, [editor]);
 
   const sel = editor.state.selection;
+  const isCell = sel instanceof CellSelection;
   const isRow = sel instanceof CellSelection && sel.isRowSelection();
   const isCol = sel instanceof CellSelection && sel.isColSelection();
 
@@ -655,10 +736,14 @@ function TableMenu({ editor }: { editor: TiptapEditor }): React.ReactElement {
         run();
       }}
     >
-      <span className="table-menu-icon">{icon}</span>
+      <span className="table-menu-icon"><OIcon name={icon} size={18} /></span>
       <span>{label}</span>
     </button>
   );
+
+  const headerToggle = isRow || isCol
+    ? (isRow ? chain().toggleHeaderRow : chain().toggleHeaderColumn)
+    : chain().toggleHeaderCell;
 
   return (
     <BubbleMenu
@@ -666,33 +751,36 @@ function TableMenu({ editor }: { editor: TiptapEditor }): React.ReactElement {
       pluginKey="tableMenu"
       shouldShow={({ editor: ed }) => {
         const s = ed.state.selection;
-        return (
-          s instanceof CellSelection &&
-          (s.isRowSelection() || s.isColSelection())
-        );
+        return s instanceof CellSelection;
       }}
       tippyOptions={{ duration: 100, placement: "bottom-start", maxWidth: "none" }}
       className="table-menu"
     >
-      {isRow &&
-        item("⊞", "切换表头", () => chain().toggleHeaderRow().run())}
-      {isCol &&
-        item("⊞", "切换表头", () => chain().toggleHeaderColumn().run())}
-      {isRow &&
-        item("↑", "在上方插入行", () => chain().addRowBefore().run())}
-      {isRow &&
-        item("↓", "在下方插入行", () => chain().addRowAfter().run())}
-      {isCol &&
-        item("←", "在左侧插入列", () => chain().addColumnBefore().run())}
-      {isCol &&
-        item("→", "在右侧插入列", () => chain().addColumnAfter().run())}
-      {item("⿹", "合并 / 拆分单元格", () => chain().mergeOrSplit().run())}
+      <button
+        type="button"
+        className="table-menu-item table-menu-toggle"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          headerToggle().run();
+        }}
+      >
+        <span className="table-menu-icon"><OIcon name="table" size={18} /></span>
+        <span>{isRow ? "表头行" : isCol ? "表头列" : "表头单元格"}</span>
+        <span className="table-menu-switch on" aria-hidden="true"><span /></span>
+      </button>
+      <span className="table-menu-section-label">插入</span>
+      {isCell && item("arrowUp", "上方插入行", () => chain().addRowBefore().run())}
+      {isCell && item("arrowDown", "下方插入行", () => chain().addRowAfter().run())}
+      {isCell && item("arrowLeft", "左侧插入列", () => chain().addColumnBefore().run())}
+      {isCell && item("arrowRight", "右侧插入列", () => chain().addColumnAfter().run())}
       <span className="table-menu-divider" />
-      {isRow &&
-        item("🗑", "删除此行", () => chain().deleteRow().run(), true)}
-      {isCol &&
-        item("🗑", "删除此列", () => chain().deleteColumn().run(), true)}
-      {item("✕", "删除整个表格", () => chain().deleteTable().run(), true)}
+      {isCell && item("table", "合并 / 拆分单元格", () => chain().mergeOrSplit().run())}
+      {isCell && item("plus", "表格撑满编辑区", () =>
+        chain().updateAttributes("table", { tableWidth: "full" }).run())}
+      <span className="table-menu-divider" />
+      {isCell && item("trash", "删除行", () => chain().deleteRow().run(), true)}
+      {isCell && item("trash", "删除列", () => chain().deleteColumn().run(), true)}
+      {item("trash", "删除表格", () => chain().deleteTable().run(), true)}
     </BubbleMenu>
   );
 }
@@ -719,7 +807,7 @@ export function MarkdownEditorContent({
     <div ref={containerRef}>
       {editor && <SelectionToolbar editor={editor} onComment={onComment} />}
       {editor && <TableMenu editor={editor} />}
-      <EditorContent editor={editor} className="doc-editor" />
+      <EditorContent editor={editor} className="doc-editor" spellCheck={false} />
     </div>
   );
 }

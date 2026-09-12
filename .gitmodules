@@ -1,0 +1,3 @@
+[submodule "vendor/outline-web"]
+	path = vendor/outline-web
+	url = https://github.com/qiaoxu123/outline.git

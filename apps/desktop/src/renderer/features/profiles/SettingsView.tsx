@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useProfileStore, useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import {
@@ -11,7 +12,6 @@ import {
   ACTIVITY_ENTRIES,
   useActivityBarOrder,
   useSidebarMode,
-  type SidebarMode,
   type ActivityEntry,
 } from "../../components/sidebar/activityBarOrder";
 import pkg from "../../../../package.json";
@@ -32,8 +32,6 @@ function loadActivityVisible(): Set<string> {
 function saveActivityVisible(s: Set<string>): void {
   localStorage.setItem(VISIBILITY_KEY, JSON.stringify([...s]));
 }
-
-const SERVER_URL = "https://notes.jlu-mcns.site";
 
 /* ---------- drag-to-reorder row for activity entries ---------- */
 
@@ -101,6 +99,7 @@ export default function SettingsView(): React.ReactElement {
   const api = useElectronAPI();
   const profiles = useProfileStore((s) => s.profiles);
   const removeProfile = useProfileStore((s) => s.removeProfile);
+  const updateProfile = useProfileStore((s) => s.updateProfile);
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
@@ -108,6 +107,8 @@ export default function SettingsView(): React.ReactElement {
   const avatar = absoluteUrl(user?.avatarUrl);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+  const codeBlockTheme = useUIStore((s) => s.codeBlockTheme);
+  const setCodeBlockTheme = useUIStore((s) => s.setCodeBlockTheme);
   const contentWidth = useUIStore((s) => s.contentWidth);
   const setContentWidth = useUIStore((s) => s.setContentWidth);
 
@@ -115,6 +116,11 @@ export default function SettingsView(): React.ReactElement {
     { value: "light", label: "浅色" },
     { value: "dark", label: "深色" },
     { value: "system", label: "跟随系统" },
+  ];
+  const codeBlockThemeOptions: { value: "light" | "dark" | "system"; label: string }[] = [
+    { value: "system", label: "跟随主题" },
+    { value: "light", label: "浅色" },
+    { value: "dark", label: "深色" },
   ];
 
   const widthOptions: { value: 1 | 2 | 3 | 4 | 5; label: string }[] = [
@@ -128,6 +134,22 @@ export default function SettingsView(): React.ReactElement {
   const [activityVisible, setActivityVisible] = useState<Set<string>>(loadActivityVisible);
   const [order, setOrder] = useActivityBarOrder();
   const [sidebarMode, setSidebarMode] = useSidebarMode();
+
+  /* ---------- workspace server URL ---------- */
+
+  const [serverUrl, setServerUrl] = useState("");
+  const [serverSaving, setServerSaving] = useState(false);
+  const [serverMsg, setServerMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const queryClient = useQueryClient();
+
+  // Sync the editable URL with the active profile (login, profile switch, …)
+  useEffect(() => {
+    setServerUrl(activeProfile?.serverUrl ?? "");
+    setServerMsg(null);
+  }, [activeProfile?.serverUrl]);
 
   // DnD state
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -230,6 +252,54 @@ export default function SettingsView(): React.ReactElement {
     return () => window.removeEventListener("mouseup", onUp);
   }, [dragKey]);
 
+  const handleSaveServer = async () => {
+    if (!activeProfileId) return;
+    const url = serverUrl.trim().replace(/\/+$/, "");
+    if (!url || url === activeProfile?.serverUrl) return;
+    setServerSaving(true);
+    setServerMsg(null);
+    try {
+      const result = (await api.profiles.update({
+        id: activeProfileId,
+        serverUrl: url,
+      })) as { ok: boolean; error?: { message?: string } } | undefined;
+      if (!result?.ok) {
+        setServerMsg({
+          type: "error",
+          text: result?.error?.message ?? "保存失败",
+        });
+        return;
+      }
+      updateProfile(activeProfileId, { serverUrl: url });
+      setServerUrl(url);
+      setServerMsg({ type: "success", text: "已保存，正在验证凭据…" });
+      // The token may or may not be accepted by the new server — verify it
+      // and surface a re-login hint when it is rejected.
+      const v = (await api.profiles.verify(activeProfileId)) as {
+        ok: boolean;
+        data?: { valid: boolean; reason?: string };
+      };
+      if (v.ok && v.data?.valid) {
+        setServerMsg({ type: "success", text: "已保存并验证通过" });
+      } else if (v.ok && v.data && v.data.reason === "auth") {
+        setServerMsg({
+          type: "error",
+          text: "服务器已更新，但当前凭据在新服务器无效，请退出后重新登录。",
+        });
+      } else {
+        setServerMsg({ type: "success", text: "已保存" });
+      }
+      // Team/user info now comes from the new server.
+      void queryClient.invalidateQueries({
+        queryKey: ["profile", activeProfileId, "userInfo"],
+      });
+    } catch {
+      setServerMsg({ type: "error", text: "保存失败" });
+    } finally {
+      setServerSaving(false);
+    }
+  };
+
   const handleLogout = async () => {
     if (activeProfileId) {
       await api.profiles.delete(activeProfileId);
@@ -283,6 +353,19 @@ export default function SettingsView(): React.ReactElement {
               key={opt.value}
               className={`settings-theme-option ${theme === opt.value ? "active" : ""}`}
               onClick={() => setTheme(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="settings-field-label">代码块背景</div>
+        <div className="settings-theme-toggle">
+          {codeBlockThemeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              className={`settings-theme-option ${codeBlockTheme === opt.value ? "active" : ""}`}
+              onClick={() => setCodeBlockTheme(opt.value)}
             >
               {opt.label}
             </button>
@@ -402,11 +485,41 @@ export default function SettingsView(): React.ReactElement {
 
       <section className="settings-section">
         <h3>工作区</h3>
-        <div className="settings-server-info">
-          <div className="server-info-row">
-            <span className="server-info-label">服务器</span>
-            <span className="server-info-value">{SERVER_URL}</span>
-          </div>
+        <div className="settings-field-label">服务器地址</div>
+        <div className="settings-server-row">
+          <input
+            className="share-search"
+            type="text"
+            value={serverUrl}
+            onChange={(e) => {
+              setServerUrl(e.target.value);
+              setServerMsg(null);
+            }}
+            disabled={serverSaving}
+            spellCheck={false}
+            style={{ marginBottom: 0, flex: 1 }}
+          />
+          <button
+            className="share-copy"
+            onClick={() => void handleSaveServer()}
+            disabled={
+              serverSaving ||
+              serverUrl.trim().replace(/\/+$/, "") === activeProfile?.serverUrl
+            }
+          >
+            {serverSaving ? "验证中…" : "保存"}
+          </button>
+        </div>
+        {serverMsg && (
+          <p
+            className={
+              serverMsg.type === "error" ? "share-error" : "share-feedback"
+            }
+          >
+            {serverMsg.text}
+          </p>
+        )}
+        <div className="settings-server-info" style={{ marginTop: 16 }}>
           <div className="server-info-row">
             <span className="server-info-label">团队</span>
             <span className="server-info-value">

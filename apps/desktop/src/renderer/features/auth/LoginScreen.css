@@ -37,6 +37,10 @@
 .login-server-badge svg { color: #4c6ef5; flex-shrink: 0; }
 
 .login-form { text-align: center; }
+.login-field-label {
+  text-align: left; margin-bottom: 6px;
+  font-size: 12px; font-weight: 600; color: #495057;
+}
 .login-description { font-size: 14px; color: #495057; margin-bottom: 20px; line-height: 1.6; }
 .login-hint { margin-top: 16px; font-size: 12px; color: #adb5bd; line-height: 1.5; }
 

@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -22,6 +24,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install official web dependencies
+        working-directory: vendor/outline-web
+        run: corepack yarn install --immutable
 
       - name: Type check
         run: npm run typecheck

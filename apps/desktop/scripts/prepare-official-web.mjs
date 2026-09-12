@@ -1,4 +1,11 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
@@ -10,6 +17,25 @@ const target = join(desktopRoot, "out/official-web");
 await rm(target, { recursive: true, force: true });
 await mkdir(target, { recursive: true });
 await cp(source, target, { recursive: true, force: true });
+
+// The Outline server normally exposes these dictionaries through
+// /locales/:lng.json. The desktop shell does not run that server, so flatten
+// the source dictionaries into the exact URL layout expected by i18next.
+const localesSource = join(projectRoot, "vendor/outline-web/shared/i18n/locales");
+const localesTarget = join(target, "locales");
+await mkdir(localesTarget, { recursive: true });
+const localeDirectories = await readdir(localesSource, { withFileTypes: true });
+await Promise.all(
+  localeDirectories
+    .filter((entry) => entry.isDirectory())
+    .map((entry) =>
+      cp(
+        join(localesSource, entry.name, "translation.json"),
+        join(localesTarget, `${entry.name}.json`),
+        { force: true },
+      ),
+    ),
+);
 
 // Electron serves the official build through outline://app. The server normally
 // fills these placeholders; the desktop shell provides the same small runtime

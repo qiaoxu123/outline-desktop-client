@@ -4,6 +4,7 @@ import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUserInfo } from "../../hooks/useOutline";
 import { unwrapIpc } from "../../lib/ipc";
+import { readProfileStorage, writeProfileStorage } from "../../lib/profileStorage";
 import type {
   OutlineCollection,
   OutlineCollectionDocument,
@@ -44,17 +45,25 @@ export function usePapersRoot(): {
 } {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const [root, setRoot] = useState<PapersRoot | null>(() => {
-    try {
-      const raw = localStorage.getItem(ROOT_KEY);
-      return raw ? (JSON.parse(raw) as PapersRoot) : null;
-    } catch {
-      return null;
+  const [root, setRoot] = useState<PapersRoot | null>(null);
+  const [status, setStatus] = useState<"resolving" | "ready" | "error">("resolving");
+
+  useEffect(() => {
+    if (!activeProfileId) {
+      setRoot(null);
+      setStatus("resolving");
+      return;
     }
-  });
-  const [status, setStatus] = useState<"resolving" | "ready" | "error">(
-    root ? "ready" : "resolving",
-  );
+    try {
+      const raw = readProfileStorage(activeProfileId, ROOT_KEY);
+      const cached = raw ? (JSON.parse(raw) as PapersRoot) : null;
+      setRoot(cached);
+      setStatus(cached ? "ready" : "resolving");
+    } catch {
+      setRoot(null);
+      setStatus("resolving");
+    }
+  }, [activeProfileId]);
 
   useEffect(() => {
     if (root || !activeProfileId) return;
@@ -66,18 +75,26 @@ export function usePapersRoot(): {
             api.collections.list(activeProfileId),
           )
         ).data;
-        for (const col of cols ?? []) {
-          const tree = (
-            await unwrapIpc<{ data: OutlineCollectionDocument[] }>(
-              api.collections.documents(activeProfileId, col.id),
-            )
-          ).data;
+        // The root can live in any collection. Fetch the trees concurrently;
+        // the previous serial scan made the first visit wait for every
+        // collection in sequence.
+        const trees = await Promise.all(
+          (cols ?? []).map(async (col) => ({
+            collectionId: col.id,
+            tree: (
+              await unwrapIpc<{ data: OutlineCollectionDocument[] }>(
+                api.collections.documents(activeProfileId, col.id),
+              )
+            ).data,
+          })),
+        );
+        for (const { collectionId, tree } of trees) {
           const stack = [...(tree ?? [])];
           while (stack.length) {
             const node = stack.pop()!;
             if ((node.title ?? "").trim() === ROOT_TITLE) {
-              const hit = { collectionId: col.id, docId: node.id };
-              localStorage.setItem(ROOT_KEY, JSON.stringify(hit));
+              const hit = { collectionId, docId: node.id };
+              writeProfileStorage(activeProfileId, ROOT_KEY, JSON.stringify(hit));
               if (!cancelled) {
                 setRoot(hit);
                 setStatus("ready");
@@ -109,9 +126,9 @@ interface TreeCache {
   tree: OutlineCollectionDocument[];
 }
 
-function readTreeCache(collectionId: string): TreeCache | null {
+function readTreeCache(profileId: string | null, collectionId: string): TreeCache | null {
   try {
-    const raw = localStorage.getItem(TREE_CACHE_KEY);
+    const raw = readProfileStorage(profileId, TREE_CACHE_KEY);
     const cache = raw ? (JSON.parse(raw) as TreeCache) : null;
     return cache?.collectionId === collectionId ? cache : null;
   } catch {
@@ -143,7 +160,7 @@ export function usePaperEntries(root: PapersRoot | null): {
           collectionId: root!.collectionId,
           tree: res.data,
         };
-        localStorage.setItem(TREE_CACHE_KEY, JSON.stringify(cache));
+        writeProfileStorage(activeProfileId, TREE_CACHE_KEY, JSON.stringify(cache));
       } catch {
         // best-effort, same as the meta cache
       }
@@ -154,11 +171,11 @@ export function usePaperEntries(root: PapersRoot | null): {
     // 5-min query GC that made every reopen show 加载论文列表…); marked stale
     // by its saved timestamp so a silent background refresh still runs.
     initialData: () => {
-      const cache = root ? readTreeCache(root.collectionId) : null;
+      const cache = root ? readTreeCache(activeProfileId, root.collectionId) : null;
       return cache ? { data: cache.tree } : undefined;
     },
     initialDataUpdatedAt: () => {
-      const cache = root ? readTreeCache(root.collectionId) : null;
+      const cache = root ? readTreeCache(activeProfileId, root.collectionId) : null;
       return cache ? new Date(cache.savedAt).getTime() : 0;
     },
   });
@@ -220,11 +237,12 @@ export function usePaperEntries(root: PapersRoot | null): {
   if (extraData?.iwTree?.length) collectInternalWork(extraData.iwTree, papers);
   if (extraData?.featuredTree?.length)
     collectFeatured(extraData.featuredTree, null, papers);
+  const unique = [...new Map(papers.map((paper) => [paper.id, paper])).values()];
   // Newest recommendation first; undated (精选/组内工作) papers sort last.
-  papers.sort(
+  unique.sort(
     (a, b) => (b.year ?? 0) - (a.year ?? 0) || (b.month ?? 0) - (a.month ?? 0),
   );
-  return { papers, isLoading };
+  return { papers: unique, isLoading };
 }
 
 /* ---------- per-paper metadata from the attribute table ---------- */
@@ -347,9 +365,9 @@ interface MetaCache {
   metas: Record<string, PaperMeta>;
 }
 
-function readMetaCache(): MetaCache | null {
+function readMetaCache(profileId: string | null): MetaCache | null {
   try {
-    const raw = localStorage.getItem(META_CACHE_KEY);
+    const raw = readProfileStorage(profileId, META_CACHE_KEY);
     return raw ? (JSON.parse(raw) as MetaCache) : null;
   } catch {
     return null;
@@ -403,7 +421,8 @@ export function usePaperMetas(root: PapersRoot | null): {
         ...(iw ? [iw.id] : []),
         ...(featured ? [featured.id] : []),
       ];
-      for (const cid of scanIds) {
+      const scanCollection = async (cid: string) => {
+        const collectionMetas: Record<string, PaperMeta> = {};
         // 扩展学习 alone holds >1000 docs; the old 1000 cap left ~34 papers with
         // no metadata → un-dated → mis-sorted. Page far enough to cover the whole
         // collection (the inner loop still breaks early once a page is short).
@@ -420,18 +439,30 @@ export function usePaperMetas(root: PapersRoot | null): {
             // skip any leftover legacy interaction registry doc
             if ((d.title ?? "").startsWith(REGISTRY_TITLE_PREFIX)) continue;
             if (typeof d.text === "string")
-              metas[d.id] = {
+              collectionMetas[d.id] = {
                 ...parsePaperMeta(d.text),
                 updatedAt: d.updatedAt ?? null,
                 urlId: d.urlId ?? null,
-                outLinks: extractOutLinks(d.text),
+                // Only 📖 papers feed the citation graph, so only scan their
+                // full text for out-links. Skipping this for the hundreds of
+                // structural docs (year/month/index nodes) removes the bulk of
+                // the per-doc full-text regex scan that froze the main thread
+                // while the metas refetch ran.
+                outLinks:
+                  (d.title ?? "").startsWith("📖") ? extractOutLinks(d.text) : [],
               };
           }
           if (docs.length < 100) break;
         }
-      }
+        return collectionMetas;
+      };
+      // Pages within one collection remain ordered, but independent
+      // collections no longer block each other.
+      const scanned = await Promise.all(scanIds.map(scanCollection));
+      for (const collectionMetas of scanned) Object.assign(metas, collectionMetas);
       try {
-        localStorage.setItem(
+        writeProfileStorage(
+          activeProfileId,
           META_CACHE_KEY,
           JSON.stringify({
             savedAt: new Date().toISOString(),
@@ -444,20 +475,20 @@ export function usePaperMetas(root: PapersRoot | null): {
       return { metas };
     },
     enabled: !!activeProfileId && !!root,
-    // Short window so newly interpreted papers pick up their metadata (updatedAt
-    // for sorting, enTitle/tags for search) within ~30s of opening the view —
-    // 10 min was long enough that fresh papers sat un-dated at the bottom. The
-    // persisted cache still paints instantly; this only governs the background
-    // refresh cadence.
-    staleTime: 30_000,
+    // The refetch pages the whole collection with full document text (hundreds
+    // of docs → tens of MB) and parses them on the main thread — running it on
+    // every open (30s stale) is what made 论文库 lag each visit. 5 min keeps
+    // freshly interpreted papers picked up quickly while making most opens
+    // instant-from-cache (the persisted cache still paints immediately).
+    staleTime: 300_000,
     // instant paint from the persisted cache; marked stale so a background
     // refresh still happens
     initialData: () => {
-      const cache = readMetaCache();
+      const cache = readMetaCache(activeProfileId);
       return cache ? { metas: cache.metas } : undefined;
     },
     initialDataUpdatedAt: () => {
-      const cache = readMetaCache();
+      const cache = readMetaCache(activeProfileId);
       return cache ? new Date(cache.savedAt).getTime() : 0;
     },
   });
@@ -524,18 +555,18 @@ const PAPER_IX_CACHE = "papers.interactions.cache.v1";
 type IpcResult<T> = { ok: boolean; data?: T; error?: { message: string } };
 type DavGet = { found: boolean; content: string | null };
 
-function readPaperIxCache(): InteractionData {
+function readPaperIxCache(profileId: string | null): InteractionData {
   try {
-    const raw = localStorage.getItem(PAPER_IX_CACHE);
+    const raw = readProfileStorage(profileId, PAPER_IX_CACHE);
     const d = raw ? (JSON.parse(raw) as InteractionData) : null;
     return d && typeof d.papers === "object" ? d : EMPTY_INTERACTIONS;
   } catch {
     return EMPTY_INTERACTIONS;
   }
 }
-function writePaperIxCache(v: InteractionData): void {
+function writePaperIxCache(profileId: string | null, v: InteractionData): void {
   try {
-    localStorage.setItem(PAPER_IX_CACHE, JSON.stringify(v));
+    writeProfileStorage(profileId, PAPER_IX_CACHE, JSON.stringify(v));
   } catch {
     /* best-effort */
   }
@@ -557,32 +588,39 @@ export function usePaperInteractions(_root: PapersRoot | null): {
   setScore: (paperId: string, score: number | null) => void;
   canInteract: boolean;
 } {
+  void _root;
   const api = useElectronAPI();
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { user } = useUserInfo();
   const [registry, setRegistry] = useState<InteractionData>(() =>
-    readPaperIxCache(),
+    readPaperIxCache(activeProfileId),
   );
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   const loaded = useRef(false);
 
   useEffect(() => {
-    if (loaded.current) return;
+    loaded.current = false;
+    setRegistry(readPaperIxCache(activeProfileId));
+  }, [activeProfileId]);
+
+  useEffect(() => {
+    if (loaded.current || !activeProfileId) return;
     loaded.current = true;
     void (async () => {
       const res = (await api.webdav.get(PAPER_IX_FILE)) as IpcResult<DavGet>;
       if (res.ok && res.data?.found) {
         const remote = parseInteractions(res.data.content);
         setRegistry(remote);
-        writePaperIxCache(remote);
+        writePaperIxCache(activeProfileId, remote);
       }
     })();
-  }, [api]);
+  }, [api, activeProfileId]);
 
   // optimistic local mutation + read-modify-write to WebDAV
   const commit = (mutate: (cur: InteractionData) => InteractionData) => {
     setRegistry((prev) => {
       const next = mutate(prev);
-      writePaperIxCache(next);
+      writePaperIxCache(activeProfileId, next);
       return next;
     });
     chainRef.current = chainRef.current.then(async () => {
@@ -594,7 +632,7 @@ export function usePaperInteractions(_root: PapersRoot | null): {
         const merged = mutate(latest);
         await api.webdav.put(PAPER_IX_FILE, JSON.stringify(merged, null, 2));
         setRegistry(merged);
-        writePaperIxCache(merged);
+        writePaperIxCache(activeProfileId, merged);
       } catch (err) {
         console.error("[papers] interaction write failed:", err);
       }
@@ -663,9 +701,9 @@ interface ViewsCache {
   views: Record<string, number>;
 }
 
-function readViewsCache(): ViewsCache | null {
+function readViewsCache(profileId: string | null): ViewsCache | null {
   try {
-    const raw = localStorage.getItem(VIEWS_CACHE_KEY);
+    const raw = readProfileStorage(profileId, VIEWS_CACHE_KEY);
     return raw ? (JSON.parse(raw) as ViewsCache) : null;
   } catch {
     return null;
@@ -682,23 +720,24 @@ export function usePaperViews(papers: PaperEntry[]): Map<string, number> {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const [views, setViews] = useState<Record<string, number>>(
-    () => readViewsCache()?.views ?? {},
+    () => readViewsCache(activeProfileId)?.views ?? {},
   );
-  const startedRef = useRef(false);
+  const requestedIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!activeProfileId || papers.length === 0 || startedRef.current) return;
-    const cache = readViewsCache();
+    if (!activeProfileId || papers.length === 0) return;
+    const cache = readViewsCache(activeProfileId);
     if (
       cache &&
       Date.now() - new Date(cache.savedAt).getTime() < VIEWS_REFRESH_MS
     ) {
       return;
     }
-    startedRef.current = true;
     let cancelled = false;
-    const ids = papers.map((p) => p.id);
-    void (async () => {
+    const ids = papers.map((p) => p.id).filter((id) => !requestedIdsRef.current.has(id));
+    if (ids.length === 0) return;
+    ids.forEach((id) => requestedIdsRef.current.add(id));
+    const start = () => void (async () => {
       const acc: Record<string, number> = { ...(cache?.views ?? {}) };
       const CONCURRENCY = 8;
       for (let i = 0; i < ids.length; i += CONCURRENCY) {
@@ -726,7 +765,8 @@ export function usePaperViews(papers: PaperEntry[]): Map<string, number> {
         }
       }
       try {
-        localStorage.setItem(
+        writeProfileStorage(
+          activeProfileId,
           VIEWS_CACHE_KEY,
           JSON.stringify({
             savedAt: new Date().toISOString(),
@@ -737,10 +777,19 @@ export function usePaperViews(papers: PaperEntry[]): Map<string, number> {
         // best-effort
       }
     })();
+    // View counts are supplementary and have no bearing on the first paint.
+    // Let the paper rows render before starting one request per paper.
+    const idle = window.setTimeout(start, 800);
     return () => {
       cancelled = true;
+      window.clearTimeout(idle);
     };
   }, [api, activeProfileId, papers]);
+
+  useEffect(() => {
+    requestedIdsRef.current.clear();
+    setViews(readViewsCache(activeProfileId)?.views ?? {});
+  }, [activeProfileId]);
 
   return useMemo(() => new Map(Object.entries(views)), [views]);
 }
@@ -787,9 +836,10 @@ export function useReadStates(): {
   stateFor: (id: string) => ReadState;
   cycle: (id: string) => void;
 } {
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
   const [states, setStates] = useState<Record<string, ReadState>>(() => {
     try {
-      return JSON.parse(localStorage.getItem(READ_KEY) ?? "{}") as Record<
+      return JSON.parse(readProfileStorage(activeProfileId, READ_KEY) ?? "{}") as Record<
         string,
         ReadState
       >;
@@ -805,7 +855,7 @@ export function useReadStates(): {
       const next =
         READ_CYCLE[(READ_CYCLE.indexOf(current) + 1) % READ_CYCLE.length];
       const merged = { ...states, [id]: next };
-      localStorage.setItem(READ_KEY, JSON.stringify(merged));
+      writeProfileStorage(activeProfileId, READ_KEY, JSON.stringify(merged));
       setStates(merged);
     },
   };

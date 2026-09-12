@@ -2,8 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "../state/uiStore";
 import { useElectronAPI } from "./useElectronAPI";
 import { unwrapIpc } from "../lib/ipc";
-
-export const SERVER_URL = "https://notes.jlu-mcns.site";
+import { getServerUrl } from "../lib/server";
 
 /* ---------- auth.info: current user + team ---------- */
 
@@ -65,7 +64,7 @@ export function canUserEdit(user: OutlineUser | undefined): boolean {
 export function absoluteUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (/^https?:\/\//.test(url)) return url;
-  return SERVER_URL + (url.startsWith("/") ? url : `/${url}`);
+  return getServerUrl() + (url.startsWith("/") ? url : `/${url}`);
 }
 
 export function roleLabel(user: OutlineUser | undefined): string {

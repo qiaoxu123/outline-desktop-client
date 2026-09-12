@@ -3,6 +3,11 @@ import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { unwrapIpc } from "../../lib/ipc";
+import {
+  profileStorageKey,
+  readProfileStorage,
+  writeProfileStorage,
+} from "../../lib/profileStorage";
 import type {
   OutlineCollection,
   OutlineCollectionDocument,
@@ -16,8 +21,8 @@ const SEEN_KEY = "discuss.seen";
 
 /** The forum collection id, once resolved (also read by DocumentView to
  * auto-open the comments panel for forum topics). */
-export function discussCollectionId(): string | null {
-  return localStorage.getItem(COLLECTION_ID_KEY);
+export function discussCollectionId(profileId?: string | null): string | null {
+  return readProfileStorage(profileId, COLLECTION_ID_KEY);
 }
 
 /**
@@ -26,7 +31,7 @@ export function discussCollectionId(): string | null {
  */
 // Module-level in-flight guard: React StrictMode double-runs effects, and two
 // concurrent resolves once raced to CREATE the collection twice.
-let resolveInFlight: Promise<string | null> | null = null;
+const resolveInFlight = new Map<string, Promise<string | null>>();
 
 export function useDiscussCollection(): {
   collectionId: string | null;
@@ -34,12 +39,14 @@ export function useDiscussCollection(): {
 } {
   const api = useElectronAPI();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
-  const [collectionId, setCollectionId] = useState<string | null>(
-    discussCollectionId,
-  );
-  const [status, setStatus] = useState<"resolving" | "ready" | "error">(
-    collectionId ? "ready" : "resolving",
-  );
+  const [collectionId, setCollectionId] = useState<string | null>(null);
+  const [status, setStatus] = useState<"resolving" | "ready" | "error">("resolving");
+
+  useEffect(() => {
+    const cached = discussCollectionId(activeProfileId);
+    setCollectionId(cached);
+    setStatus(cached ? "ready" : "resolving");
+  }, [activeProfileId]);
 
   useEffect(() => {
     if (collectionId || !activeProfileId) return;
@@ -70,12 +77,14 @@ export function useDiscussCollection(): {
         );
         hit = created.data;
       }
-      if (hit) localStorage.setItem(COLLECTION_ID_KEY, hit.id);
+      if (hit) writeProfileStorage(activeProfileId, COLLECTION_ID_KEY, hit.id);
       return hit?.id ?? null;
     };
 
-    resolveInFlight ??= doResolve();
-    resolveInFlight
+    const existing = resolveInFlight.get(activeProfileId);
+    const request = existing ?? doResolve();
+    resolveInFlight.set(activeProfileId, request);
+    request
       .then((id) => {
         if (!cancelled && id) {
           setCollectionId(id);
@@ -83,7 +92,7 @@ export function useDiscussCollection(): {
         }
       })
       .catch(() => {
-        resolveInFlight = null; // allow a retry on next mount
+        resolveInFlight.delete(activeProfileId); // allow a retry on next mount
         if (!cancelled) setStatus("error");
       });
 
@@ -112,16 +121,25 @@ export function useTopics(collectionId: string | null): {
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { data, isLoading, error } = useQuery({
     queryKey: ["profile", activeProfileId, "discuss", collectionId],
-    queryFn: () =>
-      unwrapIpc<{ data: Topic[] }>(
-        // whole collection (topics live under category parent docs)
-        api.call(activeProfileId!, "documents.list", {
+    queryFn: async () => {
+      const all: Topic[] = [];
+      for (let offset = 0; offset < 10000; offset += 100) {
+        const page = await unwrapIpc<{
+          data: Topic[];
+          pagination?: { total?: number; nextPath?: string | null };
+        }>(api.call(activeProfileId!, "documents.list", {
           collectionId,
           sort: "updatedAt",
           direction: "DESC",
-          limit: 100, // API page cap; pagination when the board outgrows it
-        }),
-      ),
+          limit: 100,
+          offset,
+        }));
+        const docs = page.data ?? [];
+        all.push(...docs);
+        if (docs.length < 100 || (page.pagination?.total != null && all.length >= page.pagination.total)) break;
+      }
+      return { data: all };
+    },
     enabled: !!activeProfileId && !!collectionId,
     refetchInterval: 2 * 60_000,
   });
@@ -212,7 +230,10 @@ export function useTopicsWithActivity(collectionId: string | null): {
           }),
         ),
       enabled: !!activeProfileId,
-      staleTime: 60_000,
+      // One comments.list per topic (80+ topics) — a full fan-out on every open
+      // made the board stutter. 5 min so reopening is served from cache and the
+      // burst only fires when genuinely stale.
+      staleTime: 300_000,
     })),
   });
 
@@ -246,34 +267,37 @@ export function useTopicsWithActivity(collectionId: string | null): {
 const VISIT_KEY = "discuss.lastVisit";
 
 export function useDiscussNewTopicCount(): number {
-  const { topics } = useTopics(discussCollectionId());
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const { topics } = useTopics(discussCollectionId(activeProfileId));
+  const visitKey = profileStorageKey(activeProfileId, VISIT_KEY);
   const [lastVisit, setLastVisit] = useState(
-    () => localStorage.getItem(VISIT_KEY) ?? new Date().toISOString(),
+    () => localStorage.getItem(visitKey) ?? new Date().toISOString(),
   );
 
   // Initialize the watermark on first run so the badge starts quiet.
   useEffect(() => {
-    if (!localStorage.getItem(VISIT_KEY)) {
-      localStorage.setItem(VISIT_KEY, lastVisit);
+    if (!localStorage.getItem(visitKey)) {
+      localStorage.setItem(visitKey, lastVisit);
     }
-    const onVisit = () => setLastVisit(localStorage.getItem(VISIT_KEY) ?? lastVisit);
+    const onVisit = () => setLastVisit(localStorage.getItem(visitKey) ?? lastVisit);
     window.addEventListener("discuss-visited", onVisit);
     return () => window.removeEventListener("discuss-visited", onVisit);
-  }, [lastVisit]);
+  }, [lastVisit, visitKey]);
 
   return topics.filter((t) => t.createdAt > lastVisit).length;
 }
 
 export function markDiscussVisited(): void {
-  localStorage.setItem(VISIT_KEY, new Date().toISOString());
+  const profileId = useUIStore.getState().activeProfileId;
+  writeProfileStorage(profileId, VISIT_KEY, new Date().toISOString());
   window.dispatchEvent(new Event("discuss-visited"));
 }
 
 /* per-topic read watermarks */
 
-function readSeen(): Record<string, string> {
+function readSeen(profileId: string | null): Record<string, string> {
   try {
-    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}") as Record<
+    return JSON.parse(readProfileStorage(profileId, SEEN_KEY) ?? "{}") as Record<
       string,
       string
     >;
@@ -287,7 +311,10 @@ export function useTopicSeen(): {
   markSeen: (topicId: string) => void;
 } {
   const queryClient = useQueryClient();
-  const [seen, setSeen] = useState<Record<string, string>>(readSeen);
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const [seen, setSeen] = useState<Record<string, string>>(() => readSeen(activeProfileId));
+
+  useEffect(() => setSeen(readSeen(activeProfileId)), [activeProfileId]);
 
   const isUnread = useCallback(
     (topicId: string, lastActivity: string) => {
@@ -300,7 +327,7 @@ export function useTopicSeen(): {
   const markSeen = useCallback(
     (topicId: string) => {
       const next = { ...seen, [topicId]: new Date().toISOString() };
-      localStorage.setItem(SEEN_KEY, JSON.stringify(next));
+      writeProfileStorage(activeProfileId, SEEN_KEY, JSON.stringify(next));
       setSeen(next);
       void queryClient; // keep hook signature future-proof
     },

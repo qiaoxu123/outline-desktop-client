@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useUIStore } from "../../state/uiStore";
 import { OIcon } from "../outlineIcons";
 import SidebarNav from "./SidebarNav";
@@ -22,7 +22,6 @@ import { unwrapIpc } from "../../lib/ipc";
 import { sortDocsByTitle } from "../../lib/naturalSort";
 import {
   discussCollectionId,
-  useDiscussNewTopicCount,
 } from "../../features/discuss/useDiscuss";
 import DocActions, { type DocActionsHandle } from "./DocActions";
 import type {
@@ -847,6 +846,9 @@ function PersonalNotesSection(): React.ReactElement {
   const handleCreate = async (): Promise<void> => {
     if (!root) return;
     const id = await create(root);
+    // A new note should let the user name it first. Do not pass focusEditor:
+    // the editor's deferred autofocus would otherwise steal focus from the
+    // title field while the newly-created document is still mounting.
     navigate(`/document/${id}`);
   };
 
@@ -937,7 +939,6 @@ function PersonalNotesSection(): React.ReactElement {
 export default function Sidebar(): React.ReactElement {
   const api = useElectronAPI();
   const navigate = useNavigate();
-  const location = useLocation();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
   const selectedCollectionId = useUIStore((s) => s.selectedCollectionId);
   const selectCollection = useUIStore((s) => s.selectCollection);
@@ -981,7 +982,7 @@ export default function Sidebar(): React.ReactElement {
   // 讨论区 has its own dedicated nav entry — showing the raw collection here
   // too would create a confusing second click-path into the same content.
   const collections = (data?.data ?? []).filter(
-    (c) => c.id !== discussCollectionId(),
+    (c) => c.id !== discussCollectionId(activeProfileId),
   );
   const avatar = absoluteUrl(user?.avatarUrl);
 

@@ -307,7 +307,6 @@ export default function PapersView(): React.ReactElement {
       return papers.filter((p) => historyRank.has(p.id));
     return papers;
     // summaryFor closes over the interactions registry; re-run when it changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [papers, scope, historyRank, summaryFor]);
 
   const filtered = base.filter((p) => {
@@ -357,14 +356,12 @@ export default function PapersView(): React.ReactElement {
     };
     const key = cmp[sortKey];
     return [...filtered].sort((a, b) => key(b) - key(a));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, sortKey, views, summaryFor, metas, scope, historyRank]);
 
   const readCount = papers.filter((p) => stateFor(p.id) === "read").length;
   // Chip counts (cheap over ~800 papers; summaryFor/historyRank change rarely).
   const likedCount = useMemo(
     () => papers.filter((p) => summaryFor(p.id).myLike).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [papers, summaryFor],
   );
   const historyCount = useMemo(

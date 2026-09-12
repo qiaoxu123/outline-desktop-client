@@ -188,6 +188,21 @@ export const OUTLINE_ICONS: Record<string, IconEl[]> = {
     { tag: "rect", x: 5, y: 13, width: 6, height: 6, rx: 1 },
     { tag: "rect", x: 13, y: 13, width: 6, height: 6, rx: 1 },
   ],
+  arrowUp: [
+    { tag: "path", d: "M12 4L5 11h4v9h6v-9h4l-7-7Z" },
+  ],
+  arrowDown: [
+    { tag: "path", d: "M12 20l7-7h-4V4H9v9H5l7 7Z" },
+  ],
+  arrowLeft: [
+    { tag: "path", d: "M4 12l7-7v4h9v6h-9v4l-7-7Z" },
+  ],
+  arrowRight: [
+    { tag: "path", d: "M20 12l-7-7v4H4v6h9v4l7-7Z" },
+  ],
+  trash: [
+    { tag: "path", d: "M6 7h12l-1 13H7L6 7Zm3-3h6l1 2H8l1-2Zm-5 2h16v2H4V6Z" },
+  ],
   // UnderlineIcon (U + baseline bar)
   underline: [
     { tag: "path", d: "M6.5 4V11C6.5 14.0376 8.96243 16.5 12 16.5C15.0376 16.5 17.5 14.0376 17.5 11V4H15.5V11C15.5 12.933 13.933 14.5 12 14.5C10.067 14.5 8.5 12.933 8.5 11V4H6.5Z" },

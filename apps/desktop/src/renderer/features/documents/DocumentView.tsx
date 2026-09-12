@@ -26,6 +26,7 @@ import { proseToMarkdown, isRichComment, splitQuoteLead } from "./commentDoc";
 import { ShareDialog } from "./ShareDialog";
 import { openOutlineLink } from "../../lib/outlineLinks";
 import { OIcon } from "../../components/outlineIcons";
+import { DocumentTitleControl } from "./DocumentTitleControl";
 import { discussCollectionId } from "../discuss/useDiscuss";
 import { usePaperInteractions } from "../papers/usePapers";
 import QuickNotePopover from "../notes/QuickNotePopover";
@@ -614,7 +615,6 @@ function CommentItem({
   onEdit,
   saving,
   onReply,
-  firstOfAuthor,
 }: {
   comment: Comment;
   ownUserId?: string;
@@ -623,8 +623,6 @@ function CommentItem({
   onEdit: (id: string, text: string) => void;
   saving: boolean;
   onReply?: () => void;
-  /** 同一作者连续评论中仅第一条显示头像（web 行为） */
-  firstOfAuthor?: boolean;
 }): React.ReactElement {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -652,24 +650,18 @@ function CommentItem({
 
   return (
     <div className="comment-item">
-      {/* 头像列：同一作者连续评论只第一条显示 */}
-      <div className="comment-avatar-col">
-        {firstOfAuthor !== false ? (
-          url ? (
-            <img className="comment-avatar-img" src={url} alt={comment.createdBy?.name} />
-          ) : (
-            <span className="comment-avatar-fallback">
-              {(comment.createdBy?.name || "?").slice(0, 1).toUpperCase()}
-            </span>
-          )
-        ) : (
-          <div className="comment-avatar-spacer" />
-        )}
-      </div>
-
-      {/* 正文气泡 */}
+      {/* 正文气泡（头像内联在 meta 行，不再独占一列，给正文留更宽的空间） */}
       <div className="comment-bubble">
         <div className="comment-meta">
+          <span className="comment-meta-avatar" title={comment.createdBy?.name}>
+            {url ? (
+              <img className="comment-avatar-img" src={url} alt={comment.createdBy?.name} />
+            ) : (
+              <span className="comment-avatar-fallback">
+                {(comment.createdBy?.name || "?").slice(0, 1).toUpperCase()}
+              </span>
+            )}
+          </span>
           <span className="comment-author">{comment.createdBy?.name}</span>
           <span className="comment-time" title={new Date(comment.createdAt).toLocaleString()}>
             {relativeTime(comment.createdAt)}
@@ -905,13 +897,38 @@ function CommentsPanel({
     if (quote?.trim()) setComposerOpen(true);
   }, [quote]);
 
-  // Scroll the focused thread (clicked anchor in the document) into view.
+  // Scroll the focused thread into view — ALIGNED with the clicked anchor
+  // (the commented sentence) so the comment sits on the same visual line as
+  // the text, instead of jumping to the top/center of the sidebar. The anchor
+  // and the sidebar are separate scroll containers, so we adjust the sidebar
+  // scroll by the delta between their current viewport tops.
   useEffect(() => {
     if (!focusedCommentId) return;
-    const el = listRef.current?.querySelector(
+    const list = listRef.current;
+    const el = list?.querySelector(
       `[data-thread-id="${focusedCommentId}"]`,
     );
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!el || !list) return;
+    const anchor = document.querySelector<HTMLElement>(
+      `.comment-anchor[data-comment-id="${focusedCommentId}"]`,
+    );
+    if (!anchor) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    // Opening the sidebar reflows the article at medium window widths (the
+    // rail takes space), moving the anchor — so wait two frames for the layout
+    // to settle before measuring, or the thread lands off by the reflow delta.
+    let raf = 0;
+    const align = () => {
+      const anchorTop = anchor.getBoundingClientRect().top;
+      const elTop = el.getBoundingClientRect().top;
+      list.scrollTop += elTop - anchorTop;
+    };
+    requestAnimationFrame(() => {
+      raf = requestAnimationFrame(align);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [focusedCommentId, comments.length]);
 
   const topLevel = comments.filter((c) => !c.parentCommentId);
@@ -972,9 +989,8 @@ function CommentsPanel({
                 onEdit={(id, text) => editMutation.mutate({ id, text })}
                 saving={editingId === c.id}
                 onReply={() => { setReplyTo(c.id); setTimeout(() => replyRef.current?.focus(), 50); }}
-                firstOfAuthor
               />
-              {replies.map((r, ri) => (
+              {replies.map((r) => (
                 <div key={r.id} className="comment-reply">
                   <CommentItem
                     comment={r}
@@ -983,7 +999,6 @@ function CommentsPanel({
                     deleting={deleteMutation.isPending}
                     onEdit={(id, text) => editMutation.mutate({ id, text })}
                     saving={editingId === r.id}
-                    firstOfAuthor={ri === 0}
                   />
                 </div>
               ))}
@@ -1213,7 +1228,7 @@ function EditableDocument({
   // Forum topics (讨论区 collection) show replies as a full-width stream
   // under the article body instead of the side panel.
   const isDiscussTopic =
-    !!doc.collectionId && doc.collectionId === discussCollectionId();
+    !!doc.collectionId && doc.collectionId === discussCollectionId(activeProfileId);
   const inlineCommentsRef = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<
     "none" | "history" | "comments" | "info"
@@ -1226,6 +1241,7 @@ function EditableDocument({
   const [commentQuote, setCommentQuote] = useState("");
 
   const [title, setTitle] = useState(doc.title);
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
   // TOC + read-pipeline preview track the live markdown as you type.
   const [tocSource, setTocSource] = useState(doc.text);
   const [saveState, setSaveState] =
@@ -1461,6 +1477,16 @@ function EditableDocument({
     saveTimer.current = setTimeout(() => void doSave(), 1200);
   }, [doSave]);
 
+  const saveTitleImmediately = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    void doSave();
+  }, [doSave]);
+
+  const commitTitle = useCallback(() => {
+    setIsTitleEditing(false);
+    saveTitleImmediately();
+  }, [saveTitleImmediately]);
+
   // Autosave on every edit; also refresh the TOC source.
   useEffect(() => {
     if (!editor) return;
@@ -1606,32 +1632,16 @@ function EditableDocument({
                 {doc.emoji}
               </span>
             )}
-            <textarea
-              className="document-title-input"
-              value={title}
-              rows={1}
-              ref={(el) => {
-                if (el) {
-                  el.style.height = "auto";
-                  el.style.height = `${el.scrollHeight}px`;
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  // Focus the ProseMirror editor body
-                  const pm = document.querySelector(".doc-editor .ProseMirror") as HTMLElement | null;
-                  pm?.focus();
-                }
-              }}
-              onChange={(e) => {
-                setTitle(e.target.value.replace(/\n/g, " "));
-                pendingRef.current.title = e.target.value.replace(/\n/g, " ");
-                e.target.style.height = "auto";
-                e.target.style.height = `${e.target.scrollHeight}px`;
+            <DocumentTitleControl
+              title={title}
+              editing={isTitleEditing}
+              onStartEditing={() => setIsTitleEditing(true)}
+              onChange={(nextTitle) => {
+                setTitle(nextTitle);
+                pendingRef.current.title = nextTitle;
                 scheduleSave();
               }}
-              placeholder="无标题"
+              onCommit={commitTitle}
             />
           </div>
           {doc.title.startsWith("📖") && <PaperByline documentId={doc.id} />}
@@ -1700,12 +1710,13 @@ function EditableDocument({
 
 function ReadOnlyDocument({ doc }: { doc: OutlineDocument }): React.ReactElement {
   const showToc = useUIStore((s) => s.showToc);
+  const activeProfileId = useUIStore((s) => s.activeProfileId);
   const { starFor } = useStars();
   const { toggle: toggleStar, isPending: starPending } = useToggleStar();
   const star = starFor(doc.id);
   const commentCount = useComments(doc.id).comments.length;
   const isDiscussTopic =
-    !!doc.collectionId && doc.collectionId === discussCollectionId();
+    !!doc.collectionId && doc.collectionId === discussCollectionId(activeProfileId);
   const inlineCommentsRef = useRef<HTMLDivElement>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);

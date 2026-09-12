@@ -2,14 +2,14 @@
 :root {
   /* base colors */
   --color-bg: #ffffff;                      /* background */
-  --color-bg-secondary: #edf2f7;            /* warmGrey / backgroundSecondary */
-  --color-bg-tertiary: #d7e0ea;             /* backgroundTertiary */
-  --color-border: #dae1e9;                  /* slateLight / divider */
-  --color-text: #111319;                    /* almostBlack */
-  --color-text-secondary: #394351;          /* slateDark */
-  --color-text-muted: #66778f;              /* slate */
+  --color-bg-secondary: #edf2f7;
+  --color-bg-tertiary: #d7e0ea;
+  --color-border: #dae1e9;
+  --color-text: #111319;
+  --color-text-secondary: #394351;
+  --color-text-muted: #66778f;
   --color-placeholder: #a2b2c3;
-  --color-primary: #0366d6;                 /* accent */
+  --color-primary: #0366d6;
   --color-primary-hover: #0258ba;
   --color-accent: #0366d6;
   --color-danger: #ed2651;
@@ -18,13 +18,13 @@
   --color-star: #edba07;                    /* yellow */
 
   /* sidebar (Outline web) */
-  --sidebar-bg: #edf2f7;                    /* warmGrey */
+  --sidebar-bg: #edf2f7;
   --sidebar-text: rgb(78, 92, 110);
   --sidebar-hover: hsl(212 31% 90% / 1);
   --sidebar-active: hsl(212 31% 85% / 1);
 
-  --color-code-bg: #f4f7fa;                 /* smoke (inline code) */
-  --color-code-border: #e8ebed;             /* smokeDark */
+  --color-code-bg: #f1f1ef;
+  --color-code-border: transparent;
 
   /* Fenced code blocks pair with the dark highlight.js theme
      (lib/markdown/highlight-theme.css), so they stay dark in both themes;
@@ -38,8 +38,8 @@
 
   /* Font stacks. system-ui / -apple-system resolve to SF Pro on macOS for a
      native feel; Inter is intentionally omitted (not bundled). */
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Helvetica Neue", Oxygen, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", Arial, sans-serif;
   --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
     monospace;
@@ -66,14 +66,14 @@
    with the polished lighten()/darken() helpers resolved to concrete values. */
 :root[data-theme="dark"] {
   --color-bg: #111319;                      /* almostBlack / background */
-  --color-bg-secondary: #1f232e;            /* backgroundSecondary */
-  --color-bg-tertiary: #2a2f3e;             /* backgroundTertiary */
-  --color-border: #20242c;                  /* lighten(0.1, almostBlack) divider */
-  --color-text: #e6e6e6;                    /* almostWhite */
-  --color-text-secondary: #8290a0;          /* lighten(0.1, slate) */
-  --color-text-muted: #66778f;              /* slate */
+  --color-bg-secondary: #1f232e;
+  --color-bg-tertiary: #2a2f3e;
+  --color-border: #20242c;
+  --color-text: #e6e6e6;
+  --color-text-secondary: #8290a0;
+  --color-text-muted: #66778f;
   --color-placeholder: #596673;
-  --color-primary: #137ffb;                 /* dark link */
+  --color-primary: #137ffb;
   --color-primary-hover: #3b95fc;
   --color-accent: #137ffb;
   --color-danger: #ed2651;
@@ -81,10 +81,10 @@
   --color-success: #3ad984;
   --color-star: #edba07;
 
-  --sidebar-bg: #08090c;                    /* veryDarkBlue */
-  --sidebar-text: #66778f;                  /* slate */
-  --sidebar-hover: #101216;                 /* lighten(0.05, veryDarkBlue) */
-  --sidebar-active: #1a1d24;                /* lighten(0.09, veryDarkBlue) */
+  --sidebar-bg: #08090c;
+  --sidebar-text: #66778f;
+  --sidebar-hover: #101216;
+  --sidebar-active: #1a1d24;
 
   --color-code-bg: #1d202a;
   --color-code-border: rgba(255, 255, 255, 0.1);
@@ -92,6 +92,18 @@
   --color-codeblock-text: #e6e6e6;
 
   color-scheme: dark;
+}
+
+/* Optional code-block palette override. Without an override, code blocks
+   follow the application theme above. */
+:root[data-code-block-theme="light"] {
+  --color-codeblock-bg: #f6f8fa;
+  --color-codeblock-text: #24292f;
+}
+
+:root[data-code-block-theme="dark"] {
+  --color-codeblock-bg: #161821;
+  --color-codeblock-text: #e6e6e6;
 }
 
 * {
@@ -108,6 +120,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-synthesis: none;
+  line-height: 1.6;
 }
 
 /* Outline-style slim scrollbars */
@@ -299,6 +312,36 @@ body.sidebar-resizing .right-panel-resizer::after {
      Values are kept genuinely narrow so lower levels actually bite on normal
      windows (a wide cap does nothing when the window itself is narrower). */
   --reading-col: 760px; /* level 1 最窄 */
+}
+
+.official-web-redirect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: var(--color-text-muted);
+}
+
+.official-web-error {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+}
+
+.official-web-error button {
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 14px;
+  color: white;
+  background: var(--color-primary);
+  cursor: pointer;
 }
 
 .app-content[data-content-width="2"] {

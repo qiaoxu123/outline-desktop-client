@@ -27,8 +27,15 @@ function timeAgo(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} 小时前`;
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d} 天前`;
-  return new Date(iso).toLocaleDateString();
+  // 超过一周：不再显示「N 天前」，改为具体发表时间（日期 + 时刻）
+  if (d < 7) return `${d} 天前`;
+  return new Date(iso).toLocaleString(undefined, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function TopicRow({
@@ -178,16 +185,34 @@ export default function DiscussView(): React.ReactElement {
   const [title, setTitle] = useState("");
   const [composeCategory, setComposeCategory] = useState<string>(UNCATEGORIZED);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Opening the board clears the sidebar "new topics" badge.
   useEffect(() => {
     markDiscussVisited();
   }, []);
 
-  const invalidateTopics = () =>
-    void queryClient.invalidateQueries({
-      queryKey: ["profile", activeProfileId, "discuss", collectionId],
-    });
+  const invalidateTopics = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["profile", activeProfileId, "discuss", collectionId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["profile", activeProfileId, "comments"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["profile", activeProfileId, "views"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["profile", activeProfileId, "discuss", collectionId, "pins"],
+        }),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const createTopic = useMutation({
     mutationFn: async (topicTitle: string) => {
@@ -216,7 +241,7 @@ export default function DiscussView(): React.ReactElement {
   const deleteTopic = useMutation({
     mutationFn: (id: string) =>
       unwrapIpc(api.call(activeProfileId!, "documents.delete", { id })),
-    onSuccess: invalidateTopics,
+    onSuccess: () => void invalidateTopics(),
   });
 
   const openTopic = (id: string) => {
@@ -244,10 +269,11 @@ export default function DiscussView(): React.ReactElement {
         <div className="discuss-header-actions">
           <button
             className="document-button subtle"
-            onClick={invalidateTopics}
+            onClick={() => void invalidateTopics()}
+            disabled={refreshing}
             title="刷新列表"
           >
-            刷新
+            {refreshing ? "刷新中…" : "刷新"}
           </button>
           <button
             className="document-button primary"

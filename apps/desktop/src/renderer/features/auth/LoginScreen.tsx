@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useProfileStore, useUIStore } from "../../state/uiStore";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
+import { DEFAULT_SERVER_URL } from "../../lib/server";
 import "./LoginScreen.css";
-
-const SERVER_NAME = "JLUMCNS-MEC";
-const SERVER_URL = "https://notes.jlu-mcns.site";
 
 type IpcResult<T> = {
   ok: boolean;
@@ -13,6 +11,15 @@ type IpcResult<T> = {
 };
 
 type Step = "email" | "link";
+
+/** Derive a short profile name from a server URL (hostname, port dropped). */
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url.replace(/^https?:\/\//, "").split("/")[0] || "Outline";
+  }
+}
 
 export default function LoginScreen({
   notice = "",
@@ -24,25 +31,31 @@ export default function LoginScreen({
   const setActiveProfileId = useUIStore((s) => s.setActiveProfileId);
 
   const [step, setStep] = useState<Step>("email");
+  const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [email, setEmail] = useState("");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState(notice);
 
+  const serverName = hostnameOf(serverUrl);
+
   const saveProfile = async (token: string) => {
     setStatus("正在保存登录信息…");
+    // Normalize the trailing slash so profiles.json and the store agree with
+    // the main process (profiles:create strips it too).
+    const url = serverUrl.trim().replace(/\/+$/, "");
     const createResult = (await api.profiles.create({
-      name: SERVER_NAME,
-      serverUrl: SERVER_URL,
+      name: serverName,
+      serverUrl: url,
       apiKey: token,
     })) as IpcResult<{ id: string }>;
 
     if (createResult.ok && createResult.data) {
       addProfile({
         id: createResult.data.id,
-        name: SERVER_NAME,
-        serverUrl: SERVER_URL,
+        name: serverName,
+        serverUrl: url,
         createdAt: new Date().toISOString(),
       });
       setActiveProfileId(createResult.data.id);
@@ -53,13 +66,14 @@ export default function LoginScreen({
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || busy) return;
+    if (!email.trim() || !serverUrl.trim() || busy) return;
     setBusy(true);
     setError("");
     setStatus("正在发送登录邮件…");
 
     try {
       const result = (await api.auth.requestEmailLogin(
+        serverUrl.trim(),
         email.trim(),
       )) as IpcResult<{ sent: boolean }>;
 
@@ -85,6 +99,7 @@ export default function LoginScreen({
 
     try {
       const result = (await api.auth.completeEmailLogin(
+        serverUrl.trim(),
         link.trim(),
         email.trim(),
       )) as IpcResult<{ token: string }>;
@@ -109,9 +124,9 @@ export default function LoginScreen({
     setStatus("已打开登录窗口，请在窗口中完成登录…");
 
     try {
-      const result = (await api.auth.loginWithBrowser()) as IpcResult<{
-        token: string;
-      }>;
+      const result = (await api.auth.loginWithBrowser(
+        serverUrl.trim(),
+      )) as IpcResult<{ token: string }>;
 
       if (result.ok && result.data?.token) {
         await saveProfile(result.data.token);
@@ -138,13 +153,13 @@ export default function LoginScreen({
         </div>
 
         <h1 className="login-title">Outline Desktop</h1>
-        <p className="login-subtitle">JLUMCNS-MEC 知识库</p>
+        <p className="login-subtitle">{serverName} 知识库</p>
 
         <div className="login-server-badge">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm3.5 5h-1.687a5.993 5.993 0 00-1.22-3.368A5.508 5.508 0 0111.5 6zm-7 0h1.687a5.993 5.993 0 011.22-3.368A5.508 5.508 0 014.5 6zM8 2.158A4.508 4.508 0 019.198 4.5H6.802A4.508 4.508 0 018 2.158z" />
           </svg>
-          <span>{SERVER_URL}</span>
+          <span>{serverUrl}</span>
         </div>
 
         {(error || status) && (
@@ -155,6 +170,17 @@ export default function LoginScreen({
 
         {step === "email" ? (
           <form className="login-form" onSubmit={handleSendEmail}>
+            <div className="login-field-label">服务器地址</div>
+            <input
+              className="login-input"
+              type="text"
+              placeholder="https://outline.example.com"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              disabled={busy}
+              spellCheck={false}
+              autoCapitalize="off"
+            />
             <p className="login-description">
               输入你的邮箱，我们会发送一封包含登录链接的邮件。
             </p>

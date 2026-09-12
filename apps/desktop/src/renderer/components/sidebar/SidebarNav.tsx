@@ -1,12 +1,10 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useUIStore } from "../../state/uiStore";
 import { OIcon } from "../outlineIcons";
 import { useDiscussNewTopicCount } from "../../features/discuss/useDiscuss";
 import {
   ACTIVITY_ENTRIES,
   useActivityBarOrder,
   type ActivityEntry,
-  useSidebarMode,
 } from "./activityBarOrder";
 
 const VISIBILITY_KEY = "ui.activityBar.visible";

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { useUIStore } from "../../state/uiStore";
+import { useUIStore, useProfileStore } from "../../state/uiStore";
 import { OIcon } from "../../components/outlineIcons";
 import { useElectronAPI } from "../../hooks/useElectronAPI";
 import { useUserInfo, canUserEdit } from "../../hooks/useOutline";
@@ -31,6 +31,9 @@ export default function CollectionsView(): React.ReactElement {
   const navigate = useNavigate();
   const { collectionId } = useParams<{ collectionId?: string }>();
   const activeProfileId = useUIStore((s) => s.activeProfileId);
+  const activeProfile = useProfileStore((s) =>
+    s.profiles.find((p) => p.id === activeProfileId),
+  );
   const [tab, setTab] = useState<"overview" | "docs">("overview");
 
   // reset to the overview tab whenever the collection changes
@@ -75,7 +78,7 @@ export default function CollectionsView(): React.ReactElement {
               />
             </svg>
           </div>
-          <h2>JLUMCNS-MEC Knowledge Base</h2>
+          <h2>{activeProfile?.name ?? "Outline"} Knowledge Base</h2>
           <p>
             Select a collection from the sidebar to browse documents, or use
             search to find specific content.

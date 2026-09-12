@@ -15,8 +15,6 @@ const ChatMessageSchema = z.object({
   content: z.string(),
 });
 
-const GetConfigSchema = z.object({}).optional();
-
 const SetConfigSchema = z.object({
   apiKey: z.string().optional(),
   model: z.string().optional(),

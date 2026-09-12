@@ -91,12 +91,39 @@
   background: transparent;
 }
 
-/* 语言标签（左上角） */
+.markdown-body pre.hljs {
+  padding: 16px 20px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "liga", "calt";
+}
+
+.markdown-body pre.hljs .code-block-line-numbers {
+  position: absolute;
+  top: 16px;
+  left: 12px;
+  color: var(--color-codeblock-text);
+  opacity: 0.78;
+  line-height: inherit;
+  text-align: right;
+  user-select: none;
+  pointer-events: none;
+}
+
+.markdown-body pre.hljs code {
+  white-space: inherit;
+  overflow-wrap: inherit;
+}
+
+/* 语言标签（右下角，代码块悬停时显示） */
 .markdown-body .hljs[data-lang]::before {
   content: attr(data-lang);
   position: absolute;
-  top: 7px;
-  left: 12px;
+  top: auto;
+  left: auto;
+  right: 12px;
+  bottom: 7px;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -104,6 +131,12 @@
   text-transform: lowercase;
   pointer-events: none;
   user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.markdown-body .hljs[data-lang]:hover::before {
+  opacity: 1;
 }
 
 /* 复制按钮（右上角，hover 时显现） */

@@ -10,6 +10,8 @@ export interface UIState {
   showToc: boolean;
   /** Color theme (persisted). "system" follows OS preference. */
   theme: "light" | "dark" | "system";
+  /** Code block palette. "system" follows the selected app theme. */
+  codeBlockTheme: "light" | "dark" | "system";
   /** Reading column width level 1 (narrowest) → 5 (full width). Persisted. */
   contentWidth: 1 | 2 | 3 | 4 | 5;
   /** Whether the AI assistant chat panel is open. */
@@ -23,6 +25,7 @@ export interface UIState {
   toggleSidebar: () => void;
   toggleToc: () => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
+  setCodeBlockTheme: (theme: "light" | "dark" | "system") => void;
   setContentWidth: (level: 1 | 2 | 3 | 4 | 5) => void;
   selectCollection: (id: string | null) => void;
   selectDocument: (id: string | null) => void;
@@ -37,9 +40,21 @@ export const useUIStore = create<UIState>((set) => ({
   selectedCollectionId: null,
   selectedDocumentId: null,
   globalSearchOpen: false,
-  showToc: localStorage.getItem("ui.showToc") !== "0",
+  showToc: (() => {
+    // One-time v2 migration: the old default was ON, so existing installs have
+    // "1" (or nothing→on) — forcing "目录默认不自动出现" to actually land once.
+    // After this, the user's toggle is respected.
+    if (!localStorage.getItem("ui.showToc.v2")) {
+      localStorage.setItem("ui.showToc", "0");
+      localStorage.setItem("ui.showToc.v2", "1");
+    }
+    return localStorage.getItem("ui.showToc") === "1";
+  })(),
   theme:
     (localStorage.getItem("ui.theme") as "light" | "dark" | "system" | null) ??
+    "system",
+  codeBlockTheme:
+    (localStorage.getItem("ui.codeBlockTheme") as "light" | "dark" | "system" | null) ??
     "system",
   contentWidth: ((): 1 | 2 | 3 | 4 | 5 => {
     // Default is 适中 = level 3 (now ~1100px, a comfortable reading width).
@@ -69,6 +84,10 @@ export const useUIStore = create<UIState>((set) => ({
   setTheme: (theme) => {
     localStorage.setItem("ui.theme", theme);
     set({ theme });
+  },
+  setCodeBlockTheme: (codeBlockTheme) => {
+    localStorage.setItem("ui.codeBlockTheme", codeBlockTheme);
+    set({ codeBlockTheme });
   },
   setContentWidth: (level) => {
     localStorage.setItem("ui.contentWidth", String(level));

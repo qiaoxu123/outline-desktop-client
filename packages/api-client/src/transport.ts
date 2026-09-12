@@ -48,6 +48,9 @@ function createDispatcher(): ProxyAgent | undefined {
 let _dispatcher: ProxyAgent | undefined;
 let _dispatcherInit = false;
 
+const MAX_NETWORK_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [350, 900];
+
 function getDispatcher(): ProxyAgent | undefined {
   if (!_dispatcherInit) {
     _dispatcher = createDispatcher();
@@ -65,60 +68,68 @@ export async function apiRequest<T = unknown>(
   const url = normalizeUrl(config.baseUrl) + "/api/" + method;
   const timeoutMs = config.timeoutMs ?? 15_000;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const linkedSignal = signal
-    ? combineSignals(signal, controller.signal)
-    : controller.signal;
+  const f = _fetchFn ?? fetch;
+  // The undici `dispatcher` (proxy) option only applies to Node's fetch.
+  const dispatcher = _fetchFn ? undefined : getDispatcher();
 
-  try {
-    const f = _fetchFn ?? fetch;
-    // The undici `dispatcher` (proxy) option only applies to Node's fetch.
-    const dispatcher = _fetchFn ? undefined : getDispatcher();
-    const response = await f(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.token}`,
-        Accept: "application/json",
-      },
-      body: JSON.stringify(params),
-      signal: linkedSignal,
-      // `dispatcher` is a Node/undici fetch option absent from the DOM RequestInit
-      // type; spreading the object literal avoids excess-property type errors.
-      ...(dispatcher ? { dispatcher } : {}),
-    });
+  for (let attempt = 0; attempt < MAX_NETWORK_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const linkedSignal = signal
+      ? combineSignals(signal, controller.signal)
+      : controller.signal;
 
-    clearTimeout(timeoutId);
+    try {
+      const response = await f(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.token}`,
+          Accept: "application/json",
+        },
+        body: JSON.stringify(params),
+        signal: linkedSignal,
+        // `dispatcher` is a Node/undici fetch option absent from the DOM RequestInit
+        // type; spreading the object literal avoids excess-property type errors.
+        ...(dispatcher ? { dispatcher } : {}),
+      });
 
-    if (response.status === 401) {
-      throw new AuthError();
-    }
+      if (response.status === 401) throw new AuthError();
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new OutlineApiError(
-        body.message ?? `API error: ${response.status}`,
-        body.code ?? "API_ERROR",
-        response.status,
-        response.status >= 500 || response.status === 429,
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new OutlineApiError(
+          body.message ?? `API error: ${response.status}`,
+          body.code ?? "API_ERROR",
+          response.status,
+          response.status >= 500 || response.status === 429,
+        );
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof OutlineApiError || error instanceof AuthError) {
+        throw error;
+      }
+      if (signal?.aborted) throw new NetworkError("Request cancelled");
+      if (attempt + 1 < MAX_NETWORK_ATTEMPTS) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 900),
+        );
+        continue;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new NetworkError("Request timed out");
+      }
+      throw new NetworkError(
+        error instanceof Error ? error.message : "Network error",
       );
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const result = await response.json();
-    return result as T;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof OutlineApiError || error instanceof AuthError) {
-      throw error;
-    }
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new NetworkError("Request timed out");
-    }
-    throw new NetworkError(
-      error instanceof Error ? error.message : "Network error",
-    );
   }
+
+  throw new NetworkError("Network error");
 }
 
 function normalizeUrl(url: string): string {

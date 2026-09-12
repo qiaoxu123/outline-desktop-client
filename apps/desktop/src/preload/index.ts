@@ -154,16 +154,41 @@ contextBridge.exposeInMainWorld("DesktopBridge", {
   restart: async () => undefined,
   restartAndInstall: async () => undefined,
   checkForUpdates: async () => undefined,
-  onTitlebarDoubleClick: async () => undefined,
-  onLogout: async () => { await ipcRenderer.invoke("desktop:logout"); },
-      addCustomHost: async (host: string) => {
+  onTitlebarDoubleClick: () =>
+    ipcRenderer.invoke("desktop:titlebarDoubleClick"),
+  onLogout: async () => {
+    await ipcRenderer.invoke("desktop:logout");
+  },
+  addCustomHost: async (host: string) => {
     // Official Web uses this hook before navigating to a host. The desktop
     // profile remains the source of truth; select a matching configured host
     // when one exists and otherwise let the Web route handle the navigation.
     await ipcRenderer.invoke("desktop:setActiveProfileByHost", host);
-      },
-      webdavGet: (path: string) => ipcRenderer.invoke("webdav:get", { path }),
-      webdavPut: (path: string, content: string) => ipcRenderer.invoke("webdav:put", { path, content }),
+  },
+  getPersonalNotesRoot: async () => {
+    const profileId = await ipcRenderer.invoke("desktop:getActiveProfile");
+    return typeof profileId === "string"
+      ? ipcRenderer.invoke("personalNotes:getRoot", profileId)
+      : { ok: true, data: null };
+  },
+  setPersonalNotesRoot: async (root: {
+    docId: string;
+    collectionId: string;
+  }) => {
+    const profileId = await ipcRenderer.invoke("desktop:getActiveProfile");
+    return typeof profileId === "string"
+      ? ipcRenderer.invoke("personalNotes:setRoot", { profileId, ...root })
+      : { ok: false, error: { code: "NOT_FOUND", message: "No active profile" } };
+  },
+  clearPersonalNotesRoot: async () => {
+    const profileId = await ipcRenderer.invoke("desktop:getActiveProfile");
+    return typeof profileId === "string"
+      ? ipcRenderer.invoke("personalNotes:clearRoot", { profileId })
+      : { ok: false, error: { code: "NOT_FOUND", message: "No active profile" } };
+  },
+  webdavGet: (path: string) => ipcRenderer.invoke("webdav:get", { path }),
+  webdavPut: (path: string, content: string) =>
+    ipcRenderer.invoke("webdav:put", { path, content }),
   loadAuthConfig: (host: string) => ipcRenderer.invoke("desktop:loadAuthConfig", host),
   clearConfig: async () => { await ipcRenderer.invoke("desktop:logout"); },
   setSpellCheckerLanguages: async (_languages: string[]) => undefined,
