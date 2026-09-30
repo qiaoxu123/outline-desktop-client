@@ -8,6 +8,7 @@ import {
   session,
   shell,
 } from "electron";
+import { loadDesktopAuthConfig } from "./authConfig";
 import { renderOfficialWebHtml, type OfficialWebAsset } from "./officialWebHtml";
 import { join, normalize, relative } from "path";
 import { readFile } from "fs/promises";
@@ -96,14 +97,7 @@ function registerAllIpcHandlers(): void {
   });
   ipcMain.handle("desktop:loadAuthConfig", async (_event, host: unknown) => {
     if (typeof host !== "string") throw new Error("Invalid host");
-    const origin = new URL(host).origin;
-    const response = await net.fetch(`${origin}/api/auth.config`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: "{}",
-    });
-    if (!response.ok) throw new Error(`Unable to load auth config (${response.status})`);
-    return response.json();
+    return loadDesktopAuthConfig(host, (url, init) => net.fetch(url, init));
   });
   ipcMain.handle("desktop:logout", () => {
     writeActiveProfileId(null);
