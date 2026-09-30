@@ -1,6 +1,6 @@
 {
   "name": "outline-desktop-client",
-  "version": "1.19.1",
+  "version": "1.20.0-rc.1",
   "private": true,
   "description": "Desktop client for Outline knowledge base",
   "author": "xu <george.x.qiao@gmail.com>",
@@ -13,7 +13,8 @@
     "dist": "npm run dist -w apps/desktop",
     "dist:mac": "npm run dist:mac -w apps/desktop",
     "dist:win": "npm run dist:win -w apps/desktop",
-    "dist:linux": "npm run dist:linux -w apps/desktop"
+    "dist:linux": "npm run dist:linux -w apps/desktop",
+    "verify:build": "node scripts/verify-build.mjs"
   },
   "workspaces": [
     "apps/desktop",

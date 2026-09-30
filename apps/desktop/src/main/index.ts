@@ -8,6 +8,7 @@ import {
   session,
   shell,
 } from "electron";
+import { renderOfficialWebHtml, type OfficialWebAsset } from "./officialWebHtml";
 import { join, normalize, relative } from "path";
 import { readFile } from "fs/promises";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
@@ -137,9 +138,6 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function officialWebRoot(): string {
-  if (is.dev) {
-    return join(__dirname, "../../../vendor/outline-web/build/app");
-  }
   return join(__dirname, "../official-web");
 }
 
@@ -153,33 +151,10 @@ async function officialIndex(): Promise<Response> {
   const template = await readFile(join(root, "index.html"), "utf8");
   const profile = activeProfile();
   const serverUrl = profile?.serverUrl ?? "";
-  const environment = {
-    ENVIRONMENT: "production",
-    URL: "outline://app",
-    CDN_URL: "outline://app",
-    VERSION: "desktop",
-    DEFAULT_LANGUAGE: "zh_CN",
-    analytics: [],
-    ENABLE_UPDATES: false,
-    ...({} as Record<string, unknown>),
-  };
   const manifest = JSON.parse(
     await readFile(join(root, ".vite/manifest.json"), "utf8"),
-  ) as Record<string, { file: string }>;
-  const entry = manifest["app/index.tsx"]?.file;
-  if (!entry) return new Response("Official Web manifest entry missing", { status: 500 });
-  const html = template
-    .replace("{lang}", "zh-CN")
-    .replace("{title}", "Outline")
-    .replace("{description}", "Outline")
-      .replace("{cdn-url}", "outline://app")
-    .replace("{head-tags}", "")
-    .replace(
-      "{env}",
-    `<script>window.env=${JSON.stringify({ ...environment, API_URL: "outline://app/api", INITIAL_SERVER_URL: serverUrl })}</script>`,
-    )
-    .replace("{script-tags}", `<script type="module" src="/static/${entry}"></script>`)
-    .replace("{content}", "");
+  ) as Record<string, OfficialWebAsset>;
+  const html = renderOfficialWebHtml(template, manifest, serverUrl);
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8" },
   });
@@ -216,18 +191,24 @@ async function handleOfficialRequest(request: Request): Promise<Response> {
     : url.pathname.slice(1);
   const requested = normalize(join(root, assetPath));
   const safeRelative = relative(root, requested);
-  const filePath = safeRelative.startsWith("..") ? join(root, "index.html") : requested;
+  if (safeRelative.startsWith("..")) {
+    return new Response("Invalid asset path", { status: 400 });
+  }
+  const filePath = requested;
   try {
     const body = await readFile(filePath);
-    const contentType = filePath.endsWith(".js")
-      ? "text/javascript"
-      : filePath.endsWith(".css")
-        ? "text/css"
-        : filePath.endsWith(".woff2")
-          ? "font/woff2"
-          : "application/octet-stream";
+    const extension = filePath.split(".").pop() ?? "";
+    const contentType = ({
+      js: "text/javascript", css: "text/css", json: "application/json",
+      svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg",
+      webp: "image/webp", ico: "image/x-icon", woff2: "font/woff2",
+      woff: "font/woff", html: "text/html; charset=utf-8",
+    } as Record<string, string>)[extension] ?? "application/octet-stream";
     return new Response(body, { headers: { "content-type": contentType } });
   } catch {
+    if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/locales/") || /\.[a-z0-9]+$/i.test(url.pathname)) {
+      return new Response("Asset not found", { status: 404 });
+    }
     return officialIndex();
   }
 }

@@ -4,7 +4,6 @@ import {
   readFile,
   readdir,
   rm,
-  writeFile,
 } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
@@ -37,27 +36,10 @@ await Promise.all(
     ),
 );
 
-// Electron serves the official build through outline://app. The server normally
-// fills these placeholders; the desktop shell provides the same small runtime
-// envelope without exposing any business API to the renderer.
-const indexPath = join(target, "index.html");
-const template = await readFile(indexPath, "utf8");
-const manifest = JSON.parse(
-  await readFile(join(target, ".vite/manifest.json"), "utf8"),
-);
-const entry = manifest["app/index.tsx"]?.file;
-if (!entry) throw new Error("Official Web manifest entry missing");
-
-const html = template
-  .replace("{lang}", "zh-CN")
-  .replace("{title}", "Outline")
-  .replace("{description}", "Outline")
-  .replace("{cdn-url}", "outline://app")
-  .replace("{head-tags}", "")
-  .replace(
-    "{env}",
-    '<script>window.env={ENVIRONMENT:"production",URL:"outline://app",CDN_URL:"outline://app",VERSION:"desktop",DEFAULT_LANGUAGE:"zh_CN",ENABLE_UPDATES:false,analytics:[]}</script>',
-  )
-  .replace("{script-tags}", `<script type="module" src="/static/${entry}"></script>`)
-  .replace("{content}", "");
-await writeFile(indexPath, html);
+// Preserve server placeholders: Electron injects the current profile and CSS
+// at launch. Pre-rendering here loses INITIAL_SERVER_URL in packaged builds.
+const template = await readFile(join(target, "index.html"), "utf8");
+const manifest = JSON.parse(await readFile(join(target, ".vite/manifest.json"), "utf8"));
+if (!manifest["app/index.tsx"]?.file || !template.includes("{env}")) {
+  throw new Error("Official Web template or manifest is incomplete");
+}
