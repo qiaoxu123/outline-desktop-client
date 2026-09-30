@@ -12,10 +12,19 @@
     "jsx": "react-jsx",
     "composite": true,
     "outDir": "./out/tsc/web",
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "@/*": ["./src/renderer/*"]
+      "@/*": [
+        "./src/renderer/*"
+      ]
     }
   },
-  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx"]
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/preload/**/*",
+    "package.json"
+  ]
 }
