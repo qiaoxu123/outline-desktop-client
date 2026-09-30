@@ -1,6 +1,6 @@
 {
   "name": "outline-desktop",
-  "version": "1.19.1",
+  "version": "1.20.0-rc.3",
   "private": true,
   "description": "Outline Desktop - cross-platform client (macOS / Windows / Linux)",
   "author": "xu <george.x.qiao@gmail.com>",
@@ -10,13 +10,13 @@
   },
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "npm run build:official-web && npm run prepare-official-web && electron-vite dev",
     "build:official-web": "npm run vite:build --prefix ../../vendor/outline-web",
     "build": "npm run build:official-web && electron-vite build && npm run prepare-official-web",
     "prepare-official-web": "node scripts/prepare-official-web.mjs",
     "preview": "electron-vite preview",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "dist": "npm run build:official-web && electron-vite build && npm run prepare-official-web && electron-builder",
@@ -113,6 +113,7 @@
       "category": "Office",
       "icon": "build/icon.png",
       "maintainer": "george.x.qiao@gmail.com"
-    }
+    },
+    "artifactName": "Outline-Desktop-${version}-${os}-${arch}.${ext}"
   }
 }

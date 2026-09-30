@@ -1,190 +1,58 @@
-# Outline Desktop Client
+# Outline Desktop
 
-Cross-platform desktop client architecture for [Outline](https://github.com/outline/outline), designed for a macOS-first release and later expansion to Windows and Linux.
+基于 **官方 Outline Web** 的跨平台桌面客户端，整合论文库、讨论区、随笔、文档标签页与 AI 助手。当前测试版本：`1.20.0-rc.3`。
 
-The application is implemented (current version `1.7.0`): an Electron + React 19 desktop client with multi-profile support, a collection browser, a markdown viewer/editor, and full-text search.
+> `main` 长期停留在旧桌面 renderer；当前产品基线是 `feat/outline-logseq`（v1.19.1）。本轮修改在 `codex/outline-workspace-polish`，实际 UI 在 `vendor/outline-web` 子模块，修改旧 `apps/desktop/src/renderer` 不会改变正式安装包。
 
-## Installation (macOS)
+## 框架与功能
 
-The macOS builds are **ad-hoc signed**, not signed with a paid Apple Developer ID. This is enough for the app to launch on Apple Silicon (arm64) without the *"App is damaged and can't be opened"* error, but because downloaded files carry a quarantine attribute, the **first launch still shows *"cannot verify the developer"***.
+| 层级 | 职责 |
+| --- | --- |
+| Electron 主进程 | 窗口、账号配置、系统密钥加密、附件、WebDAV、AI API、`outline://app` 协议 |
+| Preload / DesktopBridge | 隔离的桌面能力接口；业务密钥留在主进程 |
+| 官方 Web 子模块 | React 17 / MobX / React Router 5；官方文档编辑器、评论、主题、侧栏、搜索 |
+| 自定义 Web 场景 | 论文库、讨论区、随笔及标签页；继续使用官方组件与文档路由 |
+| 远端 Outline | 实际知识库、文档、集合、评论、权限、浏览数据；客户端不启动另一套 Outline 后端 |
+| 本地 / WebDAV | 按工作区的索引快照、阅读状态与历史；现有共享点赞/评分文件 |
 
-Two ways to open it the first time:
+论文库读取“推荐阅读”、带 📖 的组内工作和精选专题，支持元数据检索、年份/月/领域/阅读状态、点赞、评分、最近浏览、原文及代码入口。讨论区对应“讨论区”或“论坛空间”集合，帖子即文档、回复即官方评论，支持版块、置顶、未读与互动统计。
 
-1. **Right-click → Open** (recommended): in Finder, right-click (or Control-click) `Outline Desktop.app`, choose **Open**, then confirm **Open** in the dialog. macOS remembers this choice for subsequent launches.
+## 开发与复现
 
-2. **Remove the quarantine attribute from Terminal** — useful when the right-click flow is blocked or you are scripting the install:
+Node.js 22，Corepack/Yarn 4（子模块）及 npm（桌面工作区）。
 
-   ```bash
-   # After dragging the app to /Applications:
-   xattr -cr "/Applications/Outline Desktop.app"
-
-   # Or remove only the quarantine flag:
-   xattr -dr com.apple.quarantine "/Applications/Outline Desktop.app"
-   ```
-
-   After this the app opens normally with a double-click.
-
-> Why ad-hoc signing: arm64 binaries must carry at least an ad-hoc code signature to execute at all. The build runs `codesign --sign -` on the packed `.app` (see `apps/desktop/build/after-pack.js`) and disables electron-builder's Gatekeeper assessment so the unsigned-by-Developer-ID build can still be packaged.
-
-## Goals
-
-- Provide a native-feeling desktop experience for Outline workspaces
-- Support multiple Outline servers and user profiles
-- Make collections and documents faster to access than the browser flow
-- Deliver reliable offline access to recently used documents
-- Add desktop-specific affordances such as tray access and a mini window
-
-## Product Scope
-
-The client targets these core capabilities:
-
-1. Multiple server profiles
-2. Collection browser with sidebar tree and document list
-3. Document viewer and editor with full GFM markdown support
-4. Full-text search across server content
-5. Offline caching for recent documents
-6. System tray and mini window for quick access
-
-## Recommended Technical Direction
-
-The architecture documents recommend **Electron** as the initial shell, with:
-
-- `Electron 42.x` as the desktop runtime baseline
-- `React 19` + `TypeScript 5.x` for UI
-- `TanStack Query 5` for server state
-- `Zustand 5` for renderer UI/app state
-- `CodeMirror 6` for markdown editing
-- `markdown-it` + `highlight.js` for read-mode rendering
-- `better-sqlite3` in the desktop main process for offline storage
-
-The recommendation is intentional rather than neutral:
-
-- macOS is the first target, and Electron gives the most predictable browser feature surface for a markdown-heavy editor
-- Search, caching, attachments, tray, updater, and window orchestration are all mature in Electron
-- Tauri 2 is attractive for bundle size and security posture, but adds Rust operational complexity and greater runtime variance across macOS, Windows, and Linux webviews
-
-See [docs/ARCHITECTURE.md](/Users/xqiao/Workspace/outline-desktop-client/docs/ARCHITECTURE.md) for the full tradeoff analysis.
-
-## Document Set
-
-- [README.md](/Users/xqiao/Workspace/outline-desktop-client/README.md): overview, setup, quick start
-- [docs/ARCHITECTURE.md](/Users/xqiao/Workspace/outline-desktop-client/docs/ARCHITECTURE.md): full system design
-- [docs/IMPLEMENTATION_PLAN.md](/Users/xqiao/Workspace/outline-desktop-client/docs/IMPLEMENTATION_PLAN.md): phased execution plan
-
-## Outline API Grounding
-
-The design is grounded in Outline’s public API documentation and OpenAPI repository:
-
-- Outline API guide states the API is RPC-style, uses `POST /api/:method`, and supports `Authorization: Bearer <API_KEY>` authentication.
-- The OpenAPI repository documents hosted and self-hosted server patterns and the `BearerAuth` scheme.
-- The prompt-provided methods such as `documents.list`, `documents.info`, `collections.list`, and `attachments.create` are aligned with that model.
-
-One ambiguity is worth calling out: the public OpenAPI snapshot and guide clearly establish the RPC convention, auth model, pagination, and scope behavior, but endpoint discoverability in the rendered GitHub view is less convenient than the developer portal. The implementation should therefore generate method types from the live OpenAPI spec during build time once coding begins.
-
-## Quick Start For A Future Implementation
-
-This section describes how a future implementation should be approached after the design review is accepted.
-
-1. Read [docs/ARCHITECTURE.md](/Users/xqiao/Workspace/outline-desktop-client/docs/ARCHITECTURE.md) first.
-2. Follow [docs/IMPLEMENTATION_PLAN.md](/Users/xqiao/Workspace/outline-desktop-client/docs/IMPLEMENTATION_PLAN.md) phase by phase.
-3. Start with the macOS MVP:
-   - shell app
-   - secure profile storage
-   - collections browser
-   - document viewer
-4. Add editing, search, and offline cache only after the read-path is stable.
-5. Add tray, mini-window, packaging, and Windows/Linux support last.
-
-## Proposed Repository Layout
-
-When implementation starts, use this top-level structure:
-
-```text
-outline-desktop-client/
-  README.md
-  docs/
-    ARCHITECTURE.md
-    IMPLEMENTATION_PLAN.md
-  apps/
-    desktop/
-  packages/
-    api-client/
-    shared-types/
-    ui/
-  tooling/
+```bash
+git clone --recurse-submodules https://github.com/qiaoxu123/outline-desktop-client.git
+cd outline-desktop-client
+git checkout codex/outline-workspace-polish
+git submodule update --init --recursive
+npm ci
+cd vendor/outline-web
+corepack yarn install --immutable
+cd ../..
+npm run build
+npm test
+npm run verify:build
+npm run dev
 ```
 
-The detailed module layout and responsibilities are defined in the architecture document.
+修改官方 Web 场景后，重新执行桌面构建。子模块 commit 必须同步更新，CI 严格构建父仓库锁定的版本。
 
-## Feature Summary
+## 构建、发布与校验
 
-### Multiple server profiles
+- CI 检查 PR，以及 main/feat 分支变更。
+- Release 工作流在版本标签、优化分支推送或手动选择 ref 时运行。
+- Web 与桌面入口只构建/测试一次，六个打包任务共享同一份验证过的输出。
+- macOS：ARM64 / x64 的 DMG、ZIP；Windows：x64 / ARM64 的 EXE、ZIP；Linux：x64 / ARM64 的 AppImage、DEB。
+- 发布前验证 12 个安装包并重新下载计算 SHA-256；仅完整通过后公开 Release。
+- 版本必须与根 package.json、桌面 package.json、标签和 `releases/v<version>.md` 一致。每次新测试构建须提升 rc 版本，禁止覆盖已发布测试包。
 
-- Separate profile records per Outline workspace
-- API key stored in OS keychain, not plaintext config
-- Fast workspace switching with isolated local caches
+下载包后，在同一目录使用 `sha256sum --check SHA256SUMS.txt`（Linux）或 `shasum -a 256 -c SHA256SUMS.txt`（macOS）。Windows 可用 `Get-FileHash <安装包> -Algorithm SHA256` 与清单对照。
 
-### Collection browser
+macOS 安装包为 ad-hoc 签名；首次启动可在 Finder 右键“打开”。Windows 未配置商业签名，首次启动可能需要确认。完整更新内容和人工测试步骤见 [本版说明](releases/v1.20.0-rc.3.md)、[CHANGELOG](CHANGELOG.md)。
 
-- Left sidebar tree for collections and pinned sections
-- Center list for collection documents and metadata
-- Incremental loading and cached list hydration
+## 本轮优化设计
 
-### Document viewer/editor
+保留官方 Web 为唯一界面基础；共享官方主题、组件和文档路由。索引优先从快照显示，再按需增量更新；同工作区请求合并、每页有界渲染、失败保留旧数据。明确区分文档数据、可降级统计及共享互动写入，避免一次操作触发全界面刷新。
 
-- Split read and edit modes
-- GFM tables, task lists, fenced code blocks, links, callouts
-- Keyboard-first desktop workflows
-
-### Search
-
-- Server-backed search as source of truth
-- Recent-query cache and local fallback over cached docs
-- Search results grouped by collection and recency
-
-### Offline mode
-
-- Read access to recent documents and collections metadata
-- Attachment metadata cached; binary file caching optional by policy
-- Background sync when connectivity returns
-
-### Tray and mini window
-
-- Quick search, recent docs, and profile switcher
-- Global shortcut to summon a compact command surface
-- Desktop-native entry point without opening the full app
-
-## Setup Status
-
-Current status: documentation only.
-
-No commands need to be run yet. This repository intentionally avoids:
-
-- `npm init`
-- package installation
-- Electron or Tauri scaffolding
-- generated source files
-
-## Review Checklist
-
-Use this checklist before implementation begins:
-
-- Architecture recommendation approved
-- Editor and markdown rendering decisions approved
-- Offline storage model approved
-- Security and key-storage approach approved
-- macOS MVP scope frozen
-- Windows/Linux parity criteria agreed
-
-## Sources
-
-- Outline repository: <https://github.com/outline/outline>
-- Outline API guide: <https://docs.getoutline.com/s/guide/doc/api-1rEIXDfLF6>
-- Outline OpenAPI repo: <https://github.com/outline/openapi>
-- Electron release schedule: <https://releases.electronjs.org/schedule>
-- Electron security docs: <https://www.electronjs.org/docs/tutorial/security/>
-- Tauri capabilities: <https://v2.tauri.app/security/capabilities/>
-- Tauri webview versions: <https://v2.tauri.app/reference/webview-versions/>
-- CodeMirror changelog: <https://codemirror.net/docs/changelog/>
-- Tiptap docs: <https://tiptap.dev/docs/editor/getting-started/overview>
-- Monaco editor docs: <https://microsoft.github.io/monaco-editor/>
+当前 WebDAV 协议仍是共享 JSON 文件；同客户端串行写入可以防止自身覆盖，但多客户端同时写入需要后续服务端事务或 ETag 机制。

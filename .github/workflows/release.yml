@@ -1,115 +1,149 @@
 name: Release
-
-# Build installers for all three desktop platforms and publish them to a
-# GitHub Release whenever a v* tag is pushed (e.g. `git push origin v1.0.0`).
-#
-# The three platform builds run in parallel and each uploads its output as a
-# workflow *artifact*; a single final `release` job then collects everything
-# and does ONE upload to the GitHub Release. This avoids the earlier race where
-# three jobs wrote to the same release concurrently and dropped assets
-# (missing .deb / partial sets).
-#
-# Manual re-run: Actions tab → Release → Run workflow, and pass the tag
-# (e.g. v1.11.1) to rebuild & re-publish that version.
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+    branches: ["codex/outline-workspace-polish"]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Existing tag to build & publish (e.g. v1.11.1)"
+      ref:
+        description: "Commit, branch or tag to build"
         required: true
-
+        default: "codex/outline-workspace-polish"
 permissions:
-  contents: write # required to create the Release and upload assets
-
+  contents: read
+concurrency:
+  group: release-${{ github.event.inputs.ref || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 jobs:
-  build:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate release version
+        id: version
+        shell: bash
+        env:
+          TAG_REF: ${{ github.ref }}
+        run: |
+          node -e 'const fs=require("fs"); const v=require("./apps/desktop/package.json").version; if(require("./package.json").version!==v) throw Error("Version mismatch"); if(process.env.TAG_REF.startsWith("refs/tags/") && process.env.TAG_REF!==`refs/tags/v${v}`) throw Error("Tag/version mismatch"); if(!process.env.TAG_REF.startsWith("refs/tags/") && !v.includes("-")) throw Error("Branch builds must use a prerelease version"); if(!fs.existsSync(`releases/v${v}.md`)) throw Error("Release notes missing"); fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${v}\n`);'
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - name: Install official Web dependencies from lockfile
+        working-directory: vendor/outline-web
+        run: corepack yarn install --immutable
+      - name: Test official extension logic
+        working-directory: vendor/outline-web
+        run: corepack yarn vitest run --project app app/scenes/PapersHelpers.test.ts app/scenes/DiscussHelpers.test.ts app/scenes/RefreshHelpers.test.ts app/scenes/WorkspaceRequests.test.ts app/stores/TabsStore.test.ts app/utils/tabNavigation.test.ts
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run verify:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validated-build
+          path: apps/desktop/out/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+  package:
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            platform: mac
-            args: "--mac --arm64"
-          - os: windows-latest
-            platform: win
-            args: "--win --x64 --arm64"
-          - os: ubuntu-latest
-            platform: linux
-            args: "--linux --x64 --arm64"
-
+          - { os: macos-15, platform: mac, arch: arm64 }
+          - { os: macos-15-intel, platform: mac, arch: x64 }
+          - { os: windows-latest, platform: win, arch: x64 }
+          - { os: windows-latest, platform: win, arch: arm64 }
+          - { os: ubuntu-latest, platform: linux, arch: x64 }
+          - { os: ubuntu-latest, platform: linux, arch: arm64 }
     runs-on: ${{ matrix.os }}
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          # push → the tag ref; workflow_dispatch → the tag passed as input
-          ref: ${{ github.event.inputs.tag || github.ref }}
-          submodules: recursive
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+          ref: ${{ needs.validate.outputs.commit }}
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install official web dependencies
-        working-directory: vendor/outline-web
-        run: corepack yarn install --immutable
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Build renderer + main
-        run: npm run build -w apps/desktop
-
-      - name: Package installers (${{ matrix.platform }})
-        working-directory: apps/desktop
-        run: npx --no-install electron-builder ${{ matrix.args }} --publish never
-        env:
-          # No signing certs in CI — macOS/Windows produce unsigned artifacts
-          # (users bypass Gatekeeper / SmartScreen on first launch).
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - run: npm ci
+      - uses: actions/download-artifact@v4
         with:
-          name: dist-${{ matrix.platform }}
-          retention-days: 3
-          if-no-files-found: warn
+          name: validated-build
+          path: apps/desktop/out/
+      - name: Verify downloaded Web resources
+        run: npm run verify:build
+      - name: Package installer
+        working-directory: apps/desktop
+        run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Normalize Linux architecture names
+        run: node scripts/normalize-artifacts.mjs apps/desktop/dist
+      - name: Verify installer containers and record digests
+        run: node scripts/verify-artifacts.mjs apps/desktop/dist ${{ needs.validate.outputs.version }} ${{ matrix.platform }} ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 14
           path: |
             apps/desktop/dist/*.dmg
             apps/desktop/dist/*.zip
             apps/desktop/dist/*.exe
             apps/desktop/dist/*.AppImage
             apps/desktop/dist/*.deb
-
+            apps/desktop/dist/verification-*.json
   release:
-    needs: build
+    needs: [validate, package]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BUILD_COMMIT: ${{ needs.validate.outputs.commit }}
+      VERSION: ${{ needs.validate.outputs.version }}
     steps:
-      - name: Collect all platform artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.validate.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
           path: artifacts
           merge-multiple: true
-
-      - name: List collected files
-        run: ls -la artifacts
-
-      - name: Publish to GitHub Release (single upload)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: artifacts/*
-          fail_on_unmatched_files: false
-          draft: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify all twelve assets and transport digests
+        run: node scripts/verify-artifacts.mjs artifacts "$VERSION"
+      - name: Stage a release after every platform passes
+        shell: bash
+        run: |
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release already exists. Refusing to replace tested assets. Bump the prerelease version."
+            exit 1
+          fi
+          FLAGS=()
+          if [[ "$VERSION" == *-* ]]; then FLAGS+=(--prerelease); fi
+          gh release create "$TAG" artifacts/* --target "$BUILD_COMMIT" --draft "${FLAGS[@]}" --title "$TAG — 论文库与讨论区优化" --notes-file "releases/$TAG.md"
+          gh release download "$TAG" --dir downloaded --pattern 'SHA256SUMS.txt' --pattern 'Outline-Desktop-*'
+          cd downloaded
+          sha256sum --check SHA256SUMS.txt
+          gh release edit "$TAG" --draft=false
