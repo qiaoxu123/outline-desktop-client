@@ -1,6 +1,6 @@
 # Outline Desktop
 
-基于 **官方 Outline Web** 的跨平台桌面客户端，整合论文库、讨论区、随笔、文档标签页与 AI 助手。当前测试版本：`1.20.0-rc.1`。
+基于 **官方 Outline Web** 的跨平台桌面客户端，整合论文库、讨论区、随笔、文档标签页与 AI 助手。当前测试版本：`1.20.0-rc.2`。
 
 > `main` 长期停留在旧桌面 renderer；当前产品基线是 `feat/outline-logseq`（v1.19.1）。本轮修改在 `codex/outline-workspace-polish`，实际 UI 在 `vendor/outline-web` 子模块，修改旧 `apps/desktop/src/renderer` 不会改变正式安装包。
 
@@ -49,7 +49,7 @@ npm run dev
 
 下载包后，在同一目录使用 `sha256sum --check SHA256SUMS.txt`（Linux）或 `shasum -a 256 -c SHA256SUMS.txt`（macOS）。Windows 可用 `Get-FileHash <安装包> -Algorithm SHA256` 与清单对照。
 
-macOS 安装包为 ad-hoc 签名；首次启动可在 Finder 右键“打开”。Windows 未配置商业签名，首次启动可能需要确认。完整更新内容和人工测试步骤见 [本版说明](releases/v1.20.0-rc.1.md)、[CHANGELOG](CHANGELOG.md)。
+macOS 安装包为 ad-hoc 签名；首次启动可在 Finder 右键“打开”。Windows 未配置商业签名，首次启动可能需要确认。完整更新内容和人工测试步骤见 [本版说明](releases/v1.20.0-rc.2.md)、[CHANGELOG](CHANGELOG.md)。
 
 ## 本轮优化设计
 
