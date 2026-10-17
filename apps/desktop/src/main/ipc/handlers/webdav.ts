@@ -84,7 +84,13 @@ async function ensureParents(fileRel: string, authorization: string): Promise<vo
 }
 
 const GetSchema = z.object({ path: z.string().min(1) });
-const PutSchema = z.object({ path: z.string().min(1), content: z.string() });
+const PutSchema = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+  // null: create only when absent; string: replace only matching revision.
+  // undefined: legacy unconditional write (backward compatibility).
+  expectedEtag: z.string().min(1).max(512).regex(/^[^\r\n]+$/).nullable().optional(),
+});
 const CredentialsSchema = z.object({
   username: z.string().trim().min(1).max(200),
   password: z.string().min(1).max(500),
@@ -126,9 +132,13 @@ export function registerWebdavHandlers(): void {
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),
       });
-      if (res.status === 404) return ok({ found: false, content: null });
+      if (res.status === 404) return ok({ found: false, content: null, etag: null });
       if (!res.ok) return fail("HTTP", `WebDAV GET ${res.status}`);
-      return ok({ found: true, content: await res.text() });
+      return ok({
+        found: true,
+        content: await res.text(),
+        etag: res.headers.get("etag"),
+      });
     } catch (err) {
       return fail("NETWORK", err instanceof Error ? err.message : "网络错误");
     }
@@ -149,6 +159,11 @@ export function registerWebdavHandlers(): void {
         headers: {
           Authorization: authorization,
           "Content-Type": "application/json; charset=utf-8",
+          ...(parsed.data.expectedEtag === null
+            ? { "If-None-Match": "*" }
+            : parsed.data.expectedEtag
+              ? { "If-Match": parsed.data.expectedEtag }
+              : {}),
         },
         body: parsed.data.content,
         signal: AbortSignal.timeout(20_000),
@@ -159,6 +174,9 @@ export function registerWebdavHandlers(): void {
         knownDirectories.clear();
         await ensureParents(rel, authorization);
         res = await upload();
+      }
+      if (res.status === 412) {
+        return fail("CONFLICT", "共享数据版本已发生变化，需重新读取后重试");
       }
       if (!res.ok) return fail("HTTP", `WebDAV PUT ${res.status}`);
       return ok({ status: res.status });
