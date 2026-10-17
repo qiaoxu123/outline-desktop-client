@@ -31,8 +31,8 @@ export function setFetchImplementation(fn: FetchFn): void {
  * A proxy is only used when `OUTLINE_PROXY` is explicitly set — we deliberately
  * ignore the ambient `https_proxy`/`HTTPS_PROXY`, since the server is a domestic
  * host that should not be routed through a general-purpose (often foreign) proxy.
- * TLS verification is relaxed (`requestTls.rejectUnauthorized: false`) because
- * the server's cert chain root may be absent from Node's CA bundle.
+ * TLS verification stays enabled. Configure the system trust store for
+ * private CAs instead of disabling verification for proxied requests.
  */
 function createDispatcher(): ProxyAgent | undefined {
   const proxyUrl = process.env.OUTLINE_PROXY || "";
@@ -41,14 +41,23 @@ function createDispatcher(): ProxyAgent | undefined {
 
   return new ProxyAgent({
     uri: proxyUrl,
-    requestTls: { rejectUnauthorized: false },
+    requestTls: { rejectUnauthorized: true },
   });
 }
 
 let _dispatcher: ProxyAgent | undefined;
 let _dispatcherInit = false;
 
-const MAX_NETWORK_ATTEMPTS = 3;
+// Outline uses POST for both reads and writes. Retrying a failed POST after the
+// server has applied it can duplicate documents, comments, or other mutations.
+// Retry only explicitly identified read-only RPC methods.
+const RETRYABLE_READ_METHODS = new Set([
+  "auth.info", "stars.list", "shares.list", "shares.info",
+  "documents.info", "documents.search", "documents.list",
+  "documents.recently_viewed", "documents.drafts",
+  "revisions.list", "revisions.info", "comments.list", "views.list",
+  "collections.list", "collections.info", "collections.documents",
+]);
 const RETRY_DELAYS_MS = [350, 900];
 
 function getDispatcher(): ProxyAgent | undefined {
@@ -71,12 +80,13 @@ export async function apiRequest<T = unknown>(
   const f = _fetchFn ?? fetch;
   // The undici `dispatcher` (proxy) option only applies to Node's fetch.
   const dispatcher = _fetchFn ? undefined : getDispatcher();
+  const maxAttempts = RETRYABLE_READ_METHODS.has(method) ? 3 : 1;
 
-  for (let attempt = 0; attempt < MAX_NETWORK_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const linkedSignal = signal
-      ? combineSignals(signal, controller.signal)
+      ? AbortSignal.any([signal, controller.signal])
       : controller.signal;
 
     try {
@@ -112,7 +122,7 @@ export async function apiRequest<T = unknown>(
         throw error;
       }
       if (signal?.aborted) throw new NetworkError("Request cancelled");
-      if (attempt + 1 < MAX_NETWORK_ATTEMPTS) {
+      if (attempt + 1 < maxAttempts) {
         await new Promise((resolve) =>
           setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 900),
         );
@@ -140,16 +150,3 @@ function normalizeUrl(url: string): string {
   return normalized;
 }
 
-function combineSignals(...signals: AbortSignal[]): AbortSignal {
-  const controller = new AbortController();
-  for (const signal of signals) {
-    if (signal.aborted) {
-      controller.abort(signal.reason);
-      return controller.signal;
-    }
-    signal.addEventListener("abort", () => controller.abort(signal.reason), {
-      once: true,
-    });
-  }
-  return controller.signal;
-}

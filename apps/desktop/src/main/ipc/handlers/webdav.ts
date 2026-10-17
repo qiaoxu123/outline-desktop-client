@@ -1,5 +1,9 @@
 import { ipcMain, net } from "electron";
 import { z } from "zod";
+import {
+  readWebdavCredentials, webdavCredentialStatus,
+  writeWebdavCredentials, clearWebdavCredentials,
+} from "../../services/storage/webdavCredentials";
 
 /**
  * WebDAV storage for client-maintained app data (坚果云 / Jianguoyun).
@@ -12,18 +16,21 @@ import { z } from "zod";
  *
  * Routed through the main process because the renderer can't do WebDAV
  * (custom methods + Basic auth + external host) without hitting CORS.
- * Credentials are intentionally hardcoded per the project owner's request;
- * they are a Jianguoyun *app password* scoped to one shared folder, not the
- * account password. Note: anyone with the built app can extract them.
+ * Credentials are saved through the operating system encryption service;
+ * never put a shared app password into this source repository or installer.
  */
 
 const DAV_BASE = "https://dav.jianguoyun.com/dav";
-const DAV_USER = "1728094659@qq.com";
-const DAV_PASS = "aybxiymcadgqqe9s";
 const DAV_ROOT = "5-共享/Outline桌面端";
+// Avoid repeated MKCOL requests on every quiz/note/interaction save.
+const knownDirectories = new Set<string>();
 
-const AUTH_HEADER =
-  "Basic " + Buffer.from(`${DAV_USER}:${DAV_PASS}`).toString("base64");
+function authenticationHeader(): string | null {
+  const credentials = readWebdavCredentials();
+  return credentials
+    ? "Basic " + Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64")
+    : null;
+}
 
 function ok<T>(data: T) {
   return { ok: true as const, data };
@@ -46,23 +53,30 @@ function rootPath(path: string): string {
   return `${DAV_ROOT}/${path}`;
 }
 function isSafe(path: string): boolean {
-  return !path.split("/").some((seg) => seg === ".." || seg === ".");
+  if (path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
+  return path.split("/").every((seg) =>
+    seg.length > 0 && seg !== "." && seg !== ".." &&
+    !/%2e|%2f|%5c/i.test(seg),
+  );
 }
 
 /** MKCOL each ancestor collection of a file so PUT never 409s on a missing
  * parent. Idempotent: 405/301 mean the collection already exists. */
-async function ensureParents(fileRel: string): Promise<void> {
+async function ensureParents(fileRel: string, authorization: string): Promise<void> {
   const parts = fileRel.split("/").filter(Boolean);
   parts.pop(); // drop the filename
   let acc = "";
   for (const seg of parts) {
     acc = acc ? `${acc}/${seg}` : seg;
+    if (knownDirectories.has(acc)) continue;
     try {
-      await net.fetch(urlFor(acc) + "/", {
+      const response = await net.fetch(urlFor(acc) + "/", {
         method: "MKCOL",
-        headers: { Authorization: AUTH_HEADER },
+        headers: { Authorization: authorization },
         signal: AbortSignal.timeout(15_000),
       });
+      // 405 means the collection already exists.
+      if (response.ok || response.status === 405) knownDirectories.add(acc);
     } catch {
       // best-effort; the PUT below surfaces any real failure
     }
@@ -70,23 +84,61 @@ async function ensureParents(fileRel: string): Promise<void> {
 }
 
 const GetSchema = z.object({ path: z.string().min(1) });
-const PutSchema = z.object({ path: z.string().min(1), content: z.string() });
+const PutSchema = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+  // null: create only when absent; string: replace only matching revision.
+  // undefined: legacy unconditional write (backward compatibility).
+  expectedEtag: z.string().min(1).max(512).regex(/^[^\r\n]+$/).nullable().optional(),
+});
+const CredentialsSchema = z.object({
+  username: z.string().trim().min(1).max(200),
+  password: z.string().min(1).max(500),
+});
 
 export function registerWebdavHandlers(): void {
+  ipcMain.handle("webdav:status", () => ok(webdavCredentialStatus()));
+
+  ipcMain.handle("webdav:setCredentials", (_event, payload: unknown) => {
+    const parsed = CredentialsSchema.safeParse(payload);
+    if (!parsed.success) return fail("VALIDATION", "请输入有效的 WebDAV 用户名和应用密码");
+    try {
+      writeWebdavCredentials(parsed.data);
+      return ok(webdavCredentialStatus());
+    } catch (error) {
+      return fail("STORAGE", error instanceof Error ? error.message : "无法安全保存凭据");
+    }
+  });
+
+  ipcMain.handle("webdav:clearCredentials", () => {
+    try {
+      clearWebdavCredentials();
+      return ok(webdavCredentialStatus());
+    } catch (error) {
+      return fail("STORAGE", error instanceof Error ? error.message : "无法清除凭据");
+    }
+  });
+
   // Fetch a file's text; { found: false } on 404 (not an error).
   ipcMain.handle("webdav:get", async (_event, payload: unknown) => {
     const parsed = GetSchema.safeParse(payload);
     if (!parsed.success || !isSafe(parsed.data.path))
       return fail("VALIDATION", "invalid path");
+    const authorization = authenticationHeader();
+    if (!authorization) return fail("NOT_CONFIGURED", "请先在桌面偏好设置中配置 WebDAV");
     try {
       const res = await net.fetch(urlFor(rootPath(parsed.data.path)), {
-        headers: { Authorization: AUTH_HEADER },
+        headers: { Authorization: authorization },
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),
       });
-      if (res.status === 404) return ok({ found: false, content: null });
+      if (res.status === 404) return ok({ found: false, content: null, etag: null });
       if (!res.ok) return fail("HTTP", `WebDAV GET ${res.status}`);
-      return ok({ found: true, content: await res.text() });
+      return ok({
+        found: true,
+        content: await res.text(),
+        etag: res.headers.get("etag"),
+      });
     } catch (err) {
       return fail("NETWORK", err instanceof Error ? err.message : "网络错误");
     }
@@ -97,18 +149,35 @@ export function registerWebdavHandlers(): void {
     const parsed = PutSchema.safeParse(payload);
     if (!parsed.success || !isSafe(parsed.data.path))
       return fail("VALIDATION", "invalid path");
+    const authorization = authenticationHeader();
+    if (!authorization) return fail("NOT_CONFIGURED", "请先在桌面偏好设置中配置 WebDAV");
     const rel = rootPath(parsed.data.path);
     try {
-      await ensureParents(rel);
-      const res = await net.fetch(urlFor(rel), {
+      await ensureParents(rel, authorization);
+      const upload = () => net.fetch(urlFor(rel), {
         method: "PUT",
         headers: {
-          Authorization: AUTH_HEADER,
+          Authorization: authorization,
           "Content-Type": "application/json; charset=utf-8",
+          ...(parsed.data.expectedEtag === null
+            ? { "If-None-Match": "*" }
+            : parsed.data.expectedEtag
+              ? { "If-Match": parsed.data.expectedEtag }
+              : {}),
         },
         body: parsed.data.content,
         signal: AbortSignal.timeout(20_000),
       });
+      let res = await upload();
+      if (res.status === 409) {
+        // Parent may have been removed on another device; rebuild once.
+        knownDirectories.clear();
+        await ensureParents(rel, authorization);
+        res = await upload();
+      }
+      if (res.status === 412) {
+        return fail("CONFLICT", "共享数据版本已发生变化，需重新读取后重试");
+      }
       if (!res.ok) return fail("HTTP", `WebDAV PUT ${res.status}`);
       return ok({ status: res.status });
     } catch (err) {

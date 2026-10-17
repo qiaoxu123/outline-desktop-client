@@ -40,7 +40,10 @@ export interface ElectronAPI {
   /** WebDAV storage for the self-test quiz (paths under the shared quiz dir). */
   webdav: {
     get: (path: string) => Promise<unknown>;
-    put: (path: string, content: string) => Promise<unknown>;
+    put: (path: string, content: string, expectedEtag?: string | null) => Promise<unknown>;
+    status: () => Promise<unknown>;
+    setCredentials: (username: string, password: string) => Promise<unknown>;
+    clearCredentials: () => Promise<unknown>;
   };
   /** Upload a file to Outline (drag/paste into the editor). Bytes are base64. */
   attachments: {
@@ -117,7 +120,12 @@ const api: ElectronAPI = {
   },
   webdav: {
     get: (path) => ipcRenderer.invoke("webdav:get", { path }),
-    put: (path, content) => ipcRenderer.invoke("webdav:put", { path, content }),
+    put: (path, content, expectedEtag) =>
+      ipcRenderer.invoke("webdav:put", { path, content, expectedEtag }),
+    status: () => ipcRenderer.invoke("webdav:status"),
+    setCredentials: (username, password) =>
+      ipcRenderer.invoke("webdav:setCredentials", { username, password }),
+    clearCredentials: () => ipcRenderer.invoke("webdav:clearCredentials"),
   },
   attachments: {
     upload: (profileId, payload) =>
@@ -187,8 +195,12 @@ contextBridge.exposeInMainWorld("DesktopBridge", {
       : { ok: false, error: { code: "NOT_FOUND", message: "No active profile" } };
   },
   webdavGet: (path: string) => ipcRenderer.invoke("webdav:get", { path }),
-  webdavPut: (path: string, content: string) =>
-    ipcRenderer.invoke("webdav:put", { path, content }),
+  webdavPut: (path: string, content: string, expectedEtag?: string | null) =>
+    ipcRenderer.invoke("webdav:put", { path, content, expectedEtag }),
+  webdavStatus: () => ipcRenderer.invoke("webdav:status"),
+  webdavSetCredentials: (username: string, password: string) =>
+    ipcRenderer.invoke("webdav:setCredentials", { username, password }),
+  webdavClearCredentials: () => ipcRenderer.invoke("webdav:clearCredentials"),
   loadAuthConfig: (host: string) => ipcRenderer.invoke("desktop:loadAuthConfig", host),
   clearConfig: async () => { await ipcRenderer.invoke("desktop:logout"); },
   setSpellCheckerLanguages: async (_languages: string[]) => undefined,
