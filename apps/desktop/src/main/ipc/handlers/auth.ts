@@ -52,12 +52,18 @@ async function fetchWithRetry(
   init: Parameters<Session["fetch"]>[1],
 ): Promise<Response> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  // POST /auth/email sends mail, and GET /auth/email.callback consumes a
+  // one-time token. Replaying either after an ambiguous network failure can
+  // invalidate the first attempt or send multiple verification codes.
+  const method = (init?.method ?? "GET").toUpperCase();
+  const isOneTimeCallback = new URL(url).pathname === "/auth/email.callback";
+  const maxAttempts = method === "GET" && !isOneTimeCallback ? 3 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       return await ses.fetch(url, init);
     } catch (error) {
       lastError = error;
-      if (attempt < 2) {
+      if (attempt + 1 < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 350 : 900));
       }
     }
