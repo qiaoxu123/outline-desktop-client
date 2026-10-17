@@ -226,7 +226,7 @@ export function registerAuthHandlers(): void {
       // of truth: Set-Cookie is recorded on every hop, and the abort signal
       // bounds the case where the post-login redirect target is unreachable.
       const url = `${base}/auth/email.callback?${qs.toString()}`;
-      console.log(`[auth] callback: GET ${url}`);
+      console.log("[auth] callback: requesting email sign-in confirmation");
 
       let response: Response | null = null;
       let finalUrl = "";
@@ -239,7 +239,7 @@ export function registerAuthHandlers(): void {
           signal: AbortSignal.timeout(15_000),
         });
         finalUrl = response.url;
-        console.log(`[auth] callback: status ${response.status} at ${finalUrl}`);
+        console.log(`[auth] callback: response status ${response.status}`);
       } catch (fetchErr) {
         // A hop may have set the session cookie before the failure — check
         // the jar before giving up.
