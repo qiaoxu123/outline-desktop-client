@@ -21,9 +21,9 @@ import {
  */
 
 const DAV_BASE = "https://dav.jianguoyun.com/dav";
-// Supply per-installation credentials through the process environment (or
-// replace with OS keychain-backed settings). Never bundle a shared app password.
 const DAV_ROOT = "5-共享/Outline桌面端";
+// Avoid repeated MKCOL requests on every quiz/note/interaction save.
+const knownDirectories = new Set<string>();
 
 function authenticationHeader(): string | null {
   const credentials = readWebdavCredentials();
@@ -68,12 +68,15 @@ async function ensureParents(fileRel: string, authorization: string): Promise<vo
   let acc = "";
   for (const seg of parts) {
     acc = acc ? `${acc}/${seg}` : seg;
+    if (knownDirectories.has(acc)) continue;
     try {
-      await net.fetch(urlFor(acc) + "/", {
+      const response = await net.fetch(urlFor(acc) + "/", {
         method: "MKCOL",
         headers: { Authorization: authorization },
         signal: AbortSignal.timeout(15_000),
       });
+      // 405 means the collection already exists.
+      if (response.ok || response.status === 405) knownDirectories.add(acc);
     } catch {
       // best-effort; the PUT below surfaces any real failure
     }
@@ -141,7 +144,7 @@ export function registerWebdavHandlers(): void {
     const rel = rootPath(parsed.data.path);
     try {
       await ensureParents(rel, authorization);
-      const res = await net.fetch(urlFor(rel), {
+      const upload = () => net.fetch(urlFor(rel), {
         method: "PUT",
         headers: {
           Authorization: authorization,
@@ -150,6 +153,13 @@ export function registerWebdavHandlers(): void {
         body: parsed.data.content,
         signal: AbortSignal.timeout(20_000),
       });
+      let res = await upload();
+      if (res.status === 409) {
+        // Parent may have been removed on another device; rebuild once.
+        knownDirectories.clear();
+        await ensureParents(rel, authorization);
+        res = await upload();
+      }
       if (!res.ok) return fail("HTTP", `WebDAV PUT ${res.status}`);
       return ok({ status: res.status });
     } catch (err) {
