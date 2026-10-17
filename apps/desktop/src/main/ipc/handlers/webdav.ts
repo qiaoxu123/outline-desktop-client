@@ -18,8 +18,10 @@ import { z } from "zod";
  */
 
 const DAV_BASE = "https://dav.jianguoyun.com/dav";
-const DAV_USER = "1728094659@qq.com";
-const DAV_PASS = "aybxiymcadgqqe9s";
+// Supply per-installation credentials through the process environment (or
+// replace with OS keychain-backed settings). Never bundle a shared app password.
+const DAV_USER = process.env.OUTLINE_WEBDAV_USER ?? "";
+const DAV_PASS = process.env.OUTLINE_WEBDAV_PASSWORD ?? "";
 const DAV_ROOT = "5-共享/Outline桌面端";
 
 const AUTH_HEADER =
@@ -46,7 +48,11 @@ function rootPath(path: string): string {
   return `${DAV_ROOT}/${path}`;
 }
 function isSafe(path: string): boolean {
-  return !path.split("/").some((seg) => seg === ".." || seg === ".");
+  if (path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
+  return path.split("/").every((seg) =>
+    seg.length > 0 && seg !== "." && seg !== ".." &&
+    !/%2e|%2f|%5c/i.test(seg),
+  );
 }
 
 /** MKCOL each ancestor collection of a file so PUT never 409s on a missing
@@ -78,6 +84,7 @@ export function registerWebdavHandlers(): void {
     const parsed = GetSchema.safeParse(payload);
     if (!parsed.success || !isSafe(parsed.data.path))
       return fail("VALIDATION", "invalid path");
+    if (!DAV_USER || !DAV_PASS) return fail("NOT_CONFIGURED", "WebDAV credentials are not configured");
     try {
       const res = await net.fetch(urlFor(rootPath(parsed.data.path)), {
         headers: { Authorization: AUTH_HEADER },
@@ -97,6 +104,7 @@ export function registerWebdavHandlers(): void {
     const parsed = PutSchema.safeParse(payload);
     if (!parsed.success || !isSafe(parsed.data.path))
       return fail("VALIDATION", "invalid path");
+    if (!DAV_USER || !DAV_PASS) return fail("NOT_CONFIGURED", "WebDAV credentials are not configured");
     const rel = rootPath(parsed.data.path);
     try {
       await ensureParents(rel);
