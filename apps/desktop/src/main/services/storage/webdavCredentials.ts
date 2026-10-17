@@ -22,8 +22,8 @@ function secureStorageAvailable(): boolean {
   return true;
 }
 
-/** Credentials are never returned to renderer code. */
-export function readWebdavCredentials(): WebdavCredentials | null {
+/** Reads only the locally encrypted record (never an environment fallback). */
+function readSavedCredentials(): WebdavCredentials | null {
   try {
     const saved = JSON.parse(readFileSync(credentialsPath(), "utf8")) as {
       version: number;
@@ -38,6 +38,13 @@ export function readWebdavCredentials(): WebdavCredentials | null {
   } catch {
     // Not configured, OS keyring locked, or no longer decryptable.
   }
+  return null;
+}
+
+/** Credentials are never returned to renderer code. */
+export function readWebdavCredentials(): WebdavCredentials | null {
+  const saved = readSavedCredentials();
+  if (saved) return saved;
   const username = process.env.OUTLINE_WEBDAV_USER?.trim();
   const password = process.env.OUTLINE_WEBDAV_PASSWORD;
   return username && password ? { username, password } : null;
@@ -49,20 +56,12 @@ export function webdavCredentialStatus(): {
   secureStorageAvailable: boolean;
 } {
   const canEncrypt = secureStorageAvailable();
-  let source: CredentialSource = "none";
-  try {
-    const saved = JSON.parse(readFileSync(credentialsPath(), "utf8")) as {
-      version: number;
-      encrypted: string;
-    };
-    if (saved.version === 1 && typeof saved.encrypted === "string" &&
-        canEncrypt && readWebdavCredentials()) source = "local";
-  } catch {
-    // No locally encrypted credential store.
-  }
-  if (source === "none" && process.env.OUTLINE_WEBDAV_USER &&
-      process.env.OUTLINE_WEBDAV_PASSWORD) source = "environment";
-  return { configured: !!readWebdavCredentials(), source, secureStorageAvailable: canEncrypt };
+  const saved = readSavedCredentials();
+  const envPresent = !!(process.env.OUTLINE_WEBDAV_USER?.trim() &&
+    process.env.OUTLINE_WEBDAV_PASSWORD);
+  const source: CredentialSource = saved ? "local" :
+    envPresent ? "environment" : "none";
+  return { configured: source !== "none", source, secureStorageAvailable: canEncrypt };
 }
 
 /** Save locally using the OS encryption service, never plaintext fallback. */
