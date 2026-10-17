@@ -41,6 +41,9 @@ export interface ElectronAPI {
   webdav: {
     get: (path: string) => Promise<unknown>;
     put: (path: string, content: string) => Promise<unknown>;
+    status: () => Promise<unknown>;
+    setCredentials: (username: string, password: string) => Promise<unknown>;
+    clearCredentials: () => Promise<unknown>;
   };
   /** Upload a file to Outline (drag/paste into the editor). Bytes are base64. */
   attachments: {
@@ -118,6 +121,10 @@ const api: ElectronAPI = {
   webdav: {
     get: (path) => ipcRenderer.invoke("webdav:get", { path }),
     put: (path, content) => ipcRenderer.invoke("webdav:put", { path, content }),
+    status: () => ipcRenderer.invoke("webdav:status"),
+    setCredentials: (username, password) =>
+      ipcRenderer.invoke("webdav:setCredentials", { username, password }),
+    clearCredentials: () => ipcRenderer.invoke("webdav:clearCredentials"),
   },
   attachments: {
     upload: (profileId, payload) =>
@@ -189,6 +196,10 @@ contextBridge.exposeInMainWorld("DesktopBridge", {
   webdavGet: (path: string) => ipcRenderer.invoke("webdav:get", { path }),
   webdavPut: (path: string, content: string) =>
     ipcRenderer.invoke("webdav:put", { path, content }),
+  webdavStatus: () => ipcRenderer.invoke("webdav:status"),
+  webdavSetCredentials: (username: string, password: string) =>
+    ipcRenderer.invoke("webdav:setCredentials", { username, password }),
+  webdavClearCredentials: () => ipcRenderer.invoke("webdav:clearCredentials"),
   loadAuthConfig: (host: string) => ipcRenderer.invoke("desktop:loadAuthConfig", host),
   clearConfig: async () => { await ipcRenderer.invoke("desktop:logout"); },
   setSpellCheckerLanguages: async (_languages: string[]) => undefined,
