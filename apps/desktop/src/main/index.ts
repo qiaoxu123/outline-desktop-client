@@ -30,9 +30,21 @@ import { registerWebdavHandlers } from "./ipc/handlers/webdav";
 import { registerAttachmentHandlers } from "./ipc/handlers/attachments";
 import { registerAiHandlers } from "./ipc/handlers/ai";
 
-// Keep TLS verification enabled. A profile that uses a private CA should
-// install that CA in the operating system trust store rather than disabling
-// certificate validation for the whole Electron process.
+// TLS trust is managed by the OS. Do not auto-approve invalid certificates.
+function sameServerOrigin(requestUrl: string, serverUrl: string): boolean {
+  try {
+    const request = new URL(requestUrl);
+    const server = new URL(serverUrl);
+    return request.origin === server.origin && request.protocol === server.protocol
+      && ["https:", "http:"].includes(request.protocol);
+  } catch {
+    return false;
+  }
+}
+function safeExternalUrl(url: string): boolean {
+  try { return ["https:", "http:", "mailto:"].includes(new URL(url).protocol); }
+  catch { return false; }
+}
 
 function registerAllIpcHandlers(): void {
   registerProfileHandlers();
@@ -71,7 +83,7 @@ function registerAllIpcHandlers(): void {
     if (typeof url !== "string" || !/^https?:\/\//.test(url)) {
       return { ok: false, error: "invalid url" };
     }
-    const isKnownServer = readProfiles().some((p) => url.startsWith(p.serverUrl));
+    const isKnownServer = readProfiles().some((p) => sameServerOrigin(url, p.serverUrl));
     if (!isKnownServer) return { ok: false, error: "unknown server" };
     event.sender.downloadURL(url);
     return { ok: true };
@@ -270,7 +282,7 @@ function createMainWindow(): BrowserWindow {
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url);
+    if (safeExternalUrl(details.url)) void shell.openExternal(details.url);
     return { action: "deny" };
   });
 
@@ -290,29 +302,6 @@ app.whenReady().then(() => {
     const firstProfile = readProfiles()[0];
     if (firstProfile) writeActiveProfileId(firstProfile.id);
   }
-
-  // This Outline instance currently serves a certificate chain whose issuer
-  // is not present in the macOS/Electron trust store. Chromium rejects it on
-  // every fresh process, even though the configured server is reachable.
-  // Allow only this exact, user-configured profile origin and only the missing
-  // issuer error; all other certificate failures remain rejected.
-  app.on("certificate-error", (event, _webContents, url, error, _certificate, callback) => {
-    let knownProfileOrigin = false;
-    try {
-      const requestOrigin = new URL(url).origin;
-      knownProfileOrigin = readProfiles().some(
-        (profile) => new URL(profile.serverUrl).origin === requestOrigin,
-      );
-    } catch {
-      // Malformed URLs are never trusted.
-    }
-    if (knownProfileOrigin && error === "net::ERR_CERT_AUTHORITY_INVALID") {
-      event.preventDefault();
-      callback(true);
-      return;
-    }
-    callback(false);
-  });
 
   // Route ALL Outline API calls through Chromium's network stack (net.fetch)
   // instead of Node's undici fetch. On some machines undici fails with
@@ -335,7 +324,7 @@ app.whenReady().then(() => {
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     try {
       const profile = readProfiles().find((p) =>
-        details.url.startsWith(p.serverUrl),
+        sameServerOrigin(details.url, p.serverUrl),
       );
       if (profile?.apiKey && !details.requestHeaders["Authorization"]) {
         details.requestHeaders["Authorization"] = `Bearer ${profile.apiKey}`;
