@@ -29,22 +29,9 @@ import { registerPersonalNotesHandlers } from "./ipc/handlers/personalNotes";
 import { registerWebdavHandlers } from "./ipc/handlers/webdav";
 import { registerAttachmentHandlers } from "./ipc/handlers/attachments";
 import { registerAiHandlers } from "./ipc/handlers/ai";
+import { sameServerOrigin, safeExternalUrl, shouldAttachOutlineToken } from "./securityUrls";
 
 // TLS trust is managed by the OS. Do not auto-approve invalid certificates.
-function sameServerOrigin(requestUrl: string, serverUrl: string): boolean {
-  try {
-    const request = new URL(requestUrl);
-    const server = new URL(serverUrl);
-    return request.origin === server.origin && request.protocol === server.protocol
-      && ["https:", "http:"].includes(request.protocol);
-  } catch {
-    return false;
-  }
-}
-function safeExternalUrl(url: string): boolean {
-  try { return ["https:", "http:", "mailto:"].includes(new URL(url).protocol); }
-  catch { return false; }
-}
 
 function registerAllIpcHandlers(): void {
   registerProfileHandlers();
@@ -83,7 +70,8 @@ function registerAllIpcHandlers(): void {
     if (typeof url !== "string" || !/^https?:\/\//.test(url)) {
       return { ok: false, error: "invalid url" };
     }
-    const isKnownServer = readProfiles().some((p) => sameServerOrigin(url, p.serverUrl));
+    const profile = activeProfile();
+    const isKnownServer = !!profile && sameServerOrigin(url, profile.serverUrl);
     if (!isKnownServer) return { ok: false, error: "unknown server" };
     event.sender.downloadURL(url);
     return { ok: true };
@@ -323,9 +311,11 @@ app.whenReady().then(() => {
   // so newly added profiles work without a restart.
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     try {
-      const profile = readProfiles().find((p) =>
-        sameServerOrigin(details.url, p.serverUrl),
-      );
+      const profile = activeProfile();
+      if (profile && !shouldAttachOutlineToken(details.url, profile.serverUrl)) {
+        callback({ requestHeaders: details.requestHeaders });
+        return;
+      }
       if (profile?.apiKey && !details.requestHeaders["Authorization"]) {
         details.requestHeaders["Authorization"] = `Bearer ${profile.apiKey}`;
       }
