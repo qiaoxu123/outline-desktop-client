@@ -466,7 +466,29 @@ function SelectionToolbar({
   return (
     <BubbleMenu
       editor={editor}
-      tippyOptions={{ duration: 100, maxWidth: "none" }}
+      pluginKey="documentTextSelectionMenu"
+      updateDelay={0}
+      // Tiptap's default focus check can suppress a valid mouse selection in
+      // Electron. Use the actual ProseMirror text range instead; avoid showing
+      // this toolbar for a table cell/row/column selection.
+      shouldShow={({ editor: ed, state, from, to }) =>
+        ed.isEditable &&
+        !state.selection.empty &&
+        !(state.selection instanceof CellSelection) &&
+        state.doc.textBetween(from, to, " ").trim().length > 0
+      }
+      // Keep the menu outside AppShell's overflow-scrolling content, otherwise
+      // selections near the top/side of the viewport can clip the entire popup.
+      // It must stay inside React's root container: tippy moves this element
+      // out of the editor subtree, and React only delegates events from nodes
+      // under #root — appending to document.body leaves every toolbar button
+      // inert because its onMouseDown handler never fires.
+      tippyOptions={{
+        duration: 0,
+        maxWidth: "none",
+        appendTo: () => document.getElementById("root") ?? document.body,
+        zIndex: 1000,
+      }}
       className="bubble-menu"
     >
       <ToolbarButton

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useEditor, EditorContent, type Editor as TiptapEditor } from "@tiptap/react";
+import { useEditor, EditorContent, BubbleMenu, type Editor as TiptapEditor } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import Document from "@tiptap/extension-document";
@@ -10,6 +10,8 @@ import { Markdown } from "tiptap-markdown";
 import type MarkdownIt from "markdown-it";
 import highlightRule from "../../lib/markdown/highlightRule";
 import { normalizeOutlineMarkdown } from "../../lib/markdown/normalize";
+import { OIcon } from "../../components/outlineIcons";
+import "../documents/Editor.css";
 
 export interface NodeEditorProps {
   initialMarkdown: string;
@@ -223,5 +225,79 @@ export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
     else editor.commands.focus(caret + 1); // markdown offset ≈ doc pos (approximation)
   }, [editor]);
 
-  return <EditorContent editor={editor} className="ol-node-editor" />;
+  return (
+    // A single host wrapper (not a fragment) keeps React's unmount safe: tippy
+    // moves the BubbleMenu element into its own [data-tippy-root], so removing
+    // that element individually from a fragment parent throws
+    // "NotFoundError: removeChild ... not a child of this node" and crashes the
+    // renderer. Removing this wrapper instead detaches the whole subtree.
+    <div className="ol-node-editor-wrap" style={{ display: "contents" }}>
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          pluginKey="outlineNodeTextMenu"
+          updateDelay={0}
+          shouldShow={({ editor: ed, state, from, to }) =>
+            ed.isEditable &&
+            !state.selection.empty &&
+            state.doc.textBetween(from, to, " ").trim().length > 0
+          }
+          // Must stay under #root — see Editor.tsx: tippy moves this element
+          // out of the editor subtree and React only delegates events from
+          // nodes inside its root container; appending to body would make
+          // every toolbar button inert.
+          tippyOptions={{
+            duration: 0,
+            maxWidth: "none",
+            appendTo: () => document.getElementById("root") ?? document.body,
+            zIndex: 1000,
+          }}
+          className="bubble-menu"
+        >
+          {([
+            ["bold", "加粗", "bold"],
+            ["italic", "斜体", "italic"],
+            ["underline", "下划线", "underline"],
+            ["code", "行内代码", "code"],
+            ["highlight", "高亮", "highlight"],
+          ] as const).map(([mark, title, icon]) => (
+            <button
+              key={mark}
+              type="button"
+              title={title}
+              className={`bubble-btn ${editor.isActive(mark) ? "active" : ""}`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const chain = editor.chain().focus();
+                if (mark === "bold") chain.toggleBold().run();
+                else if (mark === "italic") chain.toggleItalic().run();
+                else if (mark === "underline") chain.toggleUnderline().run();
+                else if (mark === "code") chain.toggleCode().run();
+                else chain.toggleHighlight().run();
+              }}
+            >
+              <OIcon name={icon} />
+            </button>
+          ))}
+          <span className="bubble-divider" />
+          <button
+            type="button"
+            title="插入或移除链接"
+            className={`bubble-btn ${editor.isActive("link") ? "active" : ""}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const prev = (editor.getAttributes("link").href as string) ?? "";
+              const href = window.prompt("链接地址（留空移除链接）", prev);
+              if (href === null) return;
+              if (href.trim()) editor.chain().focus().setLink({ href: href.trim() }).run();
+              else editor.chain().focus().unsetLink().run();
+            }}
+          >
+            <OIcon name="link" />
+          </button>
+        </BubbleMenu>
+      )}
+      <EditorContent editor={editor} className="ol-node-editor" />
+    </div>
+  );
 }
