@@ -10,7 +10,7 @@ if (await exists(legacySource)) throw new Error("Legacy React renderer source mu
 if (await exists(legacyOutput)) throw new Error("Legacy React renderer output must not be packaged");
 
 const config = await readFile(join(desktop, "electron.vite.config.ts"), "utf8");
-if (/\\brenderer\\s*:/.test(config) || config.includes("@vitejs/plugin-react")) {
+if (/\brenderer\s*:/.test(config) || config.includes("@vitejs/plugin-react")) {
   throw new Error("Electron Vite must not build the legacy renderer");
 }
 const main = await readFile(join(desktop, "src/main/index.ts"), "utf8");
