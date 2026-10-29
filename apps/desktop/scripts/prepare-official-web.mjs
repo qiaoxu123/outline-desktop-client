@@ -13,6 +13,9 @@ const projectRoot = resolve(desktopRoot, "../..");
 const source = join(projectRoot, "vendor/outline-web/build/app");
 const target = join(desktopRoot, "out/official-web");
 
+// Purge output from pre-migration builds. Electron no longer packages a
+// second renderer, even when developers reuse an existing working tree.
+await rm(join(desktopRoot, "out/renderer"), { recursive: true, force: true });
 await rm(target, { recursive: true, force: true });
 await mkdir(target, { recursive: true });
 await cp(source, target, { recursive: true, force: true });

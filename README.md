@@ -4,6 +4,12 @@
 
 > `main` 长期停留在旧桌面 renderer；当前产品基线是 `feat/outline-logseq`（v1.19.1）。本轮修改在 `codex/outline-workspace-polish`，实际 UI 在 `vendor/outline-web` 子模块，修改旧 `apps/desktop/src/renderer` 不会改变正式安装包。
 
+## 唯一前端架构
+
+此分支已删除自行实现的 React 19 UI（原 `apps/desktop/src/renderer`），不再构建 `out/renderer`。桌面主窗口统一通过 `outline://app/` 加载 `vendor/outline-web` 的构建产物。保留 Electron 主进程、preload/DesktopBridge、认证、API 代理、WebDAV 和 AI 集成；官方 Web 子模块的论文库、讨论区、随笔和标签页逻辑不受此次清理影响。
+
+执行 `npm run verify:build` 时会检查旧前端源码与构建产物均不存在。切换分支后请重新安装桌面依赖并运行 `npm run build`。
+
 ## 框架与功能
 
 | 层级 | 职责 |

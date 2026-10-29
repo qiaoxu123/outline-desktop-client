@@ -1,7 +1,8 @@
 import { resolve } from "path";
 import { defineConfig } from "electron-vite";
-import react from "@vitejs/plugin-react";
 
+// Electron bundles only the native shell and preload. All UI assets come
+// exclusively from the official Outline Web submodule (vendor/outline-web).
 export default defineConfig({
   main: {
     build: {
@@ -22,17 +23,5 @@ export default defineConfig({
         },
       },
     },
-  },
-  renderer: {
-    root: resolve(__dirname, "src/renderer"),
-    build: {
-      outDir: resolve(__dirname, "out/renderer"),
-      rollupOptions: {
-        input: {
-          index: resolve(__dirname, "src/renderer/index.html"),
-        },
-      },
-    },
-    plugins: [react()],
   },
 });

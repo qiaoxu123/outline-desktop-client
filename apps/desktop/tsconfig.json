@@ -9,15 +9,11 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "paths": {
-      "@/*": ["./src/renderer/*"]
-    }
+    "noEmit": true
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
     "electron.vite.config.ts"
   ]
 }
