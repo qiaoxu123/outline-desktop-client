@@ -50,7 +50,7 @@ export default function OutlineNodeRow(props: OutlineNodeRowProps): React.ReactE
     <div
       className="ol-row"
       style={{ paddingLeft: depth * 22 }}
-      draggable
+      draggable={!focused}
       onDragStart={(e) => {
         e.stopPropagation();
         props.onDragStart(node.id);
