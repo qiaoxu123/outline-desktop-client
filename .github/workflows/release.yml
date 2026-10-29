@@ -2,13 +2,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
-    branches: ["codex/outline-workspace-polish"]
   workflow_dispatch:
     inputs:
       ref:
         description: "Commit, branch or tag to build"
         required: true
-        default: "codex/outline-workspace-polish"
+        default: "main"
 permissions:
   contents: read
 concurrency:
