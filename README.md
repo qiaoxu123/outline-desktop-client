@@ -2,11 +2,11 @@
 
 基于 **官方 Outline Web** 的跨平台桌面客户端，整合论文库、讨论区、随笔、文档标签页与 AI 助手。当前测试版本：`1.20.0-rc.3`。
 
-> `main` 长期停留在旧桌面 renderer；当前产品基线是 `feat/outline-logseq`（v1.19.1）。本轮修改在 `codex/outline-workspace-polish`，实际 UI 在 `vendor/outline-web` 子模块，修改旧 `apps/desktop/src/renderer` 不会改变正式安装包。
+> **唯一正式维护分支：`main`。** 客户端统一基于 `vendor/outline-web` 官方 Web 子模块开发，`apps/desktop` 仅提供 Electron 壳层和桌面专属接口。不要重新引入旧版 React 前端。
 
 ## 唯一前端架构
 
-此分支已删除自行实现的 React 19 UI（原 `apps/desktop/src/renderer`），不再构建 `out/renderer`。桌面主窗口统一通过 `outline://app/` 加载 `vendor/outline-web` 的构建产物。保留 Electron 主进程、preload/DesktopBridge、认证、API 代理、WebDAV 和 AI 集成；官方 Web 子模块的论文库、讨论区、随笔和标签页逻辑不受此次清理影响。
+已删除自行实现的 React 19 UI（原 `apps/desktop/src/renderer`），不再构建 `out/renderer`。桌面主窗口统一通过 `outline://app/` 加载 `vendor/outline-web` 的构建产物。保留 Electron 主进程、preload/DesktopBridge、认证、API 代理、WebDAV 和 AI 集成；官方 Web 子模块的论文库、讨论区、随笔和标签页逻辑不受此次清理影响。
 
 执行 `npm run verify:build` 时会检查旧前端源码与构建产物均不存在。切换分支后请重新安装桌面依赖并运行 `npm run build`。
 
@@ -30,7 +30,6 @@ Node.js 22，Corepack/Yarn 4（子模块）及 npm（桌面工作区）。
 ```bash
 git clone --recurse-submodules https://github.com/qiaoxu123/outline-desktop-client.git
 cd outline-desktop-client
-git checkout codex/outline-workspace-polish
 git submodule update --init --recursive
 npm ci
 cd vendor/outline-web
@@ -46,8 +45,8 @@ npm run dev
 
 ## 构建、发布与校验
 
-- CI 检查 PR，以及 main/feat 分支变更。
-- Release 工作流在版本标签、优化分支推送或手动选择 ref 时运行。
+- CI 检查 PR 和 `main` 分支变更；后续功能统一以 `main` 为基线提交。
+- Release 工作流由版本标签或手动触发，手动默认构建 `main`；避免 `main` 普通提交重复发布同一版本。
 - Web 与桌面入口只构建/测试一次，六个打包任务共享同一份验证过的输出。
 - macOS：ARM64 / x64 的 DMG、ZIP；Windows：x64 / ARM64 的 EXE、ZIP；Linux：x64 / ARM64 的 AppImage、DEB。
 - 发布前验证 12 个安装包并重新下载计算 SHA-256；仅完整通过后公开 Release。
