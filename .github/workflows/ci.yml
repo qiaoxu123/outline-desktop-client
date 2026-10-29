@@ -27,7 +27,7 @@ jobs:
       - working-directory: vendor/outline-web
         run: corepack yarn install --immutable
       - working-directory: vendor/outline-web
-        run: corepack yarn vitest run --project app app/scenes/PapersHelpers.test.ts app/scenes/PaperSources.test.ts app/scenes/DiscussHelpers.test.ts app/scenes/PersonalNotesHelpers.test.ts app/components/Sidebar/AppSidebarLayout.test.ts app/scenes/RefreshHelpers.test.ts app/scenes/WorkspaceRequests.test.ts app/stores/TabsStore.test.ts app/utils/tabNavigation.test.ts
+        run: corepack yarn vitest run --project app app/editor/components/hasTextSelection.test.ts app/scenes/PapersHelpers.test.ts app/scenes/PaperSources.test.ts app/scenes/DiscussHelpers.test.ts app/scenes/PersonalNotesHelpers.test.ts app/components/Sidebar/AppSidebarLayout.test.ts app/scenes/RefreshHelpers.test.ts app/scenes/WorkspaceRequests.test.ts app/stores/TabsStore.test.ts app/utils/tabNavigation.test.ts
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
