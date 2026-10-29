@@ -226,7 +226,12 @@ export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
   }, [editor]);
 
   return (
-    <>
+    // A single host wrapper (not a fragment) keeps React's unmount safe: tippy
+    // moves the BubbleMenu element into its own [data-tippy-root], so removing
+    // that element individually from a fragment parent throws
+    // "NotFoundError: removeChild ... not a child of this node" and crashes the
+    // renderer. Removing this wrapper instead detaches the whole subtree.
+    <div className="ol-node-editor-wrap" style={{ display: "contents" }}>
       {editor && (
         <BubbleMenu
           editor={editor}
@@ -237,10 +242,14 @@ export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
             !state.selection.empty &&
             state.doc.textBetween(from, to, " ").trim().length > 0
           }
+          // Must stay under #root — see Editor.tsx: tippy moves this element
+          // out of the editor subtree and React only delegates events from
+          // nodes inside its root container; appending to body would make
+          // every toolbar button inert.
           tippyOptions={{
             duration: 0,
             maxWidth: "none",
-            appendTo: () => document.body,
+            appendTo: () => document.getElementById("root") ?? document.body,
             zIndex: 1000,
           }}
           className="bubble-menu"
@@ -289,6 +298,6 @@ export default function NodeEditor(props: NodeEditorProps): React.ReactElement {
         </BubbleMenu>
       )}
       <EditorContent editor={editor} className="ol-node-editor" />
-    </>
+    </div>
   );
 }

@@ -479,10 +479,14 @@ function SelectionToolbar({
       }
       // Keep the menu outside AppShell's overflow-scrolling content, otherwise
       // selections near the top/side of the viewport can clip the entire popup.
+      // It must stay inside React's root container: tippy moves this element
+      // out of the editor subtree, and React only delegates events from nodes
+      // under #root — appending to document.body leaves every toolbar button
+      // inert because its onMouseDown handler never fires.
       tippyOptions={{
         duration: 0,
         maxWidth: "none",
-        appendTo: () => document.body,
+        appendTo: () => document.getElementById("root") ?? document.body,
         zIndex: 1000,
       }}
       className="bubble-menu"
